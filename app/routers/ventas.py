@@ -1,0 +1,33 @@
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+
+from app import models
+from app.database import get_db
+from app.dependencies import get_current_user
+from app.schemas.venta import VentaCrear, VentaRespuesta, VentaResumen
+from app.services import venta_service
+
+router = APIRouter(prefix="/ventas", tags=["Ventas"])
+
+
+@router.post("/{empresa_id}", response_model=VentaResumen, status_code=status.HTTP_201_CREATED)
+def registrar_venta(
+    empresa_id: UUID,
+    data: VentaCrear,
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(get_current_user),
+):
+    return venta_service.registrar_venta(empresa_id, data, current_user, db)
+
+
+@router.get("/{empresa_id}", response_model=list[VentaRespuesta])
+def listar_ventas(
+    empresa_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(get_current_user),
+):
+    if current_user.empresa_id != empresa_id:
+        raise HTTPException(status_code=403, detail="Acceso no autorizado")
+    return venta_service.obtener_ventas_empresa(empresa_id, db)
