@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useProductos } from '../hooks/useProductos'
 import ProductoCard from '../components/ProductoCard'
@@ -6,7 +6,12 @@ import ModalProducto from '../components/ModalProducto'
 
 export default function Inventario() {
   const { usuario } = useAuth()
-  const { productos, tienda, cargando, error, crear, actualizar, eliminar } = useProductos()
+  const { productos, tienda, cargando, error, cargar, crear, actualizar, eliminar } = useProductos()
+
+  useEffect(() => {
+    window.addEventListener('venta-completada', cargar)
+    return () => window.removeEventListener('venta-completada', cargar)
+  }, [cargar])
   const [busqueda, setBusqueda] = useState('')
   const [modalAbierto, setModalAbierto] = useState(false)
   const [productoEditar, setProductoEditar] = useState(null)

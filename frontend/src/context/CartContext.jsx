@@ -10,6 +10,7 @@ export function CartProvider({ children }) {
     setCarrito(prev => {
       const existe = prev.find(i => i.id === producto.id)
       if (existe) {
+        if (existe.cantidad >= producto.cantidad_actual) return prev
         return prev.map(i =>
           i.id === producto.id ? { ...i, cantidad: i.cantidad + 1 } : i
         )

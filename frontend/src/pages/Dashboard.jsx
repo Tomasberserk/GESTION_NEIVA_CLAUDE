@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import authService from '../services/authService'
 
-const BASE = 'http://localhost:8000'
+const BASE = '/api'
 
 export default function Dashboard() {
   const { usuario } = useAuth()

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import authService from '../services/authService'
 
-const BASE = 'http://localhost:8000'
+const BASE = '/api'
 
 export function useVentas() {
   const { usuario } = useAuth()
