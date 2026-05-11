@@ -2,7 +2,7 @@ import uuid
 import enum
 from sqlalchemy import (
     Column, String, Integer, Numeric, Boolean,
-    DateTime, ForeignKey, Enum as SAEnum, Index,
+    DateTime, ForeignKey, Enum as SAEnum, Index, UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -130,20 +130,22 @@ class Producto(AuditMixin, Base):
         nullable=False,
     )
     nombre = Column(String, nullable=False)
-    # Único globalmente en el legado; candidato a único-por-empresa en v2
-    codigo_barras = Column(String(20), unique=True, nullable=False)
+    codigo_barras = Column(String(50), nullable=False)
     precio_costo = Column(Numeric(10, 2), server_default="0.00", nullable=False)
     precio_venta = Column(Numeric(10, 2), server_default="0.00", nullable=False)
     cantidad_actual = Column(Integer, server_default="0", nullable=False)
     foto_url = Column(String, nullable=True)
 
     empresa = relationship("Empresa", back_populates="productos")
-    # passive_deletes=True porque ON DELETE RESTRICT en la FK debe dispararse
-    # antes de que el ORM intente cualquier acción en cascada
     detalles_venta = relationship(
         "DetalleVenta",
         back_populates="producto",
         passive_deletes=True,
+    )
+
+    __table_args__ = (
+        UniqueConstraint("empresa_id", "codigo_barras", name="uq_producto_empresa_barras"),
+        Index("idx_productos_empresa", "empresa_id"),
     )
 
     def __repr__(self) -> str:

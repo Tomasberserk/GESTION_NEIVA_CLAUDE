@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.routers import auth, empresas, productos, reportes, ventas
+from app.routers import auth, dashboard, empresas, productos, reportes, ventas
 
 app = FastAPI(
     title="Tiendapp API",
@@ -47,6 +47,7 @@ app.mount("/media", StaticFiles(directory=_media_dir), name="media")
 # Routers — cada uno con su propio prefijo y método HTTP definido
 # ---------------------------------------------------------------------------
 app.include_router(auth.router)
+app.include_router(dashboard.router)
 app.include_router(empresas.router)
 app.include_router(productos.router)
 app.include_router(ventas.router)
