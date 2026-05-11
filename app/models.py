@@ -101,7 +101,7 @@ class Usuario(AuditMixin, Base):
         nullable=False,
     )
     rol = Column(
-        SAEnum(RolUsuario, name="rolusuario"),
+        SAEnum(RolUsuario, name="rolusuario", values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         default=RolUsuario.TENDERO,
     )

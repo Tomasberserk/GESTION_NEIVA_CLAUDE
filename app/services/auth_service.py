@@ -106,22 +106,21 @@ def registrar_usuario_con_empresa(
         )
 
     try:
-        with db.begin():
-            empresa = models.Empresa(
-                nombre_comercial=nombre_comercial.strip(),
-                nit_o_cedula=nit_o_cedula.strip(),
-            )
-            db.add(empresa)
-            db.flush()
+        empresa = models.Empresa(
+            nombre_comercial=nombre_comercial.strip(),
+            nit_o_cedula=nit_o_cedula.strip(),
+        )
+        db.add(empresa)
+        db.flush()
 
-            usuario = models.Usuario(
-                email=email,
-                hashed_password=hash_password(password),
-                empresa_id=empresa.id,
-                rol=rol,
-            )
-            db.add(usuario)
-
+        usuario = models.Usuario(
+            email=email,
+            hashed_password=hash_password(password),
+            empresa_id=empresa.id,
+            rol=rol,
+        )
+        db.add(usuario)
+        db.commit()
         db.refresh(usuario)
         token = crear_token_acceso({"sub": str(usuario.id)})
         return {"access_token": token, "token_type": "bearer", "usuario": usuario}
