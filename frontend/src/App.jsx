@@ -14,12 +14,12 @@ export default function App() {
       <Route path="/registro" element={<Registro />} />
 
       <Route element={<ProtectedRoute />}>
-        <Route path="/dashboard" element={<Navigate to="/inventario" replace />} />
-        <Route path="/" element={<Dashboard />}>
-          <Route index element={<Navigate to="/inventario" replace />} />
-          <Route path="inventario" element={<Inventario />} />
-          <Route path="ventas" element={<Ventas />} />
-          <Route path="reportes" element={<Reportes />} />
+        <Route element={<Layout />}>
+          <Route path="/" element={<Navigate to="/inventario" replace />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/inventario" element={<Inventario />} />
+          <Route path="/ventas" element={<Ventas />} />
+          <Route path="/reportes" element={<Reportes />} />
         </Route>
       </Route>
 
