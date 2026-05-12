@@ -98,6 +98,34 @@
 
 ---
 
+## Sprint 3.6 — Mini-refactor Historial de Ventas (UX cuadre de caja)
+
+**Objetivo:** Vista de Ventas con 3 tabs (Hoy / Semana / Histórico) y filtro por fecha en el backend.
+
+| # | Tarea | Archivo | Estado |
+|---|-------|---------|--------|
+| 1 | Endpoint ventas con `fecha_inicio` / `fecha_fin` query params | `routers/ventas.py`, `services/venta_service.py` | ✅ Hecho |
+| 2 | UI tabs + TotalBanner + ExcelExport (tab Histórico) | `pages/Ventas.jsx` | ✅ Hecho |
+
+---
+
+## Sprint 3.8 — Cierre de Brechas SRS
+
+**Objetivo:** Cubrir los requisitos funcionales RF-02 y RF-03 del SRS antes del despliegue.
+
+| # | Paso | Descripción | Estado |
+|---|------|-------------|--------|
+| 1 | RF-02 | Categorías de productos — enum + migration 005 + selector en modal | ✅ Hecho |
+| 2 | RF-03 | Escáner de código de barras via cámara (`@zxing/browser`) | ✅ Hecho |
+| 3 | RF-04 | Responsividad móvil — layout y componentes adaptados a pantalla pequeña | ⏳ Pendiente |
+
+### Criterios de éxito Sprint 3.8
+1. Se puede asignar categoría al crear/editar un producto.
+2. Al pulsar 📷 en el modal, la cámara detecta un código EAN/UPC y lo auto-rellena.
+3. El POS es usable en móvil (mínimo 375 px de ancho).
+
+---
+
 ## Sprint 5 — Pipeline funcional tier basic (próximo)
 
 - `factory/workflows/build-basic.md` como workflow ejecutable real
