@@ -122,7 +122,7 @@ export default function Dashboard() {
               <BarChart
                 data={topProductos}
                 layout="vertical"
-                margin={{ top: 0, right: 20, left: 4, bottom: 0 }}
+                margin={{ top: 0, right: 16, left: 4, bottom: 0 }}
               >
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
                 <XAxis
@@ -134,11 +134,11 @@ export default function Dashboard() {
                 <YAxis
                   type="category"
                   dataKey="nombre"
-                  width={120}
-                  tick={{ fontSize: 12, fill: '#475569' }}
+                  width={100}
+                  tick={{ fontSize: 11, fill: '#475569' }}
                   axisLine={false}
                   tickLine={false}
-                  tickFormatter={(v) => v.length > 15 ? `${v.slice(0, 15)}…` : v}
+                  tickFormatter={(v) => v.length > 12 ? `${v.slice(0, 12)}…` : v}
                 />
                 <Tooltip content={<TooltipVentas />} cursor={{ fill: '#f8fafc' }} />
                 <Bar dataKey="total_vendido" radius={[0, 6, 6, 0]} maxBarSize={30}>

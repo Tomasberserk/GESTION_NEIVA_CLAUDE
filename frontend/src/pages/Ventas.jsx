@@ -5,9 +5,9 @@ import authService from '../services/authService'
 const BASE = 'http://localhost:8000'
 
 const TABS = [
-  { id: 'hoy',      label: 'Hoy' },
-  { id: 'semana',   label: 'Esta Semana' },
-  { id: 'historico', label: 'Histórico y Reportes' },
+  { id: 'hoy',       label: 'Hoy',      labelCorto: 'Hoy' },
+  { id: 'semana',    label: 'Esta Semana', labelCorto: 'Semana' },
+  { id: 'historico', label: 'Histórico y Reportes', labelCorto: 'Histórico' },
 ]
 
 function getFechas(tab) {
@@ -206,13 +206,14 @@ export default function Ventas() {
           <button
             key={t.id}
             onClick={() => cambiarTab(t.id)}
-            className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
+            className={`flex-1 py-2 px-2 sm:px-3 rounded-lg text-sm font-medium transition-all ${
               tab === t.id
                 ? 'bg-white text-violet-700 shadow-sm'
                 : 'text-slate-500 hover:text-slate-700'
             }`}
           >
-            {t.label}
+            <span className="sm:hidden">{t.labelCorto}</span>
+            <span className="hidden sm:inline">{t.label}</span>
           </button>
         ))}
       </div>

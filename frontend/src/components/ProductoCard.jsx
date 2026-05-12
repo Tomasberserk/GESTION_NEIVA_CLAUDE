@@ -53,7 +53,7 @@ export default function ProductoCard({ producto, onEditar, onEliminar }) {
         <button
           onClick={() => agregar(producto)}
           disabled={sinStock}
-          className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:bg-gray-200 disabled:cursor-not-allowed text-white text-sm py-2 rounded-lg transition-colors"
+          className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:bg-gray-200 disabled:cursor-not-allowed text-white text-sm py-3 rounded-lg transition-colors"
         >
           Agregar
         </button>
@@ -62,14 +62,14 @@ export default function ProductoCard({ producto, onEditar, onEliminar }) {
             <button
               onClick={() => onEditar(producto)}
               title="Editar"
-              className="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              className="px-3 py-3 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
             >
               ✏️
             </button>
             <button
               onClick={() => onEliminar(producto.id)}
               title="Eliminar"
-              className="px-3 py-2 text-sm bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors"
+              className="px-3 py-3 text-sm bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors"
             >
               🗑️
             </button>

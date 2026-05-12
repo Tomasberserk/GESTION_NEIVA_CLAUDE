@@ -42,7 +42,7 @@ export default function CartSidebar() {
       )}
 
       <div
-        className={`fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-40 flex flex-col transition-transform duration-300 ${
+        className={`fixed top-0 right-0 h-full w-full sm:w-80 bg-white shadow-2xl z-40 flex flex-col transition-transform duration-300 ${
           carritoAbierto ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -113,9 +113,26 @@ export default function CartSidebar() {
                   )}
 
                   {/* Subtotal por ítem */}
-                  <span className="text-sm font-semibold text-gray-700">
-                    ${(item.precio_venta * item.cantidad).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
-                  </span>
+                  {ES_GRANEL(item.unidad_medida) ? (
+                    <div className="flex items-center gap-1">
+                      <span className="text-sm text-gray-500 font-semibold">$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={Math.round(item.precio_venta * item.cantidad)}
+                        onChange={e => {
+                          const val = parseFloat(e.target.value) || 0;
+                          setCantidad(item.id, val / item.precio_venta);
+                        }}
+                        className="w-20 border border-gray-300 bg-white rounded-md px-1 py-1 text-sm text-right font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-violet-400"
+                        title="Puedes escribir el precio final de la balanza directamente"
+                      />
+                    </div>
+                  ) : (
+                    <span className="text-sm font-semibold text-gray-700">
+                      ${(item.precio_venta * item.cantidad).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                    </span>
+                  )}
                 </div>
               </div>
             ))

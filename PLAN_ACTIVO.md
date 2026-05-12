@@ -117,7 +117,7 @@
 |---|------|-------------|--------|
 | 1 | RF-02 | Categorías de productos — enum + migration 005 + selector en modal | ✅ Hecho |
 | 2 | RF-03 | Escáner de código de barras via cámara (`@zxing/browser`) | ✅ Hecho |
-| 3 | RF-04 | Responsividad móvil — layout y componentes adaptados a pantalla pequeña | ⏳ Pendiente |
+| 3 | RF-04 | Responsividad móvil — layout y componentes adaptados a pantalla pequeña | ✅ Hecho |
 
 ### Criterios de éxito Sprint 3.8
 1. Se puede asignar categoría al crear/editar un producto.
