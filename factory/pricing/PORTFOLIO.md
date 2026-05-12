@@ -12,13 +12,15 @@ Construimos sistemas de software de gestión empresarial a una fracción del cos
 **Tiempo de entrega:**
 - Tier basic: 3–5 días hábiles
 - Tier medium: 2–3 semanas
-- Tier professional: 4–8 semanas
+- Tier premium: 4–8 semanas
 
 ---
 
-## Tier Basic — Sistema POS Simple
+## Tier Basic — POS en la nube
 
-**Ideal para:** tiendas de barrio, minimercados, panaderías, ferreterías pequeñas, papelerías.
+**Ideal para:** tiendas de barrio, minimercados, panaderías, ferreterías pequeñas, papelerías con internet estable.
+
+**Infraestructura:** Cloud (Supabase) — requiere conexión a internet.
 
 ### Módulos incluidos
 
@@ -30,6 +32,7 @@ Construimos sistemas de software de gestión empresarial a una fracción del cos
 | **Reportes** | Exportar ventas a Excel por rango de fechas |
 | **Dashboard** | KPIs del día: ventas, ingresos, productos con stock bajo |
 | **Autenticación** | Multi-usuario por tienda: admin + tenderos |
+| **Acceso multi-dispositivo** | PC, tablet, celular — cualquier navegador |
 
 ### Qué NO incluye
 
@@ -39,6 +42,7 @@ Construimos sistemas de software de gestión empresarial a una fracción del cos
 - App móvil nativa
 - Proveedores o cuentas por pagar
 - Reportes avanzados o gráficas
+- Funcionamiento sin internet
 
 ### Precios
 
@@ -51,11 +55,13 @@ Construimos sistemas de software de gestión empresarial a una fracción del cos
 
 ---
 
-## Tier Medium — ERP Ligero
+## Tier Medium — ERP Ligero en la nube
 
 **Ideal para:** distribuidores, restaurantes, tiendas con múltiples cajeros, empresas con manejo de proveedores.
 
-### Módulos incluidos (todo el basic +)
+**Infraestructura:** Cloud (Supabase) — requiere conexión a internet.
+
+### Módulos incluidos (todo el Basic +)
 
 | Módulo adicional | Descripción |
 |-----------------|-------------|
@@ -66,6 +72,7 @@ Construimos sistemas de software de gestión empresarial a una fracción del cos
 | **Multi-usuario avanzado** | Roles granulares: admin, supervisor, cajero, bodeguero |
 | **Reportes avanzados** | Por categoría, por proveedor, por usuario, por turno |
 | **Gráficas** | Ventas por período, productos top, rotación de inventario |
+| **Multi-sucursal** | Varias sedes, un solo panel de control |
 
 ### Precios
 
@@ -78,31 +85,46 @@ Construimos sistemas de software de gestión empresarial a una fracción del cos
 
 ---
 
-## Tier Professional — SaaS Completo
+## Tier Premium — On-Premise / Híbrido
 
-**Ideal para:** startups, empresas que quieren su propio SaaS, negocios con clientes que pagan suscripción.
+**Ideal para:** negocios en zonas con internet inestable o sin internet, empresas que exigen que su data viva localmente, clientes con alta rotación de ventas que no pueden depender de la nube.
 
-### Módulos incluidos (todo el medium +)
+**Infraestructura:** instalación local en el equipo del cliente + sincronización opcional a la nube cuando hay señal.
+
+### Qué lo diferencia
+
+- **Funciona sin internet** — ventas, inventario y reportes operan aunque se caiga la señal
+- **Data local** — la base de datos vive en el PC del cliente, no en servidores externos
+- **Sincronización automática** — cuando vuelve el internet, sincroniza con la nube sin intervención
+- **Backup en la nube** — aunque la data sea local, hay respaldo automático para evitar pérdidas
+
+### Módulos incluidos (todo el Medium +)
 
 | Módulo adicional | Descripción |
 |-----------------|-------------|
-| **Multi-tenant real** | Cada cliente tiene su instancia aislada, panel de superadmin |
-| **Suscripciones y pagos** | Integración con Stripe o MercadoPago |
-| **SSO / Auth avanzado** | Login con Google/Microsoft, 2FA |
-| **API pública** | Endpoints documentados para integraciones de terceros |
-| **Webhooks** | Notificaciones a sistemas externos en tiempo real |
-| **Jobs en background** | Reportes pesados, emails masivos, sincronización offline |
-| **Monitoreo** | Sentry para errores, métricas de uso por tenant |
-| **Deploy automatizado** | CI/CD con Railway/Render, staging + producción |
+| **Motor offline** | SQLite local sincronizado con PostgreSQL en la nube |
+| **Cola de sincronización** | Las ventas hechas sin internet se envían al reconectar |
+| **Dashboard de sync** | El admin ve cuándo fue la última sincronización |
+| **Instalador** | Ejecutable para Windows/Mac que levanta el sistema local |
+| **Soporte presencial** | Instalación y configuración en sitio incluida |
+
+### Qué NO incluye
+
+- Multi-tenant SaaS
+- SSO / login con Google
+- API pública
+- Webhooks
 
 ### Precios
 
 | Modalidad | Precio |
 |-----------|--------|
-| Sistema completo (pago único) | $5,000–10,000 USD |
-| Sistema + customización avanzada | $8,000–15,000 USD |
-| Revenue share (10% de suscripciones) | Negociable |
-| Mantenimiento mensual | $200–500 USD/mes |
+| Sistema completo (pago único) | $2,500–4,000 USD |
+| Sistema + personalización | $3,500–5,500 USD |
+| Mantenimiento anual (incluye actualizaciones) | $300–600 USD/año |
+| Soporte presencial adicional | $50–100 USD/visita |
+
+> **Por qué es más caro:** cada instalación es única, requiere presencia física, las actualizaciones son manuales por cliente, y el soporte es de mayor complejidad.
 
 ---
 
@@ -122,19 +144,21 @@ Construimos sistemas de software de gestión empresarial a una fracción del cos
 
 ## Comparación rápida
 
-| Característica | Basic | Medium | Professional |
-|----------------|-------|--------|-------------|
+| Característica | Basic | Medium | Premium |
+|----------------|-------|--------|---------|
 | Inventario y ventas | ✅ | ✅ | ✅ |
 | Reportes Excel | ✅ | ✅ | ✅ |
 | Dashboard KPIs | ✅ | ✅ | ✅ |
+| Acceso multi-dispositivo | ✅ | ✅ | ✅ |
 | Proveedores y compras | ❌ | ✅ | ✅ |
 | Contabilidad | ❌ | ✅ | ✅ |
 | Multi-sucursal | ❌ | ✅ | ✅ |
-| Multi-tenant SaaS | ❌ | ❌ | ✅ |
-| Pasarela de pagos | ❌ | ❌ | ✅ |
-| API pública | ❌ | ❌ | ✅ |
+| Funciona sin internet | ❌ | ❌ | ✅ |
+| Data 100% local | ❌ | ❌ | ✅ |
+| Instalación presencial | ❌ | ❌ | ✅ |
+| Multi-tenant SaaS | ❌ | ❌ | ❌ |
 | Tiempo de entrega | 3–5 días | 2–3 semanas | 4–8 semanas |
-| Precio desde | $300 USD | $1,500 USD | $5,000 USD |
+| Precio desde | $300 USD | $1,500 USD | $2,500 USD |
 
 ---
 

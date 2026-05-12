@@ -7,11 +7,11 @@ from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 class DetalleVentaCrear(BaseModel):
     producto_id: UUID
-    cantidad: int
+    cantidad: Decimal
 
     @field_validator("cantidad")
     @classmethod
-    def cantidad_positiva(cls, v: int) -> int:
+    def cantidad_positiva(cls, v: Decimal) -> Decimal:
         if v <= 0:
             raise ValueError("La cantidad debe ser mayor a 0")
         return v
@@ -38,7 +38,7 @@ class DetalleVentaRespuesta(BaseModel):
 
     id: UUID
     producto_id: UUID
-    cantidad: int
+    cantidad: float
     precio_unitario: float
     subtotal: float
     producto_nombre: str

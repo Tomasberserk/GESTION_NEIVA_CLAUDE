@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { useCart } from '../context/CartContext'
 import { useVentas } from '../hooks/useVentas'
 
+const ES_GRANEL = (unidad) => unidad && unidad !== 'unidad'
+
 export default function CartSidebar() {
-  const { carrito, carritoAbierto, setCarritoAbierto, agregar, restar, eliminar, vaciar, total } =
+  const { carrito, carritoAbierto, setCarritoAbierto, agregar, restar, setCantidad, eliminar, vaciar, total } =
     useCart()
   const { registrar } = useVentas()
   const [procesando, setProcesando] = useState(false)
@@ -21,6 +23,7 @@ export default function CartSidebar() {
         texto: `Venta registrada — Total: $${resultado.total.toLocaleString('es-CO')}`,
       })
       vaciar()
+      window.dispatchEvent(new CustomEvent('venta-realizada'))
       setTimeout(() => setMensaje(null), 5000)
     } catch (e) {
       setMensaje({ tipo: 'error', texto: e.message })
@@ -58,34 +61,62 @@ export default function CartSidebar() {
             <p className="text-center text-gray-400 mt-10 text-sm">El carrito está vacío</p>
           ) : (
             carrito.map(item => (
-              <div key={item.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm truncate">{item.nombre}</p>
-                  <p className="text-violet-600 text-sm">
-                    ${item.precio_venta.toLocaleString('es-CO')}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1">
+              <div key={item.id} className="p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">{item.nombre}</p>
+                    <p className="text-violet-600 text-xs">
+                      ${item.precio_venta.toLocaleString('es-CO')}
+                      {ES_GRANEL(item.unidad_medida) && ` / ${item.unidad_medida}`}
+                    </p>
+                  </div>
                   <button
-                    onClick={() => restar(item.id)}
-                    className="w-7 h-7 bg-gray-200 hover:bg-gray-300 rounded text-sm font-bold"
+                    onClick={() => eliminar(item.id)}
+                    className="text-red-400 hover:text-red-600 text-sm shrink-0"
                   >
-                    −
-                  </button>
-                  <span className="w-6 text-center text-sm font-medium">{item.cantidad}</span>
-                  <button
-                    onClick={() => agregar(item)}
-                    className="w-7 h-7 bg-gray-200 hover:bg-gray-300 rounded text-sm font-bold"
-                  >
-                    +
+                    ✕
                   </button>
                 </div>
-                <button
-                  onClick={() => eliminar(item.id)}
-                  className="text-red-400 hover:text-red-600 text-sm ml-1"
-                >
-                  ✕
-                </button>
+
+                <div className="flex items-center justify-between">
+                  {ES_GRANEL(item.unidad_medida) ? (
+                    /* Productos a granel: input numérico con decimales */
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        step="0.001"
+                        min="0.001"
+                        max={item.cantidad_actual}
+                        value={item.cantidad}
+                        onChange={e => setCantidad(item.id, e.target.value)}
+                        className="w-24 border border-gray-300 rounded-lg px-2 py-1 text-sm text-center focus:outline-none focus:ring-2 focus:ring-violet-400"
+                      />
+                      <span className="text-xs text-gray-500">{item.unidad_medida}</span>
+                    </div>
+                  ) : (
+                    /* Productos por unidad: botones +/- */
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => restar(item.id)}
+                        className="w-7 h-7 bg-gray-200 hover:bg-gray-300 rounded text-sm font-bold"
+                      >
+                        −
+                      </button>
+                      <span className="w-8 text-center text-sm font-medium">{item.cantidad}</span>
+                      <button
+                        onClick={() => agregar(item)}
+                        className="w-7 h-7 bg-gray-200 hover:bg-gray-300 rounded text-sm font-bold"
+                      >
+                        +
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Subtotal por ítem */}
+                  <span className="text-sm font-semibold text-gray-700">
+                    ${(item.precio_venta * item.cantidad).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                  </span>
+                </div>
               </div>
             ))
           )}
@@ -107,7 +138,7 @@ export default function CartSidebar() {
         <div className="p-4 border-t space-y-3">
           <div className="flex justify-between font-bold text-lg">
             <span>Total</span>
-            <span className="text-violet-600">${total.toLocaleString('es-CO')}</span>
+            <span className="text-violet-600">${total.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
           </div>
           <button
             onClick={checkout}

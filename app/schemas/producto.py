@@ -1,8 +1,10 @@
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, date
 from decimal import Decimal
-from typing import Optional, List
+from typing import Optional, List, Literal
 from pydantic import BaseModel, ConfigDict, field_validator
+
+UNIDADES = Literal["unidad", "gramo", "libra", "kilo"]
 
 
 class ProductoCrear(BaseModel):
@@ -10,7 +12,9 @@ class ProductoCrear(BaseModel):
     codigo_barras: str
     precio_costo: Decimal = Decimal("0.00")
     precio_venta: Decimal = Decimal("0.00")
-    cantidad_actual: int = 0
+    cantidad_actual: Decimal = Decimal("0.000")
+    unidad_medida: UNIDADES = "unidad"
+    fecha_vencimiento: Optional[date] = None
     empresa_id: UUID
 
     @field_validator("nombre")
@@ -38,7 +42,7 @@ class ProductoCrear(BaseModel):
 
     @field_validator("cantidad_actual")
     @classmethod
-    def stock_no_negativo(cls, v: int) -> int:
+    def stock_no_negativo(cls, v: Decimal) -> Decimal:
         if v < 0:
             raise ValueError("El stock inicial no puede ser negativo")
         return v
@@ -50,7 +54,9 @@ class ProductoActualizar(BaseModel):
     codigo_barras: Optional[str] = None
     precio_costo: Optional[Decimal] = None
     precio_venta: Optional[Decimal] = None
-    cantidad_actual: Optional[int] = None
+    cantidad_actual: Optional[Decimal] = None
+    unidad_medida: Optional[UNIDADES] = None
+    fecha_vencimiento: Optional[date] = None
     foto_url: Optional[str] = None
 
     @field_validator("precio_costo", "precio_venta")
@@ -62,7 +68,7 @@ class ProductoActualizar(BaseModel):
 
     @field_validator("cantidad_actual")
     @classmethod
-    def stock_no_negativo(cls, v: Optional[int]) -> Optional[int]:
+    def stock_no_negativo(cls, v: Optional[Decimal]) -> Optional[Decimal]:
         if v is not None and v < 0:
             raise ValueError("El stock no puede ser negativo")
         return v
@@ -75,9 +81,11 @@ class ProductoRespuesta(BaseModel):
     empresa_id: UUID
     nombre: str
     codigo_barras: str
-    precio_costo: float   # float para serialización JSON directa al frontend
+    precio_costo: float
     precio_venta: float
-    cantidad_actual: int
+    cantidad_actual: float
+    unidad_medida: str
+    fecha_vencimiento: Optional[date]
     foto_url: Optional[str]
     created_at: datetime
     is_active: bool

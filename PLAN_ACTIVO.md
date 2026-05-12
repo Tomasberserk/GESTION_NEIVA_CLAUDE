@@ -48,6 +48,28 @@
 
 ---
 
+---
+
+## Sprint 3.5 — Features "Gancho" para MVP (Alta Prioridad)
+
+**Objetivo:** Implementar analítica, fechas de vencimiento y soporte para productos a granel para aumentar el valor percibido del MVP Básico.
+
+| # | Tarea | Responsable | Estado |
+|---|-------|-------------|--------|
+| 1 | Migración DB: `cantidad` a `Numeric`, añadir `fecha_vencimiento` y `unidad_medida` (Enum: unidad, gramo, libra, kilo) | Claude | ✅ Hecho |
+| 2 | Endpoints Dashboard (Top productos, Alertas vencimiento a 15 días fijos) | Claude | ✅ Hecho |
+| 3 | Actualizar ModalProducto (nuevos campos, input fecha y selector de medida) | Claude | ✅ Hecho |
+| 4 | Modificar CartSidebar para permitir fracciones en granel según medida | Claude | ✅ Hecho |
+| 5 | Gráficas en Dashboard (Recharts) y panel rojo de vencimientos | Claude | ✅ Hecho |
+
+### Criterios de éxito Sprint 3.5
+1. Dashboard muestra gráfica de los 5 productos más vendidos.
+2. Dashboard muestra alerta roja para productos que vencen en 15 días o menos.
+3. Se puede crear un producto seleccionando unidad de medida (ej. Libra) y fecha de vencimiento opcional.
+4. En el POS (CartSidebar), si un producto es por peso, se puede ingresar "1.5" y calcula el subtotal.
+
+---
+
 ## Sprint 4 — Fundamentos de la fábrica
 
 **Objetivo:** infraestructura de documentación y agentes para que la fábrica pueda operar.

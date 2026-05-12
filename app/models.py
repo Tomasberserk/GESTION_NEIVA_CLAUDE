@@ -1,7 +1,7 @@
 import uuid
 import enum
 from sqlalchemy import (
-    Column, String, Integer, Numeric, Boolean,
+    Column, String, Integer, Numeric, Boolean, Date,
     DateTime, ForeignKey, Enum as SAEnum, Index, UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -18,6 +18,19 @@ from app.database import Base
 class RolUsuario(str, enum.Enum):
     ADMIN = "admin"
     TENDERO = "tendero"
+
+
+class PlanEmpresa(str, enum.Enum):
+    BASIC = "basic"
+    MEDIUM = "medium"
+    PREMIUM = "premium"
+
+
+class UnidadMedida(str, enum.Enum):
+    UNIDAD = "unidad"
+    GRAMO = "gramo"
+    LIBRA = "libra"
+    KILO = "kilo"
 
 
 # ---------------------------------------------------------------------------
@@ -63,6 +76,12 @@ class Empresa(AuditMixin, Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     nombre_comercial = Column(String(150), nullable=False)
     nit_o_cedula = Column(String(50), unique=True, nullable=False)
+    plan = Column(
+        SAEnum(PlanEmpresa, name="planempresa", values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+        server_default="basic",
+    )
+    trial_expires_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relaciones (cascade: si se borra la empresa, se borran sus hijos)
     usuarios = relationship(
@@ -133,7 +152,13 @@ class Producto(AuditMixin, Base):
     codigo_barras = Column(String(50), nullable=False)
     precio_costo = Column(Numeric(10, 2), server_default="0.00", nullable=False)
     precio_venta = Column(Numeric(10, 2), server_default="0.00", nullable=False)
-    cantidad_actual = Column(Integer, server_default="0", nullable=False)
+    cantidad_actual = Column(Numeric(10, 3), server_default="0.000", nullable=False)
+    unidad_medida = Column(
+        SAEnum(UnidadMedida, name="unidadmedida", values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+        server_default="unidad",
+    )
+    fecha_vencimiento = Column(Date, nullable=True)
     foto_url = Column(String, nullable=True)
 
     empresa = relationship("Empresa", back_populates="productos")
@@ -208,7 +233,7 @@ class DetalleVenta(AuditMixin, Base):
         ForeignKey("productos.id", ondelete="RESTRICT"),
         nullable=False,
     )
-    cantidad = Column(Integer, nullable=False)
+    cantidad = Column(Numeric(10, 3), nullable=False)
     # Snapshot del precio en el momento de la venta; no cambia si el
     # precio del producto se modifica después
     precio_unitario = Column(Numeric(10, 2), nullable=False)

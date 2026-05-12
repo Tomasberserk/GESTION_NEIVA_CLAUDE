@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
@@ -35,6 +37,23 @@ def get_current_user(
 
     if not usuario:
         raise _no_autenticado
+
+    empresa = db.query(models.Empresa).filter(
+        models.Empresa.id == usuario.empresa_id,
+        models.Empresa.is_active.is_(True),
+    ).first()
+
+    if not empresa:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Empresa inactiva o no encontrada",
+        )
+
+    if empresa.trial_expires_at and empresa.trial_expires_at < datetime.now(timezone.utc):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tu período de prueba ha vencido. Contacta al administrador para activar tu plan.",
+        )
 
     return usuario
 

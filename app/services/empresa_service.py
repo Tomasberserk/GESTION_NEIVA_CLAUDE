@@ -1,3 +1,4 @@
+from datetime import datetime, timezone, timedelta
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -20,6 +21,8 @@ def crear_empresa(data: EmpresaCrear, db: Session) -> models.Empresa:
     empresa = models.Empresa(
         nombre_comercial=data.nombre_comercial,
         nit_o_cedula=data.nit_o_cedula,
+        plan=models.PlanEmpresa.BASIC,
+        trial_expires_at=datetime.now(timezone.utc) + timedelta(days=30),
     )
     db.add(empresa)
     db.commit()
