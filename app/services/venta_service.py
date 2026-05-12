@@ -1,4 +1,6 @@
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal
+from typing import Optional
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -117,7 +119,12 @@ def registrar_venta(
     )
 
 
-def obtener_ventas_empresa(empresa_id: UUID, db: Session) -> list:
+def obtener_ventas_empresa(
+    empresa_id: UUID,
+    db: Session,
+    fecha_inicio: Optional[datetime] = None,
+    fecha_fin: Optional[datetime] = None,
+) -> list:
     if not db.query(models.Empresa).filter(
         models.Empresa.id == empresa_id,
         models.Empresa.is_active.is_(True),
@@ -127,15 +134,18 @@ def obtener_ventas_empresa(empresa_id: UUID, db: Session) -> list:
             detail="Empresa no encontrada",
         )
 
+    ahora = datetime.now(timezone.utc)
+    inicio = fecha_inicio or (ahora - timedelta(days=30))
+    fin    = fecha_fin   or ahora
+
     return (
         db.query(models.Venta)
         .filter(
             models.Venta.empresa_id == empresa_id,
             models.Venta.is_active.is_(True),
+            models.Venta.fecha_venta >= inicio,
+            models.Venta.fecha_venta <= fin,
         )
-        # joinedload: carga detalles + productos en una sola query (evita N+1)
-        # y asegura que DetalleVentaRespuesta.modelo_validator encuentre
-        # detalle.producto cargado
         .options(
             joinedload(models.Venta.detalles).joinedload(models.DetalleVenta.producto)
         )

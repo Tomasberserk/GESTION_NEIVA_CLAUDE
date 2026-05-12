@@ -1,6 +1,8 @@
+from datetime import datetime
+from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app import models
@@ -25,9 +27,11 @@ def registrar_venta(
 @router.get("/{empresa_id}", response_model=list[VentaRespuesta])
 def listar_ventas(
     empresa_id: UUID,
+    fecha_inicio: Optional[datetime] = Query(None, description="ISO datetime — ej: 2026-05-01T00:00:00Z"),
+    fecha_fin:    Optional[datetime] = Query(None, description="ISO datetime — ej: 2026-05-12T23:59:59Z"),
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(get_current_user),
 ):
     if current_user.empresa_id != empresa_id:
         raise HTTPException(status_code=403, detail="Acceso no autorizado")
-    return venta_service.obtener_ventas_empresa(empresa_id, db)
+    return venta_service.obtener_ventas_empresa(empresa_id, db, fecha_inicio, fecha_fin)
