@@ -16,6 +16,10 @@ const UNIDADES = [
   { value: 'kilo',   label: 'Kilo' },
 ]
 
+const CATEGORIAS = [
+  'Bebidas', 'Snacks', 'Aseo', 'Lacteos', 'Limpieza', 'Panaderia',
+]
+
 export default function ModalProducto({ producto, onGuardar, onCerrar }) {
   const { usuario } = useAuth()
   const esEdicion = Boolean(producto)
@@ -28,6 +32,7 @@ export default function ModalProducto({ producto, onGuardar, onCerrar }) {
     cantidad_actual: '',
     unidad_medida: 'unidad',
     fecha_vencimiento: '',
+    categoria: '',
     empresa_id: usuario?.empresa_id ?? '',
   })
   const [error, setError] = useState(null)
@@ -43,6 +48,7 @@ export default function ModalProducto({ producto, onGuardar, onCerrar }) {
         cantidad_actual: producto.cantidad_actual,
         unidad_medida: producto.unidad_medida ?? 'unidad',
         fecha_vencimiento: producto.fecha_vencimiento ?? '',
+        categoria: producto.categoria ?? '',
         empresa_id: producto.empresa_id,
       })
     }
@@ -61,6 +67,7 @@ export default function ModalProducto({ producto, onGuardar, onCerrar }) {
         precio_venta: parseFloat(form.precio_venta) || 0,
         cantidad_actual: parseFloat(form.cantidad_actual) || 0,
         fecha_vencimiento: form.fecha_vencimiento || null,
+        categoria: form.categoria || null,
       }
       await onGuardar(payload)
       onCerrar()
@@ -116,6 +123,24 @@ export default function ModalProducto({ producto, onGuardar, onCerrar }) {
             >
               {UNIDADES.map(u => (
                 <option key={u.value} value={u.value}>{u.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Categoría
+              <span className="text-gray-400 font-normal ml-1">(opcional)</span>
+            </label>
+            <select
+              name="categoria"
+              value={form.categoria}
+              onChange={cambiar}
+              className={`${inputClass} bg-white`}
+            >
+              <option value="">Sin categoría</option>
+              {CATEGORIAS.map(c => (
+                <option key={c} value={c}>{c}</option>
               ))}
             </select>
           </div>

@@ -4,7 +4,8 @@ from decimal import Decimal
 from typing import Optional, List, Literal
 from pydantic import BaseModel, ConfigDict, field_validator
 
-UNIDADES = Literal["unidad", "gramo", "libra", "kilo"]
+UNIDADES    = Literal["unidad", "gramo", "libra", "kilo"]
+CATEGORIAS  = Literal["Bebidas", "Snacks", "Aseo", "Lacteos", "Limpieza", "Panaderia"]
 
 
 class ProductoCrear(BaseModel):
@@ -15,6 +16,7 @@ class ProductoCrear(BaseModel):
     cantidad_actual: Decimal = Decimal("0.000")
     unidad_medida: UNIDADES = "unidad"
     fecha_vencimiento: Optional[date] = None
+    categoria: Optional[CATEGORIAS] = None
     empresa_id: UUID
 
     @field_validator("nombre")
@@ -57,6 +59,7 @@ class ProductoActualizar(BaseModel):
     cantidad_actual: Optional[Decimal] = None
     unidad_medida: Optional[UNIDADES] = None
     fecha_vencimiento: Optional[date] = None
+    categoria: Optional[CATEGORIAS] = None
     foto_url: Optional[str] = None
 
     @field_validator("precio_costo", "precio_venta")
@@ -86,6 +89,7 @@ class ProductoRespuesta(BaseModel):
     cantidad_actual: float
     unidad_medida: str
     fecha_vencimiento: Optional[date]
+    categoria: Optional[str]
     foto_url: Optional[str]
     created_at: datetime
     is_active: bool

@@ -33,6 +33,15 @@ class UnidadMedida(str, enum.Enum):
     KILO = "kilo"
 
 
+class CategoriaProducto(str, enum.Enum):
+    BEBIDAS   = "Bebidas"
+    SNACKS    = "Snacks"
+    ASEO      = "Aseo"
+    LACTEOS   = "Lacteos"
+    LIMPIEZA  = "Limpieza"
+    PANADERIA = "Panaderia"
+
+
 # ---------------------------------------------------------------------------
 # AuditMixin
 # ---------------------------------------------------------------------------
@@ -159,6 +168,10 @@ class Producto(AuditMixin, Base):
         server_default="unidad",
     )
     fecha_vencimiento = Column(Date, nullable=True)
+    categoria = Column(
+        SAEnum(CategoriaProducto, name="categoriaproducto", values_callable=lambda x: [e.value for e in x]),
+        nullable=True,
+    )
     foto_url = Column(String, nullable=True)
 
     empresa = relationship("Empresa", back_populates="productos")
