@@ -1,19 +1,8 @@
 version: "3.9"
 
-services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: gestion_neiva_db
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: gestion_user
-      POSTGRES_PASSWORD: gestion_pass
-      POSTGRES_DB: gestion_neiva
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+# PostgreSQL removido — ahora usa Supabase (db.ldzevrggvzbsayofermn.supabase.co)
 
+services:
   redis:
     image: redis:7-alpine
     container_name: gestion_neiva_redis
@@ -24,5 +13,4 @@ services:
       - redis_data:/data
 
 volumes:
-  postgres_data:
   redis_data:

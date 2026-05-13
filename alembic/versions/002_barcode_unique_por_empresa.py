@@ -17,8 +17,8 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # 1. Eliminar unique constraint global
-    op.drop_constraint("productos_codigo_barras_key", "productos", type_="unique")
+    # 1. Eliminar unique constraint global (nombre definido en migración 001)
+    op.drop_constraint("uq_productos_codigo_barras", "productos", type_="unique")
 
     # 2. Ampliar columna de 20 a 50 chars (barcodes EAN-128 pueden ser largos)
     op.alter_column("productos", "codigo_barras",
@@ -44,4 +44,4 @@ def downgrade() -> None:
                     existing_type=sa.String(50),
                     type_=sa.String(20),
                     existing_nullable=False)
-    op.create_unique_constraint("productos_codigo_barras_key", "productos", ["codigo_barras"])
+    op.create_unique_constraint("uq_productos_codigo_barras", "productos", ["codigo_barras"])

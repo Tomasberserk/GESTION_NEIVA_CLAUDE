@@ -19,9 +19,10 @@ app = FastAPI(
 )
 
 # ---------------------------------------------------------------------------
-# CORS — configurable via CORS_ORIGINS para producción.
-# El default cubre los dos puertos que Vite puede asignar en desarrollo
-# (5173 si está libre, 5174 si el primero ya está en uso).
+# CORS — en producción, Render/Vercel inyectan:
+#   FRONTEND_URL=https://tu-app.vercel.app
+#   CORS_ORIGINS=https://a.vercel.app,https://b.vercel.app  (lista completa si hay varios)
+# En desarrollo, el default cubre los puertos que Vite asigna (5173 / 5174).
 # ---------------------------------------------------------------------------
 _CORS_DEFAULT = ",".join([
     "http://localhost:5173",
@@ -29,7 +30,13 @@ _CORS_DEFAULT = ",".join([
     "http://127.0.0.1:5173",
     "http://127.0.0.1:5174",
 ])
-_origins = [o.strip() for o in os.getenv("CORS_ORIGINS", _CORS_DEFAULT).split(",")]
+_origins_raw = os.getenv("CORS_ORIGINS", _CORS_DEFAULT)
+_origins = [o.strip() for o in _origins_raw.split(",") if o.strip()]
+
+# FRONTEND_URL es un alias de una sola URL — se añade si no está ya en la lista
+_frontend_url = os.getenv("FRONTEND_URL", "").strip()
+if _frontend_url and _frontend_url not in _origins:
+    _origins.append(_frontend_url)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_origins,

@@ -14,9 +14,9 @@ if not DATABASE_URL:
 
 engine = create_engine(
     DATABASE_URL,
-    pool_pre_ping=True,   # Detecta conexiones muertas antes de usarlas
-    pool_size=10,         # Conexiones activas en el pool
-    max_overflow=20,      # Conexiones adicionales permitidas bajo carga
+    pool_pre_ping=True,
+    pool_size=5,       # Supabase free tier: máx ~15 conexiones directas
+    max_overflow=10,
     echo=os.getenv("ENVIRONMENT") == "development",
 )
 

@@ -24,7 +24,9 @@ if not database_url:
         "DATABASE_URL no está configurada. "
         "Ejecuta: cp .env.example .env y completa las credenciales."
     )
-config.set_main_option("sqlalchemy.url", database_url)
+# % en el URL (e.g. caracteres especiales URL-encoded) rompe ConfigParser.
+# Se escapan para que alembic los lea como literales.
+config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

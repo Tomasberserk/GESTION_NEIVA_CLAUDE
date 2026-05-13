@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard'
 import Inventario from './pages/Inventario'
 import Ventas from './pages/Ventas'
 import Reportes from './pages/Reportes'
+import Layout from './components/layout/Layout'
 
 export default function App() {
   return (
