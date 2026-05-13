@@ -1,7 +1,7 @@
 import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
 
-const BASE = '/api'
+const BASE = import.meta.env.VITE_API_URL || '/api'
 
 export default function ProductoCard({ producto, onEditar, onEliminar }) {
   const { agregar } = useCart()

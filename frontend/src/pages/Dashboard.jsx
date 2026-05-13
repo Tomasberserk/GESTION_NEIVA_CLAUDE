@@ -6,7 +6,7 @@ import {
   ResponsiveContainer, Cell,
 } from 'recharts'
 
-const BASE = '/api'
+const BASE = import.meta.env.VITE_API_URL || '/api'
 
 const PALETA = ['#7c3aed', '#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe']
 
