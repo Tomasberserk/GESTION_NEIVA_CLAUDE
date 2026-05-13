@@ -23,7 +23,7 @@ export default function CartSidebar() {
         texto: `Venta registrada — Total: $${resultado.total.toLocaleString('es-CO')}`,
       })
       vaciar()
-      window.dispatchEvent(new CustomEvent('venta-realizada'))
+      window.dispatchEvent(new Event('venta-completada'))
       setTimeout(() => setMensaje(null), 5000)
     } catch (e) {
       setMensaje({ tipo: 'error', texto: e.message })

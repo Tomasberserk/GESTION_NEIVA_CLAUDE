@@ -17,7 +17,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # 1. Eliminar unique constraint global (nombre definido en migración 001)
+    # 1. Eliminar unique constraint global (nombre real en la BD)
     op.drop_constraint("uq_productos_codigo_barras", "productos", type_="unique")
 
     # 2. Ampliar columna de 20 a 50 chars (barcodes EAN-128 pueden ser largos)

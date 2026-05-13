@@ -163,10 +163,16 @@
 
 ## Propuestas pendientes de evaluación
 
-> [GEMINI PROPONE] Validar límite de stock en CartContext.agregar()
-> **Motivo:** Actualmente se pueden agregar unidades infinitas usando el botón "+" del carrito, lo que permite sobreventa y posibles errores 400 en el backend.
-> **Propuesta:** En `frontend/src/context/CartContext.jsx`, dentro de la función `agregar()`, validar que la cantidad en el carrito no supere a `producto.cantidad_actual` antes de incrementar. Ej: `if (existe && existe.cantidad >= producto.cantidad_actual) return prev;`
+_(Sin propuestas pendientes — todas implementadas)_
 
-> [GEMINI PROPONE] Refrescar listado de productos post-checkout
-> **Motivo:** Al finalizar una venta exitosa en `CartSidebar.jsx`, el inventario visual queda desactualizado mostrando el stock viejo en las tarjetas de producto.
-> **Propuesta:** Forzar una recarga del estado de productos cuando la promesa de `registrar(detalles)` sea exitosa para mantener sincronía entre stock real y visual en la interfaz.
+---
+
+## Historial de propuestas implementadas
+
+> [GEMINI PROPONE → ✅ CLAUDE IMPLEMENTA] Validar límite de stock en CartContext.agregar()
+> **Solución:** `CartContext.jsx` — en `agregar()`, si `existe.cantidad >= producto.cantidad_actual` retorna `prev` sin modificar. El botón "+" queda silenciosamente deshabilitado al llegar al stock disponible.
+
+> [GEMINI PROPONE → ✅ CLAUDE IMPLEMENTA] Refrescar listado de productos post-checkout
+> **Solución:** Evento `window` desacoplado — `CartSidebar.jsx` dispara `new Event('venta-completada')` post-checkout. `Inventario.jsx` escucha el evento con `useEffect` y llama `cargar()`. Evita acoplar contextos y no requiere ProductosContext global.
+
+

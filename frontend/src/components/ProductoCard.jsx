@@ -1,7 +1,7 @@
 import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
 
-const BASE = 'http://localhost:8000'
+const BASE = '/api'
 
 export default function ProductoCard({ producto, onEditar, onEliminar }) {
   const { agregar } = useCart()

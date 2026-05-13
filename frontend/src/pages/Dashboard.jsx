@@ -6,7 +6,7 @@ import {
   ResponsiveContainer, Cell,
 } from 'recharts'
 
-const BASE = 'http://localhost:8000'
+const BASE = '/api'
 
 const PALETA = ['#7c3aed', '#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe']
 

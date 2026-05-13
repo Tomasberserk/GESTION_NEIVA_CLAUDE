@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import authService from '../services/authService'
 
-const BASE = 'http://localhost:8000'
+const BASE = '/api'
 
 export default function Reportes() {
   const { usuario } = useAuth()

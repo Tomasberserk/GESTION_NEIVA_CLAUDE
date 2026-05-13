@@ -6,13 +6,13 @@ import ModalProducto from '../components/ModalProducto'
 
 export default function Inventario() {
   const { usuario } = useAuth()
-  const { productos, tienda, cargando, error, crear, actualizar, eliminar, cargar } = useProductos()
+  const { productos, tienda, cargando, error, cargar, crear, actualizar, eliminar } = useProductos()
+
   const [busqueda, setBusqueda] = useState('')
 
   useEffect(() => {
-    const handler = () => cargar()
-    window.addEventListener('venta-realizada', handler)
-    return () => window.removeEventListener('venta-realizada', handler)
+    window.addEventListener('venta-completada', cargar)
+    return () => window.removeEventListener('venta-completada', cargar)
   }, [cargar])
   const [modalAbierto, setModalAbierto] = useState(false)
   const [productoEditar, setProductoEditar] = useState(null)
