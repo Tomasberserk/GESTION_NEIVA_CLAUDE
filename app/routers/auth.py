@@ -20,7 +20,7 @@ router = APIRouter(tags=["Autenticación"])
 def registro(data: UsuarioCrear, db: Session = Depends(get_db)):
     usuario = auth_service.registrar_usuario(data, db)
     token = auth_service.crear_token_acceso({"sub": str(usuario.id)})
-    return {"access_token": token, "token_type": "bearer", "usuario": usuario}
+    return {"access_token": token, "token_type": "bearer", "usuario": usuario}  # nosec B105
 
 
 @router.post("/auth/registro-completo", response_model=TokenRespuesta, status_code=status.HTTP_201_CREATED)

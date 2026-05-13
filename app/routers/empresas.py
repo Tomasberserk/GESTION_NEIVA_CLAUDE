@@ -4,7 +4,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app import models
 from app.database import get_db
+from app.dependencies import get_current_user
 from app.schemas.empresa import EmpresaCrear, EmpresaRespuesta
 from app.services import empresa_service
 
@@ -35,5 +37,15 @@ def crear_empresa(data: EmpresaCrear, db: Session = Depends(get_db)):
 
 
 @router.get("/{empresa_id}", response_model=EmpresaRespuesta)
-def obtener_empresa(empresa_id: UUID, db: Session = Depends(get_db)):
+def obtener_empresa(
+    empresa_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(get_current_user),
+):
+    # Un usuario solo puede leer los datos de su propia empresa
+    if current_user.empresa_id != empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acceso no autorizado",
+        )
     return empresa_service.obtener_empresa(empresa_id, db)

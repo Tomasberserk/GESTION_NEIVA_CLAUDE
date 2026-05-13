@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
 
+import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
 from app import models
@@ -27,7 +27,7 @@ def get_current_user(
         user_id: str | None = payload.get("sub")
         if user_id is None:
             raise _no_autenticado
-    except JWTError:
+    except jwt.InvalidTokenError:
         raise _no_autenticado
 
     usuario = db.query(models.Usuario).filter(

@@ -1,9 +1,9 @@
 # Web framework
-fastapi==0.104.1
+fastapi>=0.115.0
 uvicorn[standard]==0.24.0
 
 # Base de datos
-sqlalchemy==2.0.23
+sqlalchemy>=2.0.30
 psycopg2-binary==2.9.10
 alembic==1.13.1
 
@@ -11,10 +11,10 @@ alembic==1.13.1
 pydantic==2.10.6
 pydantic-settings==2.7.0
 email-validator==2.1.0       # requerido por pydantic.EmailStr
-python-dotenv==1.0.0
+python-dotenv>=1.2.2         # CVE-2026-28684 fijado en >=1.2.2
 passlib[bcrypt]==1.7.4
-python-jose[cryptography]==3.3.0
-python-multipart==0.0.6
+PyJWT>=2.9.0                 # Reemplaza python-jose (PYSEC-2024-232, PYSEC-2024-233)
+python-multipart>=0.0.27     # CVE-2024-53981, CVE-2026-24486, CVE-2026-40347 fijados
 
 # Reportes
 openpyxl==3.1.2

@@ -8,12 +8,14 @@ from fastapi.staticfiles import StaticFiles
 
 from app.routers import auth, dashboard, empresas, productos, reportes, ventas
 
+_DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+
 app = FastAPI(
     title="Tiendapp API",
     description="Sistema POS SaaS — Gestión Inteligente Neiva",
     version="2.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url="/docs" if _DEBUG else None,
+    redoc_url="/redoc" if _DEBUG else None,
 )
 
 # ---------------------------------------------------------------------------
@@ -80,3 +82,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 @app.get("/health", tags=["Sistema"])
 def health_check():
     return {"status": "ok", "version": "2.0.0"}
+
+@app.get("/", include_in_schema=False)
+def root():
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/docs")

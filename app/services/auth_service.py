@@ -3,8 +3,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import bcrypt
+import jwt
 from fastapi import HTTPException, status
-from jose import jwt
 from sqlalchemy.orm import Session
 
 from app import models
@@ -14,7 +14,8 @@ SECRET_KEY = os.getenv("SECRET_KEY", "")
 if not SECRET_KEY:
     raise ValueError("SECRET_KEY no está configurada en las variables de entorno")
 
-ALGORITHM = os.getenv("ALGORITHM", "HS256")
+# Algoritmo de firma fijo — no configurable via env para evitar algorithm-confusion attacks
+ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 
 
@@ -109,6 +110,7 @@ def registrar_usuario_con_empresa(
         empresa = models.Empresa(
             nombre_comercial=nombre_comercial.strip(),
             nit_o_cedula=nit_o_cedula.strip(),
+            trial_expires_at=datetime.now(timezone.utc) + timedelta(days=30),
         )
         db.add(empresa)
         db.flush()
@@ -123,7 +125,7 @@ def registrar_usuario_con_empresa(
         db.commit()
         db.refresh(usuario)
         token = crear_token_acceso({"sub": str(usuario.id)})
-        return {"access_token": token, "token_type": "bearer", "usuario": usuario}
+        return {"access_token": token, "token_type": "bearer", "usuario": usuario}  # nosec B105
 
     except HTTPException:
         db.rollback()
@@ -157,4 +159,4 @@ def login_usuario(email: str, password: str, db: Session) -> dict:
         raise _credenciales_invalidas
 
     token = crear_token_acceso({"sub": str(usuario.id)})
-    return {"access_token": token, "token_type": "bearer", "usuario": usuario}
+    return {"access_token": token, "token_type": "bearer", "usuario": usuario}  # nosec B105
