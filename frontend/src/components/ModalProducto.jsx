@@ -34,6 +34,7 @@ export default function ModalProducto({ producto, onGuardar, onCerrar }) {
     unidad_medida: 'unidad',
     fecha_vencimiento: '',
     categoria: '',
+    foto_url: '',
     empresa_id: usuario?.empresa_id ?? '',
   })
   const [error,      setError]      = useState(null)
@@ -49,8 +50,9 @@ export default function ModalProducto({ producto, onGuardar, onCerrar }) {
         precio_venta:      producto.precio_venta,
         cantidad_actual:   producto.cantidad_actual,
         unidad_medida:     producto.unidad_medida     ?? 'unidad',
-        fecha_vencimiento: producto.fecha_vencimiento ?? '',
+        fecha_vencimiento: producto.fecha_vencimiento ? producto.fecha_vencimiento.split('T')[0] : '',
         categoria:         producto.categoria         ?? '',
+        foto_url:          producto.foto_url          ?? '',
         empresa_id:        producto.empresa_id,
       })
     }
@@ -75,6 +77,7 @@ export default function ModalProducto({ producto, onGuardar, onCerrar }) {
         cantidad_actual:   parseFloat(form.cantidad_actual) || 0,
         fecha_vencimiento: form.fecha_vencimiento || null,
         categoria:         form.categoria         || null,
+        foto_url:          form.foto_url          || null,
       }
       await onGuardar(payload)
       onCerrar()
@@ -210,6 +213,21 @@ export default function ModalProducto({ producto, onGuardar, onCerrar }) {
               name="fecha_vencimiento"
               value={form.fecha_vencimiento}
               onChange={cambiar}
+              className={cls}
+            />
+          </div>
+
+          {/* Foto URL */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              URL de la Imagen <span className="text-gray-400 font-normal">(opcional)</span>
+            </label>
+            <input
+              type="url"
+              name="foto_url"
+              value={form.foto_url}
+              onChange={cambiar}
+              placeholder="https://ejemplo.com/imagen.jpg"
               className={cls}
             />
           </div>

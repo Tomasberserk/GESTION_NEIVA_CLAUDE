@@ -17,7 +17,7 @@ export default function ProductoCard({ producto, onEditar, onEliminar }) {
     >
       {producto.foto_url ? (
         <img
-          src={`${BASE}${producto.foto_url}`}
+          src={producto.foto_url.startsWith('http') ? producto.foto_url : `${BASE}${producto.foto_url}`}
           alt={producto.nombre}
           className="w-full h-36 object-cover rounded-lg"
         />
