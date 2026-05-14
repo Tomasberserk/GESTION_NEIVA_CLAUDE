@@ -106,6 +106,7 @@ cd frontend && npm run dev
 6. **Soft delete** — los registros nunca se borran físicamente; `is_active = False`
 7. **Multi-tenant siempre** — todas las queries deben filtrar por `empresa_id`
 8. **Gemini lee, Claude actúa** — no usar Claude para análisis de archivos grandes; usar Gemini CLI
+9. **Verificación antes de finalizar (Regla Superpowers)** — Nunca marques una tarea como completada en `PLAN_ACTIVO.md` sin antes haber ejecutado un comando para verificar que realmente funciona (tests, curl, npm run build).
 
 ---
 

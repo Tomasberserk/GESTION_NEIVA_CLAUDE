@@ -136,7 +136,18 @@ Dado que Claude y Gemini no comparten memoria en tiempo real, la coordinación s
 
 ---
 
-## 7. Restricciones actuales
+## 7. Metodología de Trabajo (Inspirada en Superpowers)
+
+Para evitar el "token burn" y garantizar código robusto, ambos agentes deben adherirse a esta metodología manual:
+
+1. **Cero código sin diseño previo (Brainstorming):** Nunca empezar a escribir archivos sin antes tener un plan en `PLAN_ACTIVO.md`. Gemini hace el rol de estructurar el diseño; Claude lo implementa.
+2. **Micro-tareas:** Los pasos en `PLAN_ACTIVO.md` deben ser tareas diminutas y atómicas (no "crear módulo de ventas", sino "crear endpoint POST /ventas").
+3. **Verificación Explícita (Verification Before Completion):** Todo paso en `PLAN_ACTIVO.md` debe incluir un comando de verificación exacto. Claude *no puede* marcar un paso como ✅ sin antes haber ejecutado ese comando y visto el resultado exitoso.
+4. **TDD pragmático (Test-Driven Development):** Siempre que sea posible, escribir el test unitario *antes* que la implementación. Si el proyecto aún no tiene tests formales, la prueba manual (ej: `curl`, script en python, o test por consola) debe fallar primero, y luego pasar al escribir la función.
+
+---
+
+## 8. Restricciones actuales
 
 - **Hermes-3 (Together AI):** BLOQUEADO hasta primer ingreso del sistema
 - **Ollama local:** descartado — degrada rendimiento del equipo de forma exponencial
