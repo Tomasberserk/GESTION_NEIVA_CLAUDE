@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import authService from '../services/authService'
 
-const BASE = 'http://localhost:8000'
+const BASE = import.meta.env.VITE_API_URL || '/api'
 
 const TABS = [
   { id: 'hoy',       label: 'Hoy',      labelCorto: 'Hoy' },
