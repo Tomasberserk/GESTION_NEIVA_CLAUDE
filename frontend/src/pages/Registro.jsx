@@ -32,24 +32,27 @@ export default function Registro() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-violet-50 to-violet-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-8">
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-800">Crear cuenta</h1>
-          <p className="text-gray-500 text-sm mt-1">
-            Registra tu empresa y administrador en un solo paso.
+    <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center p-6 font-sans">
+      
+      <div className="w-full max-w-sm flex flex-col items-center">
+        
+        <div className="text-center mb-8">
+          <div className="text-6xl mb-4 drop-shadow-sm">📝</div>
+          <h1 className="text-3xl font-bold text-[#111827] tracking-tight">Crear cuenta</h1>
+          <p className="text-[#6B7280] text-sm font-medium mt-2">
+            Registra tu empresa y administrador.
           </p>
         </div>
 
-        {error && (
-          <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm text-center mb-4">
-            {error}
-          </div>
-        )}
+        <form onSubmit={handleRegistro} className="w-full space-y-5">
+          {error && (
+            <div className="bg-red-50 text-red-600 p-4 rounded-[15px] text-sm text-center border border-red-100">
+              {error}
+            </div>
+          )}
 
-        <form onSubmit={handleRegistro} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-[#374151] uppercase tracking-wider ml-1">
               Nombre comercial
             </label>
             <input
@@ -59,11 +62,14 @@ export default function Registro() {
               onChange={cambiar}
               required
               placeholder="Tienda La Esperanza"
-              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+              className="w-full bg-white border border-[#E5E7EB] rounded-[20px] px-5 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent transition-all shadow-sm"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">NIT o Cédula</label>
+
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-[#374151] uppercase tracking-wider ml-1">
+              NIT o Cédula
+            </label>
             <input
               type="text"
               name="nit_o_cedula"
@@ -71,11 +77,14 @@ export default function Registro() {
               onChange={cambiar}
               required
               placeholder="900123456-1"
-              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+              className="w-full bg-white border border-[#E5E7EB] rounded-[20px] px-5 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent transition-all shadow-sm"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Correo</label>
+
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-[#374151] uppercase tracking-wider ml-1">
+              Correo Electrónico
+            </label>
             <input
               type="email"
               name="email"
@@ -84,13 +93,13 @@ export default function Registro() {
               required
               autoComplete="email"
               placeholder="admin@empresa.com"
-              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+              className="w-full bg-white border border-[#E5E7EB] rounded-[20px] px-5 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent transition-all shadow-sm"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Contraseña{' '}
-              <span className="text-gray-400 font-normal">(mín. 8 caracteres)</span>
+
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-[#374151] uppercase tracking-wider ml-1">
+              Contraseña <span className="text-[#9CA3AF] font-normal normal-case tracking-normal">(mín. 8 caracteres)</span>
             </label>
             <input
               type="password"
@@ -101,24 +110,27 @@ export default function Registro() {
               minLength={8}
               autoComplete="new-password"
               placeholder="••••••••"
-              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+              className="w-full bg-white border border-[#E5E7EB] rounded-[20px] px-5 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent transition-all shadow-sm"
             />
           </div>
+
           <button
             type="submit"
             disabled={cargando}
-            className="w-full bg-violet-600 hover:bg-violet-700 disabled:bg-gray-200 text-white font-semibold py-3 rounded-lg transition-colors"
+            className="w-full bg-[#10B981] hover:bg-[#059669] disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-4 rounded-[20px] transition-all shadow-lg shadow-emerald-100 active:scale-[0.97] mt-6"
           >
             {cargando ? 'Creando cuenta...' : 'Crear cuenta'}
           </button>
         </form>
 
-        <p className="text-center text-sm text-gray-500 mt-6">
-          ¿Ya tienes cuenta?{' '}
-          <Link to="/login" className="text-violet-600 hover:text-violet-700 font-medium">
-            Ingresar
-          </Link>
-        </p>
+        <footer className="mt-10 text-center">
+          <p className="text-sm text-[#9CA3AF]">
+            ¿Ya tienes cuenta?{' '}
+            <Link to="/login" className="text-[#3B82F6] hover:text-[#2563EB] font-bold transition-colors">
+              Ingresar
+            </Link>
+          </p>
+        </footer>
       </div>
     </div>
   )
