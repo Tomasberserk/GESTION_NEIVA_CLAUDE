@@ -10,7 +10,7 @@ export default function Navbar() {
   return (
     <nav className="bg-violet-600 text-white shadow-lg">
       <div className="max-w-7xl mx-auto px-4 flex items-center justify-between h-16">
-        <span className="font-bold text-lg tracking-tight">TiendApp</span>
+        <span className="font-bold text-lg tracking-tight">TiendAppS</span>
 
         <div className="flex items-center gap-6 text-sm">
           {[

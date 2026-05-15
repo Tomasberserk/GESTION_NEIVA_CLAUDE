@@ -30,7 +30,7 @@ export default function Login() {
       <div className="w-full max-w-[340px]">
         <div className="text-center mb-10">
           <div className="text-6xl mb-4">📦</div>
-          <h1 className="text-[28px] font-extrabold text-[#1a1f2c] tracking-tight mb-1">TiendAPP</h1>
+          <h1 className="text-[28px] font-extrabold text-[#1a1f2c] tracking-tight mb-1">TiendAppS</h1>
           <p className="text-[15px] text-slate-500 font-medium">Acceso Administrativo</p>
         </div>
 
