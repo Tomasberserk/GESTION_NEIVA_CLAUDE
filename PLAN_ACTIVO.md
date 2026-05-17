@@ -1,8 +1,8 @@
 # PLAN ACTIVO — Gestión Neiva + Fábrica de Agentes IA
 
-**Fecha:** 2026-05-11  
-**Sprint activo:** Sprint 3 (cierre MVP) + Sprint 4 fundamentos fábrica  
-**Próxima revisión:** Fin de Sprint 3
+**Fecha:** 2026-05-17  
+**Sprint activo:** Sprint 5 — Pipeline funcional tier basic  
+**Próxima revisión:** Fin de Sprint 5
 
 > Este documento es **mutable por Claude y Gemini**. Ver `AGENTS.md` para el protocolo de cambios.  
 > Usa `> [GEMINI PROPONE]` o `> [CLAUDE PROPONE]` para proponer cambios sin implementarlos aún.
@@ -13,12 +13,50 @@
 
 ```
 [✅] Sprint 2 — Auth funcional, layout conectado, bugs críticos resueltos
-[🔄] Sprint 3 — Cierre MVP (en progreso)
-[🔄] Sprint 4 — Fundamentos de la fábrica (en progreso en paralelo)
-[⏳] Sprint 5 — Pipeline funcional tier basic
+[✅] Sprint 3 — MVP cerrado (flujo end-to-end en producción verificado)
+[✅] Sprint 3.5 — Features gancho: vencimiento, granel, categorías, escáner
+[✅] Sprint 3.6 — Historial de ventas con tabs y filtro por fecha
+[✅] Sprint 3.8 — Cierre brechas SRS: categorías, escáner, responsividad
+[✅] Sprint 4 — Fundamentos de la fábrica (docs + templates + workflows)
+[🔄] Sprint 5 — Pipeline funcional tier basic (ACTIVO)
 [⏳] Sprint 6 — Template medium
 [⏳] Sprint 7 — Template professional + Hermes activado
 ```
+
+---
+
+## Sprint 5 — Pipeline funcional tier basic
+
+**Objetivo:** ejecutar el pipeline `build-basic.md` de punta a punta con un sistema demo real, medir costos reales y tener algo que mostrar a un primer cliente.
+
+**La meta concreta:** construir **"POS Papelería"** — un segundo sistema básico usando la fábrica, que sirva como demo y validación del pipeline.
+
+| # | Tarea | Archivo | Estado |
+|---|-------|---------|--------|
+| 1 | Definir requirements de POS Papelería (texto libre) | `factory/jobs/pos-papeleria/requirements.txt` | ⏳ |
+| 2 | [Gemini] Analizar requirements → JSON estructurado | `factory/jobs/pos-papeleria/requirements.json` | ⏳ |
+| 3 | [Architect] Schema DB + contratos API adaptados | `factory/jobs/pos-papeleria/schema.md` + `api-contracts.md` | ⏳ |
+| 4 | [Haiku] Backend: models + schemas + migration | `factory/jobs/pos-papeleria/` | ⏳ |
+| 5 | [Haiku] Backend: routers + services | `factory/jobs/pos-papeleria/` | ⏳ |
+| 6 | [Sonnet] Frontend adaptado | `factory/jobs/pos-papeleria/` | ⏳ |
+| 7 | [Gemini] QA review completo | `factory/jobs/pos-papeleria/qa-report.md` | ⏳ |
+| 8 | [Haiku] DevOps: docker-compose + README deploy | `factory/jobs/pos-papeleria/` | ⏳ |
+| 9 | Medir costo real en tokens y tiempo | `factory/jobs/pos-papeleria/METRICAS.md` | ⏳ |
+| 10 | Landing page simple para mostrar el portafolio | `docs/landing/` o Notion público | ⏳ |
+
+### Criterios de éxito Sprint 5
+
+1. POS Papelería corre en local: `login → inventario → venta → reporte`
+2. Costo real de tokens documentado en `METRICAS.md`
+3. Tiempo real de construcción documentado (debe ser < 4 horas)
+4. QA report sin issues críticos
+5. Hay algo que mostrarle a un potencial cliente (demo o landing)
+
+### Próximo paso inmediato
+
+> Redactar los requirements de POS Papelería en `factory/jobs/pos-papeleria/requirements.txt`  
+> (texto libre, como si fuera el dueño de la papelería explicando qué necesita)
+
 
 ---
 
