@@ -1,5 +1,5 @@
 import os
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from dotenv import load_dotenv
 
@@ -12,13 +12,20 @@ if not DATABASE_URL:
         "Copia .env.example a .env y completa tus credenciales."
     )
 
-engine = create_engine(
-    DATABASE_URL,
-    pool_pre_ping=True,
-    pool_size=5,       # Supabase free tier: máx ~15 conexiones directas
-    max_overflow=10,
-    echo=os.getenv("ENVIRONMENT") == "development",
-)
+# SQLite (usado en tests) no soporta pool_size ni max_overflow.
+# PostgreSQL (producción) sí los necesita para Supabase free tier.
+_is_sqlite = DATABASE_URL.startswith("sqlite")
+_engine_kwargs: dict = {
+    "pool_pre_ping": not _is_sqlite,  # SQLite no tiene pool real
+    "echo": os.getenv("ENVIRONMENT") == "development",
+}
+if not _is_sqlite:
+    _engine_kwargs["pool_size"] = 5       # Supabase free: máx ~15 conexiones
+    _engine_kwargs["max_overflow"] = 10
+if _is_sqlite:
+    _engine_kwargs["connect_args"] = {"check_same_thread": False}
+
+engine = create_engine(DATABASE_URL, **_engine_kwargs)
 
 SessionLocal = sessionmaker(
     autocommit=False,
