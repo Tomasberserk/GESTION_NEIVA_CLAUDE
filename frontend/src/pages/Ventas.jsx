@@ -18,7 +18,8 @@ function getFechas(tab) {
   if (tab === 'hoy') {
     inicio.setHours(0, 0, 0, 0)
   } else if (tab === 'semana') {
-    inicio.setDate(inicio.getDate() - 7)
+    const dayOfWeek = inicio.getDay() || 7 // Convertir Domingo (0) a 7
+    inicio.setDate(inicio.getDate() - (dayOfWeek - 1)) // Retroceder hasta el Lunes
     inicio.setHours(0, 0, 0, 0)
   } else {
     inicio.setDate(inicio.getDate() - 30)
