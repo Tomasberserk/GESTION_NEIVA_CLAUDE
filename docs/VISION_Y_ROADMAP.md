@@ -26,7 +26,7 @@ Gestión Neiva es el primer producto de esa fábrica y su implementación de ref
 |------|---------|-------------|---------------|---------|
 | **Basic** | POS simple | Inventario + Ventas + Reportes + Dashboard | $300–800 USD | ~$0.21 |
 | **Medium** | ERP ligero | + Proveedores + Contabilidad + Multi-usuario avanzado | $1,500–3,500 USD | ~$0.80 |
-| **Professional** | SaaS completo | + Multi-tenant + Pagos + SSO + API pública | $5,000–15,000 USD | ~$2.50 |
+| **Professional** | SaaS completo | + Multi-tenant + Pagos + SSO + API pública + nomina y facturación electrónica Colombia | $5,000–15,000 USD | ~$2.50 |
 
 Ver `factory/pricing/PORTFOLIO.md` para el catálogo completo.
 

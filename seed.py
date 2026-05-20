@@ -43,8 +43,8 @@ def seed():
     db.query(Producto).filter(Producto.empresa_id == empresa.id).delete()
     db.commit()
 
-    print("Creando 30 productos...")
-    for idx, nombre in enumerate(nombres_productos):
+    print("Creando 15 productos...")
+    for idx, nombre in enumerate(nombres_productos[:15]):
         costo = random.randint(1000, 15000)
         # Margen aleatorio entre 15% y 35%
         venta = int(costo * (1 + random.uniform(0.15, 0.35)))
@@ -67,11 +67,11 @@ def seed():
         db.refresh(p)
     print("¡Productos creados exitosamente!")
 
-    # 3. Crear 14 ventas aleatorias
-    print("Creando 14 ventas...")
+    # 3. Crear 20 ventas aleatorias
+    print("Creando 20 ventas...")
     now = datetime.now()
     
-    for i in range(14):
+    for i in range(20):
         # Fecha aleatoria en los últimos 7 días
         dias_restar = random.randint(0, 7)
         horas_restar = random.randint(0, 23)

@@ -1,5 +1,3 @@
-from datetime import datetime, timezone
-
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -24,10 +22,12 @@ def get_current_user(
     )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: str | None = payload.get("sub")
-        if user_id is None:
+        user_id_str: str | None = payload.get("sub")
+        if user_id_str is None:
             raise _no_autenticado
-    except jwt.InvalidTokenError:
+        import uuid
+        user_id = uuid.UUID(user_id_str)
+    except (jwt.InvalidTokenError, ValueError):
         raise _no_autenticado
 
     usuario = db.query(models.Usuario).filter(
@@ -47,15 +47,6 @@ def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Empresa inactiva o no encontrada",
-        )
-
-    trial_ts = empresa.trial_expires_at
-    if trial_ts is not None and trial_ts.tzinfo is None:
-        trial_ts = trial_ts.replace(tzinfo=timezone.utc)
-    if trial_ts and trial_ts < datetime.now(timezone.utc):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Tu período de prueba ha vencido. Contacta al administrador para activar tu plan.",
         )
 
     return usuario

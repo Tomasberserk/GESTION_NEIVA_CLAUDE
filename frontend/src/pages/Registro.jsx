@@ -33,9 +33,9 @@ export default function Registro() {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center p-6 font-sans">
-      
+
       <div className="w-full max-w-sm flex flex-col items-center">
-        
+
         <div className="text-center mb-8">
           <div className="text-6xl mb-4 drop-shadow-sm">📝</div>
           <h1 className="text-3xl font-bold text-[#111827] tracking-tight">Crear cuenta</h1>
