@@ -1,5 +1,15 @@
 const BASE = import.meta.env.VITE_API_URL || '/api'
 
+async function parseJsonSafe(res) {
+  const text = await res.text()
+  if (!text) return null
+  try {
+    return JSON.parse(text)
+  } catch {
+    return null
+  }
+}
+
 const authService = {
   setToken(token) {
     localStorage.setItem('access_token', token)
@@ -20,10 +30,11 @@ const authService = {
       body: JSON.stringify({ email, password }),
     })
     if (!res.ok) {
-      const err = await res.json()
-      throw new Error(err.detail || 'Credenciales inválidas')
+      const err = await parseJsonSafe(res)
+      throw new Error(err?.detail || res.statusText || 'Credenciales inválidas')
     }
-    const data = await res.json()
+    const data = await parseJsonSafe(res)
+    if (!data) throw new Error('Respuesta inválida del servidor')
     this.setToken(data.access_token)
     return data
   },
@@ -35,10 +46,11 @@ const authService = {
       body: JSON.stringify(payload),
     })
     if (!res.ok) {
-      const err = await res.json()
-      throw new Error(err.detail || 'Error en el registro')
+      const err = await parseJsonSafe(res)
+      throw new Error(err?.detail || res.statusText || 'Error en el registro')
     }
-    const data = await res.json()
+    const data = await parseJsonSafe(res)
+    if (!data) throw new Error('Respuesta inválida del servidor')
     this.setToken(data.access_token)
     return data
   },
@@ -50,16 +62,18 @@ const authService = {
       body: JSON.stringify(payload),
     })
     if (!res.ok) {
-      const err = await res.json()
-      throw new Error(err.detail || 'Error creando empresa')
+      const err = await parseJsonSafe(res)
+      throw new Error(err?.detail || res.statusText || 'Error creando empresa')
     }
-    return res.json()
+    return parseJsonSafe(res)
   },
 
   async getMe() {
     const res = await this.fetchAuth(`${BASE}/me`)
     if (!res.ok) throw new Error('No autenticado')
-    return res.json()
+    const data = await parseJsonSafe(res)
+    if (!data) throw new Error('Respuesta inválida del servidor')
+    return data
   },
 
   logout() {

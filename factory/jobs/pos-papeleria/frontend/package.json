@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "clsx": "^2.1.0",
-    "lucide-react": "^0.330.0",
+    "lucide-react": "^0.475.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.0.0",
