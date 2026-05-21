@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import uuid
 
 import jwt
 from fastapi import Depends, HTTPException, status
@@ -27,11 +28,16 @@ def get_current_user(
         user_id: str | None = payload.get("sub")
         if user_id is None:
             raise _no_autenticado
+        # Convertir string UUID a UUID object para comparación correcta
+        try:
+            user_id_uuid = uuid.UUID(user_id)
+        except (ValueError, TypeError):
+            raise _no_autenticado
     except jwt.InvalidTokenError:
         raise _no_autenticado
 
     usuario = db.query(models.Usuario).filter(
-        models.Usuario.id == user_id,
+        models.Usuario.id == user_id_uuid,
         models.Usuario.is_active.is_(True),
     ).first()
 

@@ -1,4 +1,5 @@
 import os
+import uuid
 
 # CRÍTICO: sobreescribir ANTES de cualquier import de app.
 # load_dotenv() en database.py usa override=False por defecto,
@@ -8,13 +9,44 @@ os.environ.setdefault("SECRET_KEY", "pytest-secret-key-not-for-production")
 os.environ.setdefault("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, TypeDecorator, CHAR, VARCHAR
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+from sqlalchemy.dialects.postgresql import UUID
 from fastapi.testclient import TestClient
 
 import app.database as db_module
+import app.models  # IMPORTANTE: Registra todas las tablas en Base.metadata
 from app.main import app
 from app.database import Base, get_db
+
+
+# TypeDecorator para UUID en SQLite — convierte automáticamente entre string y UUID
+class GUID(TypeDecorator):
+    """Platform-independent GUID type that uses CHAR(32) on SQLite."""
+    impl = CHAR
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == 'postgresql':
+            return dialect.type_descriptor(UUID())
+        return dialect.type_descriptor(CHAR(32))
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        if dialect.name == 'postgresql':
+            return str(value)
+        if not isinstance(value, uuid.UUID):
+            return str(uuid.UUID(value)) if value else None
+        return str(value).replace('-', '')
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return value
+        if not isinstance(value, uuid.UUID):
+            return uuid.UUID(value) if value else None
+        return value
 
 
 @pytest.fixture
@@ -26,9 +58,16 @@ def client():
     las queries de los routers usen la misma conexión donde creamos las tablas.
     Un engine :memory: separado sería una BD diferente — por eso fallaban antes.
     """
+    # Reemplazar tipos UUID por GUID en todos los modelos para SQLite
+    for table in Base.metadata.tables.values():
+        for column in table.columns:
+            if isinstance(column.type, UUID):
+                column.type = GUID()
+    
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
     )
     # Crear todas las tablas en ESTE engine
     Base.metadata.create_all(engine)

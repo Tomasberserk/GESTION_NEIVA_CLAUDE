@@ -77,6 +77,7 @@ def registrar_usuario(data: UsuarioCrear, db: Session) -> models.Usuario:
         hashed_password=hash_password(data.password),
         empresa_id=data.empresa_id,
         rol=data.rol,
+        is_active=True,
     )
     db.add(usuario)
     db.commit()
@@ -111,6 +112,7 @@ def registrar_usuario_con_empresa(
             nombre_comercial=nombre_comercial.strip(),
             nit_o_cedula=nit_o_cedula.strip(),
             trial_expires_at=datetime.now(timezone.utc) + timedelta(days=30),
+            is_active=True,
         )
         db.add(empresa)
         db.flush()
@@ -120,6 +122,7 @@ def registrar_usuario_con_empresa(
             hashed_password=hash_password(password),
             empresa_id=empresa.id,
             rol=rol,
+            is_active=True,
         )
         db.add(usuario)
         db.commit()
