@@ -179,11 +179,33 @@
 
 ---
 
-## Sprint 6 — Template medium
+## Sprint 6 — Template medium (ERP Ligero)
 
-- Definir y construir template medium (ERP ligero)
-- Módulos adicionales: proveedores, compras, cuentas por pagar
-- Probar construcción con la fábrica
+**Objetivo:** Definir el estándar para sistemas comerciales del Tier Medium y validar el pipeline construyendo un sistema demo completo llamado **"ERP Distribuidora"** (sistema mayorista de abasto con proveedores y deudas).
+
+| # | Tarea | Recurso / Archivo | Estado |
+|---|-------|-------------------|--------|
+| 1 | **[Gemini]** Crear carpeta y plantillas del Tier Medium | `factory/templates/medium/` | ✅ Completado |
+| 2 | **[Gemini]** Diseñar esquema de base de datos relacional del ERP | `factory/templates/medium/schema.md` | ✅ Completado |
+| 3 | **[Gemini]** Diseñar contratos de API REST (Compras, Proveedores, CxP) | `factory/templates/medium/api-contracts.md` | ✅ Completado |
+| 4 | **[Gemini]** Listar componentes React 19 y checklist de customización | `.../components-list.md` + `.../customization-checklist.md` | ✅ Completado |
+| 5 | **[Gemini]** Analizar requisitos de "erp-distribuidora" → JSON | `factory/jobs/erp-distribuidora/requirements.json` | ✅ Completado |
+| 6 | **[Architect/Claude]** Schema DB + Contratos adaptados a Distribuidora | `factory/jobs/erp-distribuidora/schema.md` | ⏳ Siguiente |
+
+| 7 | **[Haiku]** Backend Boilerplate (Modelos, schemas, migraciones Alembic) | `factory/jobs/erp-distribuidora/` | ⏳ Pendiente |
+| 8 | **[Haiku]** Routers FastAPI + Lógica de negocio (Servicios transaccionales) | `factory/jobs/erp-distribuidora/` | ⏳ Pendiente |
+| 9 | **[Sonnet]** Frontend React JSX (Compras, Proveedores, Cuentas por Pagar) | `factory/jobs/erp-distribuidora/` | ⏳ Pendiente |
+| 10 | **[Haiku]** Pruebas de integración del flujo de compras y abonos | `factory/jobs/erp-distribuidora/tests/` | ⏳ Pendiente |
+| 11 | **[Gemini]** QA completo y reporte final de bugs y correcciones | `factory/jobs/erp-distribuidora/qa-report.md` | ⏳ Pendiente |
+| 12 | **[Haiku]** DevOps: docker-compose + README deploy del ERP | `factory/jobs/erp-distribuidora/` | ⏳ Pendiente |
+| 13 | Medir costo real de tokens y tiempo en ERP | `factory/jobs/erp-distribuidora/METRICAS.md` | ⏳ Pendiente |
+
+### Criterios de éxito Sprint 6
+1. La plantilla del Tier Medium está completa, estructurada y documentada.
+2. El sistema de validación "ERP Distribuidora" funciona en local: registro de proveedor → compra a crédito (actualiza stock e incrementa deuda) → abono a cuenta por pagar (amortiza deuda hasta saldar e inactivar).
+3. Todas las pruebas de integración backend de compras y abonos pasan satisfactoriamente.
+4. Reporte de métricas reales del Tier Medium completado (costo en USD y tiempo).
+
 
 ---
 
