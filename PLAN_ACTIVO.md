@@ -42,7 +42,7 @@
 | 7 | [Gemini] QA review completo | `factory/jobs/pos-papeleria/qa-report.md` | ✅ |
 | 8 | [Haiku] DevOps: docker-compose + README deploy | `factory/jobs/pos-papeleria/` | ✅ |
 | 9 | Medir costo real en tokens y tiempo | `factory/jobs/pos-papeleria/METRICAS.md` | ✅ |
-| 10 | Landing page simple para mostrar el portafolio | `docs/landing/` o Notion público | ⏳ pendiente Sprint 6 |
+| 10 | Landing page simple para mostrar el portafolio | `docs/landing/` | ✅ Hecho |
 
 ### Criterios de éxito Sprint 5
 
@@ -56,6 +56,7 @@
 
 ✅ **34/34 tests passing** — 0 issues críticos en QA  
 ✅ `qa-report.md`, `docker-compose.yml`, `README.md`, `METRICAS.md` entregados  
+✅ Landing Page ultra-premium interactiva con configurador completada en `docs/landing/`  
 ✅ Costo real: ~$0.22 USD | Tiempo: ~4.5 horas  
 
 ### Próximo paso (Sprint 6)
