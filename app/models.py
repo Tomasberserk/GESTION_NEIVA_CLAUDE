@@ -48,6 +48,11 @@ class EstadoTicket(str, enum.Enum):
     CERRADO = "cerrado"
 
 
+class RemitenteRol(str, enum.Enum):
+    SUPERADMIN = "superadmin"
+    USUARIO = "usuario"
+
+
 # ---------------------------------------------------------------------------
 # AuditMixin
 # ---------------------------------------------------------------------------
@@ -303,7 +308,7 @@ class SoporteTicket(AuditMixin, Base):
     )
 
     empresa = relationship("Empresa", back_populates="soporte_tickets")
-    usuario = relationship("Usuario")
+    usuario = relationship("Usuario", foreign_keys=[usuario_id], viewonly=True)
     mensajes = relationship(
         "SoporteMensaje",
         back_populates="ticket",
@@ -332,7 +337,10 @@ class SoporteMensaje(Base):
         ForeignKey("soporte_tickets.id", ondelete="CASCADE"),
         nullable=False,
     )
-    remitente_rol = Column(String(30), nullable=False)   # 'superadmin' | 'usuario'
+    remitente_rol = Column(
+        SAEnum(RemitenteRol, name="remitenterol", values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+    )
     remitente_email = Column(String(255), nullable=False)
     mensaje = Column(Text, nullable=False)
     created_at = Column(
