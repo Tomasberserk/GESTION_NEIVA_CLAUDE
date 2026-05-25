@@ -1,7 +1,7 @@
 import uuid
 import enum
 from sqlalchemy import (
-    Column, String, Integer, Numeric, Boolean, Date,
+    Column, String, Integer, Numeric, Boolean, Date, Text,
     DateTime, ForeignKey, Enum as SAEnum, Index, UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -40,6 +40,12 @@ class CategoriaProducto(str, enum.Enum):
     LACTEOS   = "Lacteos"
     LIMPIEZA  = "Limpieza"
     PANADERIA = "Panaderia"
+
+
+class EstadoTicket(str, enum.Enum):
+    ABIERTO = "abierto"
+    RESPONDIDO = "respondido"
+    CERRADO = "cerrado"
 
 
 # ---------------------------------------------------------------------------
@@ -105,6 +111,11 @@ class Empresa(AuditMixin, Base):
     )
     ventas = relationship(
         "Venta",
+        back_populates="empresa",
+        cascade="all, delete-orphan",
+    )
+    soporte_tickets = relationship(
+        "SoporteTicket",
         back_populates="empresa",
         cascade="all, delete-orphan",
     )
@@ -264,3 +275,77 @@ class DetalleVenta(AuditMixin, Base):
             f"<DetalleVenta venta={self.venta_id} "
             f"producto={self.producto_id} qty={self.cantidad}>"
         )
+
+
+# ---------------------------------------------------------------------------
+# SoporteTicket (hilo de conversación de soporte)
+# ---------------------------------------------------------------------------
+
+class SoporteTicket(AuditMixin, Base):
+    __tablename__ = "soporte_tickets"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    empresa_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("empresas.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    usuario_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("usuarios.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    asunto = Column(String(150), nullable=False)
+    estado = Column(
+        SAEnum(EstadoTicket, name="estadoticket", values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+        server_default="abierto",
+    )
+
+    empresa = relationship("Empresa", back_populates="soporte_tickets")
+    usuario = relationship("Usuario")
+    mensajes = relationship(
+        "SoporteMensaje",
+        back_populates="ticket",
+        cascade="all, delete-orphan",
+        order_by="SoporteMensaje.created_at",
+    )
+
+    __table_args__ = (
+        Index("idx_soporte_tickets_empresa", "empresa_id"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<SoporteTicket {self.asunto!r} estado={self.estado}>"
+
+
+# ---------------------------------------------------------------------------
+# SoporteMensaje (mensaje individual dentro de un ticket)
+# ---------------------------------------------------------------------------
+
+class SoporteMensaje(Base):
+    __tablename__ = "soporte_mensajes"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    ticket_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("soporte_tickets.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    remitente_rol = Column(String(30), nullable=False)   # 'superadmin' | 'usuario'
+    remitente_email = Column(String(255), nullable=False)
+    mensaje = Column(Text, nullable=False)
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    ticket = relationship("SoporteTicket", back_populates="mensajes")
+
+    __table_args__ = (
+        Index("idx_soporte_mensajes_ticket", "ticket_id"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<SoporteMensaje rol={self.remitente_rol!r}>"
