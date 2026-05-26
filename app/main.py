@@ -1,12 +1,14 @@
 import os
 
 from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.routers import auth, dashboard, empresas, productos, reportes, ventas
+from app.routers import auth, dashboard, empresas, productos, reportes, ventas, superadmin, soporte
+from app.core.security_middleware import SecurityHeadersMiddleware
 
 _DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 
@@ -45,6 +47,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.add_middleware(SecurityHeadersMiddleware)
+
 # ---------------------------------------------------------------------------
 # Archivos estáticos (fotos de productos)
 # ---------------------------------------------------------------------------
@@ -61,6 +65,8 @@ app.include_router(empresas.router)
 app.include_router(productos.router)
 app.include_router(ventas.router)
 app.include_router(reportes.router)
+app.include_router(superadmin.router)
+app.include_router(soporte.router)
 
 # ---------------------------------------------------------------------------
 # Exception handlers globales
@@ -78,7 +84,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={"detail": exc.errors()},
+        content={"detail": jsonable_encoder(exc.errors())},
     )
 
 
