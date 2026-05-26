@@ -112,7 +112,7 @@ def listar_todos_tickets(
     """
     return (
         db.query(models.SoporteTicket)
-        .filter(models.SoporteTicket.is_active.is_(True))
+        .filter(models.SoporteTicket.is_active != False)
         .order_by(models.SoporteTicket.updated_at.desc())
         .all()
     )
@@ -131,7 +131,7 @@ def responder_ticket(
     """
     ticket = db.query(models.SoporteTicket).filter(
         models.SoporteTicket.id == ticket_id,
-        models.SoporteTicket.is_active.is_(True),
+        models.SoporteTicket.is_active != False,
     ).first()
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket no encontrado")
