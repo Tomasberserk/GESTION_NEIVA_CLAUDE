@@ -9,6 +9,7 @@ from app.database import get_db
 from app.schemas.soporte import (
     ActualizarEstado,
     ActualizarTrial,
+    EmpresaAdminOut,
     TicketListOut,
     TicketResponder,
 )
@@ -29,7 +30,7 @@ def _check_superadmin(x_superadmin_key: str = Header(default=None, alias="x-supe
         )
 
 
-@router.get("/empresas")
+@router.get("/empresas", response_model=list[EmpresaAdminOut])
 def listar_empresas(
     db: Session = Depends(get_db),
     _: None = Depends(_check_superadmin),
@@ -37,24 +38,31 @@ def listar_empresas(
     """
     Lista todas las empresas con estadísticas básicas.
     Requiere header x-superadmin-key.
+    Optimizado: usa GROUP BY en vez de N+1 queries.
     """
+    from sqlalchemy import func
+
+    # Single aggregated query for user counts per empresa
+    counts = dict(
+        db.query(models.Usuario.empresa_id, func.count(models.Usuario.id))
+        .group_by(models.Usuario.empresa_id)
+        .all()
+    )
+
+    # Single query for all empresas
     empresas = db.query(models.Empresa).order_by(models.Empresa.created_at.desc()).all()
+
     result = []
     for e in empresas:
-        total_usuarios = (
-            db.query(models.Usuario)
-            .filter(models.Usuario.empresa_id == e.id)
-            .count()
-        )
-        result.append({
-            "id": e.id,
-            "nombre_comercial": e.nombre_comercial,
-            "nit_o_cedula": e.nit_o_cedula,
-            "plan": e.plan.value if e.plan else None,
-            "is_active": e.is_active,
-            "trial_expires_at": e.trial_expires_at,
-            "total_usuarios": total_usuarios,
-        })
+        result.append(EmpresaAdminOut(
+            id=e.id,
+            nombre_comercial=e.nombre_comercial,
+            nit_o_cedula=e.nit_o_cedula,
+            plan=e.plan.value if e.plan else "basic",
+            is_active=e.is_active,
+            trial_expires_at=e.trial_expires_at,
+            total_usuarios=counts.get(e.id, 0),
+        ))
     return result
 
 
