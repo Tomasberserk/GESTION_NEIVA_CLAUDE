@@ -25,6 +25,7 @@ def crear_ticket(
         empresa_id=current_user.empresa_id,
         usuario_id=current_user.id,
         asunto=data.asunto,
+        is_active=True,
     )
     db.add(ticket)
     db.flush()
@@ -55,7 +56,7 @@ def listar_tickets(
         db.query(models.SoporteTicket)
         .filter(
             models.SoporteTicket.empresa_id == current_user.empresa_id,
-            models.SoporteTicket.is_active != False,
+            models.SoporteTicket.is_active.is_(True),
         )
         .order_by(models.SoporteTicket.updated_at.desc())
         .all()
@@ -77,7 +78,7 @@ def obtener_ticket(
         .filter(
             models.SoporteTicket.id == ticket_id,
             models.SoporteTicket.empresa_id == current_user.empresa_id,
-            models.SoporteTicket.is_active != False,
+            models.SoporteTicket.is_active.is_(True),
         )
         .first()
     )
@@ -102,7 +103,7 @@ def responder_ticket(
         .filter(
             models.SoporteTicket.id == ticket_id,
             models.SoporteTicket.empresa_id == current_user.empresa_id,
-            models.SoporteTicket.is_active != False,
+            models.SoporteTicket.is_active.is_(True),
         )
         .first()
     )
