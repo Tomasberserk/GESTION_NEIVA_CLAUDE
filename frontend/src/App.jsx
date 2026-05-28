@@ -7,6 +7,8 @@ import Dashboard from './pages/Dashboard'
 import Inventario from './pages/Inventario'
 import Ventas from './pages/Ventas'
 import Reportes from './pages/Reportes'
+import Soporte from './pages/Soporte'
+import SuperAdmin from './pages/SuperAdmin'
 
 
 export default function App() {
@@ -22,8 +24,11 @@ export default function App() {
           <Route path="/inventario" element={<Inventario />} />
           <Route path="/ventas" element={<Ventas />} />
           <Route path="/reportes" element={<Reportes />} />
+          <Route path="/soporte" element={<Soporte />} />
         </Route>
       </Route>
+
+      <Route path="/superadmin" element={<SuperAdmin />} />
 
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>

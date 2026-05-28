@@ -20,7 +20,8 @@
 [✅] Sprint 4 — Fundamentos de la fábrica (docs + templates + workflows)
 [✅] Sprint 5 — Pipeline funcional tier basic (COMPLETO)
 [✅] Sprint 6 — Template medium (COMPLETO)
-[🔄] Sprint 7 — Template professional + Hermes activado (SIGUIENTE)
+[✅] Sprint 7 — Template professional (Diseño & Especificaciones en factory/templates/professional/ COMPLETO)
+[🔄] Sprint 8 — Despliegue y Activación de Hermes-3 + Landing Page (SIGUIENTE)
 ```
 
 ---
@@ -75,10 +76,10 @@
 | 1 | CartSidebar en el layout | `Layout.jsx` | ✅ Hecho |
 | 2 | Fix unique barcode global → por empresa | `models.py` + migration 002 | ✅ Hecho |
 | 3 | Dashboard con métricas reales | `Dashboard.jsx` + `routers/dashboard.py` | ✅ Hecho |
-| 4 | Correr migration 002 en BD | `alembic upgrade head` | ⏳ Pendiente |
-| 5 | Probar flujo end-to-end | Manual: login → producto → venta | ⏳ Pendiente |
-| 6 | Tests auth básicos | `tests/test_auth.py` | ⏳ Pendiente |
-| 7 | Script arranque entorno | `dev.sh` o `Makefile` | ⏳ Pendiente |
+| 4 | Correr migration 002 en BD | `alembic upgrade head` | ✅ Hecho |
+| 5 | Probar flujo end-to-end | Manual: login → producto → venta | ✅ Hecho |
+| 6 | Tests auth básicos | `tests/test_auth.py` | ✅ Hecho |
+| 7 | Script arranque entorno | `dev.ps1` (Menú Interactivo Windows) | ✅ Hecho |
 
 ### Criterios de éxito Sprint 3
 
@@ -209,12 +210,44 @@
 
 ---
 
-## Sprint 7 — Template professional + Hermes activado
+## Sprint 7 — Template professional (COMPLETO)
 
-- Template professional: multi-tenant real, pagos, SSO, API pública
+- Template professional: multi-tenant real, pagos, SSO, API pública (Diseño & Especificaciones) ✅
+- **factory/templates/professional/ creado:** `schema.md`, `api-contracts.md`, `components-list.md` y `customization-checklist.md` ✅
+
+---
+
+## Sprint 7.5 — Panel Super Admin + Sistema de Soporte CRM (COMPLETO)
+
+**Objetivo:** Añadir una capa de operaciones internas a Gestión Neiva: panel de control para el superadmin y bandeja de soporte bidireccional entre tiendas y el equipo de soporte.
+
+| # | Tarea | Archivo | Estado |
+|---|-------|---------|--------|
+| 1 | Modelos `SoporteTicket` + `SoporteMensaje` en `app/models.py` | `app/models.py` | ✅ Completado |
+| 2 | Migración Alembic `006_crear_tablas_soporte` | `alembic/versions/006_crear_tablas_soporte.py` | ✅ Completado |
+| 3 | Schemas Pydantic: `TicketOut`, `EmpresaAdminOut`, etc. | `app/schemas/soporte.py` | ✅ Completado |
+| 4 | Router superadmin (empresas, trial, status, tickets) | `app/routers/superadmin.py` | ✅ Completado |
+| 5 | Router soporte (crear, listar, detalle, responder) | `app/routers/soporte.py` | ✅ Completado |
+| 6 | Registrar routers en `app/main.py` | `app/main.py` | ✅ Completado |
+| 7 | Sidebar + rutas frontend (`/soporte`, `/superadmin`) | `Sidebar.jsx` + `App.jsx` | ✅ Completado |
+| 8 | Página Soporte.jsx (bandeja Gmail-style) | `frontend/src/pages/Soporte.jsx` | ✅ Completado |
+| 9 | Página SuperAdmin.jsx (login por clave + 2 tabs) | `frontend/src/pages/SuperAdmin.jsx` | ✅ Completado |
+| 10 | Tests de integración (7/7 passing, 16/16 total) | `tests/test_soporte_crm.py` | ✅ Completado |
+
+### Criterios de éxito Sprint 7.5
+1. ✅ Usuario puede crear ticket, ver hilo y responder desde `/soporte`
+2. ✅ Superadmin autentica con `x-superadmin-key`, ve todas las empresas y tickets
+3. ✅ Superadmin puede responder tickets (estado → `respondido`)
+4. ✅ Flujo end-to-end: Crear ticket → Responder como admin → Ver actualización en hilo del cliente
+5. ✅ 16/16 tests passing (auth + OWASP + soporte CRM), build frontend sin errores
+
+---
+
+## Sprint 8 — Despliegue, Activación de Hermes-3 y Landing Page (SIGUIENTE)
+
 - **Activar Hermes-3 vía Together AI** (primer ingreso recurrente confirmado)
-- Documentación pública del portafolio
-- Landing page con los tres tiers
+- Documentación pública del portafolio comercial
+- Landing page oficial con los tres tiers integrados
 
 ---
 

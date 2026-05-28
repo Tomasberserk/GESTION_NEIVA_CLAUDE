@@ -1,0 +1,729 @@
+import { useState, useEffect, useCallback } from 'react'
+
+const API = 'http://localhost:8000'
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function apiFetch(path, clave, options = {}) {
+  return fetch(`${API}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'x-superadmin-key': clave,
+      ...(options.headers || {}),
+    },
+  })
+}
+
+function formatFecha(iso) {
+  if (!iso) return 'Sin trial'
+  try {
+    return new Date(iso).toLocaleDateString('es-CO', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    })
+  } catch {
+    return iso
+  }
+}
+
+function toDatetimeLocalValue(iso) {
+  if (!iso) return ''
+  try {
+    const d = new Date(iso)
+    const pad = (n) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  } catch {
+    return ''
+  }
+}
+
+// ─── Badges ───────────────────────────────────────────────────────────────────
+
+const PLAN_COLORS = {
+  basic: 'bg-slate-100 text-slate-700',
+  medium: 'bg-blue-100 text-blue-700',
+  professional: 'bg-purple-100 text-purple-700',
+}
+
+function PlanBadge({ plan }) {
+  const cls = PLAN_COLORS[plan] || 'bg-slate-100 text-slate-600'
+  return (
+    <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide ${cls}`}>
+      {plan || 'sin plan'}
+    </span>
+  )
+}
+
+const ESTADO_COLORS = {
+  abierto: 'bg-yellow-100 text-yellow-700',
+  respondido: 'bg-blue-100 text-blue-700',
+  cerrado: 'bg-slate-100 text-slate-500',
+}
+
+function EstadoBadge({ estado }) {
+  const cls = ESTADO_COLORS[estado] || 'bg-slate-100 text-slate-500'
+  const label = estado ? estado.charAt(0).toUpperCase() + estado.slice(1) : '—'
+  return (
+    <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${cls}`}>
+      {label}
+    </span>
+  )
+}
+
+function ActiveBadge({ activo }) {
+  return activo ? (
+    <span className="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-green-100 text-green-700">
+      Activo
+    </span>
+  ) : (
+    <span className="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-700">
+      Inactivo
+    </span>
+  )
+}
+
+// ─── Auth Screen ──────────────────────────────────────────────────────────────
+
+function PantallaLogin({ onLogin }) {
+  const [clave, setClave] = useState('')
+  const [error, setError] = useState('')
+  const [cargando, setCargando] = useState(false)
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!clave.trim()) return
+    setCargando(true)
+    setError('')
+    try {
+      const res = await apiFetch('/superadmin/empresas', clave.trim())
+      if (res.ok) {
+        localStorage.setItem('x-superadmin-key', clave.trim())
+        onLogin(clave.trim())
+      } else if (res.status === 403) {
+        setError('Clave incorrecta')
+      } else {
+        setError('Error de conexión')
+      }
+    } catch {
+      setError('Error de conexión')
+    } finally {
+      setCargando(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm">
+        <div className="mb-6 text-center">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-indigo-100 mb-3">
+            <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+          </div>
+          <h1 className="text-xl font-bold text-slate-800">Panel Super Admin</h1>
+          <p className="text-sm text-slate-500 mt-1">Ingresa la clave de administrador para continuar</p>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="clave">
+              Clave de acceso
+            </label>
+            <input
+              id="clave"
+              type="password"
+              placeholder="Clave de acceso"
+              value={clave}
+              onChange={(e) => setClave(e.target.value)}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              autoFocus
+            />
+          </div>
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              {error}
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={cargando || !clave.trim()}
+            className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-semibold rounded-lg py-2 text-sm transition-colors"
+          >
+            {cargando ? 'Verificando...' : 'Ingresar'}
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// ─── Empresa Card ─────────────────────────────────────────────────────────────
+
+function EmpresaCard({ empresa, clave, onRefresh }) {
+  const [cargandoStatus, setCargandoStatus] = useState(false)
+  const [mostrarTrial, setMostrarTrial] = useState(false)
+  const [nuevaTrial, setNuevaTrial] = useState(toDatetimeLocalValue(empresa.trial_expires_at))
+  const [cargandoTrial, setCargandoTrial] = useState(false)
+  const [errorLocal, setErrorLocal] = useState('')
+
+  async function toggleStatus() {
+    setCargandoStatus(true)
+    setErrorLocal('')
+    try {
+      const res = await apiFetch(`/superadmin/empresas/${empresa.id}/status`, clave, {
+        method: 'PUT',
+        body: JSON.stringify({ is_active: !empresa.is_active }),
+      })
+      if (res.ok) {
+        onRefresh()
+      } else {
+        setErrorLocal('Error al cambiar estado')
+      }
+    } catch {
+      setErrorLocal('Error de conexión')
+    } finally {
+      setCargandoStatus(false)
+    }
+  }
+
+  async function confirmarTrial() {
+    if (!nuevaTrial) return
+    setCargandoTrial(true)
+    setErrorLocal('')
+    try {
+      const res = await apiFetch(`/superadmin/empresas/${empresa.id}/trial`, clave, {
+        method: 'PUT',
+        body: JSON.stringify({ trial_expires_at: nuevaTrial }),
+      })
+      if (res.ok) {
+        setMostrarTrial(false)
+        onRefresh()
+      } else {
+        setErrorLocal('Error al extender trial')
+      }
+    } catch {
+      setErrorLocal('Error de conexión')
+    } finally {
+      setCargandoTrial(false)
+    }
+  }
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4 flex flex-col gap-3">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h3 className="font-bold text-slate-800 text-base leading-tight">{empresa.nombre_comercial}</h3>
+          <p className="text-xs text-slate-500 mt-0.5">{empresa.nit_o_cedula}</p>
+        </div>
+        <ActiveBadge activo={empresa.is_active} />
+      </div>
+
+      <div className="flex flex-wrap gap-2 items-center">
+        <PlanBadge plan={empresa.plan} />
+        <span className="text-xs text-slate-500">{empresa.total_usuarios} usuario{empresa.total_usuarios !== 1 ? 's' : ''}</span>
+      </div>
+
+      <div className="text-xs text-slate-600">
+        <span className="font-medium">Trial:</span>{' '}
+        {formatFecha(empresa.trial_expires_at)}
+      </div>
+
+      {errorLocal && (
+        <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1">{errorLocal}</p>
+      )}
+
+      <div className="flex flex-wrap gap-2 mt-1">
+        <button
+          onClick={toggleStatus}
+          disabled={cargandoStatus}
+          className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-colors disabled:opacity-50 ${
+            empresa.is_active
+              ? 'bg-red-600 hover:bg-red-700 text-white'
+              : 'bg-green-600 hover:bg-green-700 text-white'
+          }`}
+        >
+          {cargandoStatus ? '...' : empresa.is_active ? 'Desactivar' : 'Activar'}
+        </button>
+        <button
+          onClick={() => setMostrarTrial((v) => !v)}
+          className="text-xs px-3 py-1.5 rounded-lg font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition-colors"
+        >
+          Extender Trial
+        </button>
+      </div>
+
+      {mostrarTrial && (
+        <div className="border border-indigo-200 bg-indigo-50 rounded-lg p-3 flex flex-col gap-2">
+          <label className="text-xs font-medium text-indigo-700">Nueva fecha de trial</label>
+          <input
+            type="datetime-local"
+            value={nuevaTrial}
+            onChange={(e) => setNuevaTrial(e.target.value)}
+            className="text-xs border border-indigo-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={confirmarTrial}
+              disabled={cargandoTrial || !nuevaTrial}
+              className="text-xs px-3 py-1.5 rounded-lg font-semibold bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 transition-colors"
+            >
+              {cargandoTrial ? 'Guardando...' : 'Confirmar'}
+            </button>
+            <button
+              onClick={() => setMostrarTrial(false)}
+              className="text-xs px-3 py-1.5 rounded-lg font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Tab Comercios ────────────────────────────────────────────────────────────
+
+function TabComercios({ clave }) {
+  const [empresas, setEmpresas] = useState([])
+  const [cargando, setCargando] = useState(true)
+  const [error, setError] = useState('')
+
+  const cargarEmpresas = useCallback(async () => {
+    setCargando(true)
+    setError('')
+    try {
+      const res = await apiFetch('/superadmin/empresas', clave)
+      if (res.ok) {
+        const data = await res.json()
+        setEmpresas(data)
+      } else {
+        setError('Error al cargar empresas')
+      }
+    } catch {
+      setError('Error de conexión')
+    } finally {
+      setCargando(false)
+    }
+  }, [clave])
+
+  useEffect(() => {
+    cargarEmpresas()
+  }, [cargarEmpresas])
+
+  if (cargando) {
+    return (
+      <div className="flex items-center justify-center py-16 text-slate-500 text-sm">
+        Cargando comercios...
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 gap-3">
+        <p className="text-red-600 text-sm">{error}</p>
+        <button onClick={cargarEmpresas} className="text-sm text-indigo-600 hover:underline">
+          Reintentar
+        </button>
+      </div>
+    )
+  }
+
+  if (empresas.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-16 text-slate-400 text-sm">
+        No hay comercios registrados.
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm text-slate-500">{empresas.length} comercio{empresas.length !== 1 ? 's' : ''} registrado{empresas.length !== 1 ? 's' : ''}</p>
+        <button
+          onClick={cargarEmpresas}
+          className="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
+        >
+          Actualizar
+        </button>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {empresas.map((empresa) => (
+          <EmpresaCard
+            key={empresa.id}
+            empresa={empresa}
+            clave={clave}
+            onRefresh={cargarEmpresas}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── Tab Soporte ──────────────────────────────────────────────────────────────
+
+const FILTROS = ['todos', 'abierto', 'respondido', 'cerrado']
+
+function TicketListItem({ ticket, seleccionado, onClick }) {
+  const fecha = ticket.created_at
+    ? new Date(ticket.created_at).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
+    : '—'
+  const empresaCorta = ticket.empresa_id
+    ? String(ticket.empresa_id).substring(0, 8) + '...'
+    : '—'
+
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full text-left px-4 py-3 border-b border-slate-100 hover:bg-slate-50 transition-colors ${
+        seleccionado ? 'bg-indigo-50 border-l-2 border-l-indigo-500' : ''
+      }`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <p className={`text-sm font-semibold leading-tight ${seleccionado ? 'text-indigo-700' : 'text-slate-800'} line-clamp-1`}>
+          {ticket.asunto || 'Sin asunto'}
+        </p>
+        <EstadoBadge estado={ticket.estado} />
+      </div>
+      <div className="flex items-center gap-2 mt-1">
+        <span className="text-xs text-slate-400">{fecha}</span>
+        <span className="text-xs text-slate-400">·</span>
+        <span className="text-xs text-slate-400 font-mono">{empresaCorta}</span>
+      </div>
+    </button>
+  )
+}
+
+function TicketDetalle({ ticket, clave, onRefresh }) {
+  const [respuesta, setRespuesta] = useState('')
+  const [cargando, setCargando] = useState(false)
+  const [error, setError] = useState('')
+  const [exito, setExito] = useState(false)
+
+  // Reset state when ticket changes
+  useEffect(() => {
+    setRespuesta('')
+    setError('')
+    setExito(false)
+  }, [ticket?.id])
+
+  async function enviarRespuesta() {
+    if (!respuesta.trim()) return
+    setCargando(true)
+    setError('')
+    setExito(false)
+    try {
+      const res = await apiFetch(`/superadmin/tickets/${ticket.id}/responder`, clave, {
+        method: 'POST',
+        body: JSON.stringify({ mensaje: respuesta.trim() }),
+      })
+      if (res.ok) {
+        setRespuesta('')
+        setExito(true)
+        onRefresh()
+        setTimeout(() => setExito(false), 3000)
+      } else {
+        setError('Error al enviar respuesta')
+      }
+    } catch {
+      setError('Error de conexión')
+    } finally {
+      setCargando(false)
+    }
+  }
+
+  if (!ticket) {
+    return (
+      <div className="flex items-center justify-center h-full py-16 text-slate-400 text-sm">
+        Selecciona un ticket para ver el detalle
+      </div>
+    )
+  }
+
+  const fechaCreado = ticket.created_at
+    ? new Date(ticket.created_at).toLocaleString('es-CO', {
+        year: 'numeric', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+      })
+    : '—'
+  const fechaActualizado = ticket.updated_at
+    ? new Date(ticket.updated_at).toLocaleString('es-CO', {
+        year: 'numeric', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+      })
+    : '—'
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="p-4 border-b border-slate-200">
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <h3 className="font-bold text-slate-800 text-base leading-tight">{ticket.asunto || 'Sin asunto'}</h3>
+          <EstadoBadge estado={ticket.estado} />
+        </div>
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-500">
+          <dt className="font-medium text-slate-600">Empresa ID</dt>
+          <dd className="font-mono">{ticket.empresa_id || '—'}</dd>
+          <dt className="font-medium text-slate-600">Creado</dt>
+          <dd>{fechaCreado}</dd>
+          <dt className="font-medium text-slate-600">Actualizado</dt>
+          <dd>{fechaActualizado}</dd>
+        </dl>
+      </div>
+
+      <div className="p-4 bg-amber-50 border-b border-amber-100">
+        <p className="text-xs text-amber-700">
+          Los mensajes del hilo estan disponibles en la vista del cliente.
+        </p>
+      </div>
+
+      <div className="flex-1 p-4 flex flex-col gap-3">
+        <label className="text-sm font-semibold text-slate-700">Responder al ticket</label>
+        <textarea
+          value={respuesta}
+          onChange={(e) => setRespuesta(e.target.value)}
+          placeholder="Escribe tu respuesta al cliente..."
+          rows={5}
+          className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+        />
+        {error && (
+          <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1">{error}</p>
+        )}
+        {exito && (
+          <p className="text-xs text-green-600 bg-green-50 border border-green-200 rounded px-2 py-1">
+            Respuesta enviada correctamente.
+          </p>
+        )}
+        <button
+          onClick={enviarRespuesta}
+          disabled={cargando || !respuesta.trim()}
+          className="self-start bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+        >
+          {cargando ? 'Enviando...' : 'Responder'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function TabSoporte({ clave }) {
+  const [tickets, setTickets] = useState([])
+  const [cargando, setCargando] = useState(true)
+  const [error, setError] = useState('')
+  const [filtro, setFiltro] = useState('todos')
+  const [ticketSeleccionado, setTicketSeleccionado] = useState(null)
+
+  const cargarTickets = useCallback(async () => {
+    setCargando(true)
+    setError('')
+    try {
+      const res = await apiFetch('/superadmin/tickets', clave)
+      if (res.ok) {
+        const data = await res.json()
+        setTickets(data)
+        // Keep selected ticket in sync after refresh
+        if (ticketSeleccionado) {
+          const actualizado = data.find((t) => t.id === ticketSeleccionado.id)
+          setTicketSeleccionado(actualizado || null)
+        }
+      } else {
+        setError('Error al cargar tickets')
+      }
+    } catch {
+      setError('Error de conexión')
+    } finally {
+      setCargando(false)
+    }
+  }, [clave]) // intentionally omit ticketSeleccionado to avoid loop
+
+  useEffect(() => {
+    cargarTickets()
+  }, [cargarTickets])
+
+  const ticketsFiltrados = filtro === 'todos'
+    ? tickets
+    : tickets.filter((t) => t.estado === filtro)
+
+  return (
+    <div className="flex flex-col h-full" style={{ minHeight: '600px' }}>
+      {/* Filter bar */}
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        {FILTROS.map((f) => (
+          <button
+            key={f}
+            onClick={() => setFiltro(f)}
+            className={`text-xs px-3 py-1.5 rounded-full font-semibold capitalize transition-colors ${
+              filtro === f
+                ? 'bg-indigo-600 text-white'
+                : 'bg-white border border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-600'
+            }`}
+          >
+            {f === 'todos' ? 'Todos' : f.charAt(0).toUpperCase() + f.slice(1)}
+            {f === 'todos' && ` (${tickets.length})`}
+            {f !== 'todos' && ` (${tickets.filter((t) => t.estado === f).length})`}
+          </button>
+        ))}
+        <button
+          onClick={cargarTickets}
+          className="ml-auto text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
+        >
+          Actualizar
+        </button>
+      </div>
+
+      {/* Two-column layout */}
+      <div className="flex flex-1 border border-slate-200 rounded-xl overflow-hidden bg-white">
+        {/* Left: ticket list */}
+        <div className="w-80 flex-shrink-0 border-r border-slate-200 overflow-y-auto">
+          {cargando ? (
+            <div className="flex items-center justify-center py-10 text-slate-400 text-sm">
+              Cargando...
+            </div>
+          ) : error ? (
+            <div className="p-4 text-sm text-red-600">{error}</div>
+          ) : ticketsFiltrados.length === 0 ? (
+            <div className="flex items-center justify-center py-10 text-slate-400 text-sm">
+              Sin tickets en este filtro
+            </div>
+          ) : (
+            ticketsFiltrados.map((ticket) => (
+              <TicketListItem
+                key={ticket.id}
+                ticket={ticket}
+                seleccionado={ticketSeleccionado?.id === ticket.id}
+                onClick={() => setTicketSeleccionado(ticket)}
+              />
+            ))
+          )}
+        </div>
+
+        {/* Right: ticket detail */}
+        <div className="flex-1 overflow-y-auto">
+          <TicketDetalle
+            ticket={ticketSeleccionado}
+            clave={clave}
+            onRefresh={cargarTickets}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Main Panel ───────────────────────────────────────────────────────────────
+
+function PanelPrincipal({ clave, onLogout }) {
+  const [tabActiva, setTabActiva] = useState('comercios')
+
+  const TABS = [
+    { id: 'comercios', label: 'Comercios' },
+    { id: 'soporte', label: 'Soporte' },
+  ]
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col">
+      {/* Header */}
+      <header className="bg-slate-800 text-white px-6 py-3 flex items-center justify-between shadow">
+        <div className="flex items-center gap-3">
+          <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+          <span className="font-bold text-base tracking-wide">Panel Super Admin</span>
+          <span className="hidden sm:inline text-slate-400 text-xs font-mono ml-2">Gestion Neiva</span>
+        </div>
+        <button
+          onClick={onLogout}
+          className="text-sm text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg font-medium transition-colors"
+        >
+          Cerrar sesion
+        </button>
+      </header>
+
+      {/* Tabs */}
+      <div className="bg-white border-b border-slate-200 px-6">
+        <nav className="flex gap-6">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setTabActiva(tab.id)}
+              className={`py-3 text-sm font-semibold border-b-2 transition-colors ${
+                tabActiva === tab.id
+                  ? 'border-indigo-600 text-indigo-700'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* Content */}
+      <main className="flex-1 px-4 sm:px-6 py-6 max-w-7xl mx-auto w-full">
+        {tabActiva === 'comercios' && <TabComercios clave={clave} />}
+        {tabActiva === 'soporte' && <TabSoporte clave={clave} />}
+      </main>
+    </div>
+  )
+}
+
+// ─── Root Component ───────────────────────────────────────────────────────────
+
+export default function SuperAdmin() {
+  const [autenticado, setAutenticado] = useState(false)
+  const [clave, setClave] = useState('')
+  const [verificando, setVerificando] = useState(true)
+
+  // On mount: check stored key
+  useEffect(() => {
+    const stored = localStorage.getItem('x-superadmin-key')
+    if (!stored) {
+      setVerificando(false)
+      return
+    }
+    apiFetch('/superadmin/empresas', stored)
+      .then((res) => {
+        if (res.ok) {
+          setClave(stored)
+          setAutenticado(true)
+        } else {
+          localStorage.removeItem('x-superadmin-key')
+        }
+      })
+      .catch(() => {
+        // network error — clear stored key for safety
+        localStorage.removeItem('x-superadmin-key')
+      })
+      .finally(() => {
+        setVerificando(false)
+      })
+  }, [])
+
+  function handleLogin(nuevaClave) {
+    setClave(nuevaClave)
+    setAutenticado(true)
+  }
+
+  function handleLogout() {
+    localStorage.removeItem('x-superadmin-key')
+    setClave('')
+    setAutenticado(false)
+  }
+
+  if (verificando) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center">
+        <p className="text-slate-500 text-sm">Verificando sesion...</p>
+      </div>
+    )
+  }
+
+  if (!autenticado) {
+    return <PantallaLogin onLogin={handleLogin} />
+  }
+
+  return <PanelPrincipal clave={clave} onLogout={handleLogout} />
+}

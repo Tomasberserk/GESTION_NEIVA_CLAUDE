@@ -4,6 +4,7 @@ import {
   Package,
   ShoppingCart,
   BarChart3,
+  MessageCircle,
   Settings,
   X,
 } from 'lucide-react'
@@ -14,6 +15,7 @@ const navItems = [
   { to: '/inventario',    label: 'Inventario',    icon: Package },
   { to: '/ventas',        label: 'Ventas',        icon: ShoppingCart },
   { to: '/reportes',      label: 'Reportes',      icon: BarChart3 },
+  { to: '/soporte',       label: 'Soporte Técnico', icon: MessageCircle },
   { to: '/configuracion', label: 'Configuración', icon: Settings },
 ]
 
