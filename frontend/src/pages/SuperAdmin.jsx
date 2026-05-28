@@ -328,12 +328,114 @@ function EmpresaCard({ empresa, clave, onRefresh }) {
   )
 }
 
+// ─── Modal Nueva Empresa ──────────────────────────────────────────────────────
+
+function ModalNuevaEmpresa({ onClose, onCreada }) {
+  const [form, setForm] = useState({
+    nombre_comercial: '',
+    nit_o_cedula: '',
+    email: '',
+    password: '',
+  })
+  const [cargando, setCargando] = useState(false)
+  const [error, setError] = useState('')
+
+  function cambiar(e) {
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!form.nombre_comercial.trim() || !form.nit_o_cedula.trim() || !form.email.trim() || !form.password.trim()) {
+      setError('Todos los campos son obligatorios.')
+      return
+    }
+    setCargando(true)
+    setError('')
+    try {
+      const res = await fetch(`${API}/auth/registro-completo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...form, rol: 'admin' }),
+      })
+      if (res.status === 201 || res.ok) {
+        onCreada()
+        onClose()
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setError(data?.detail || 'Error al crear la empresa.')
+      }
+    } catch {
+      setError('Error de conexion.')
+    } finally {
+      setCargando(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 relative">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors text-lg leading-none"
+        >
+          &times;
+        </button>
+        <h2 className="text-lg font-bold text-slate-800 mb-1">Nueva Empresa</h2>
+        <p className="text-sm text-slate-500 mb-5">
+          Se creara un usuario administrador junto con la empresa.
+        </p>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
+          )}
+          {[
+            { name: 'nombre_comercial', label: 'Nombre comercial', type: 'text', placeholder: 'Ej: Tienda Don Pedro' },
+            { name: 'nit_o_cedula', label: 'NIT o Cedula', type: 'text', placeholder: 'Ej: 900123456' },
+            { name: 'email', label: 'Email del admin', type: 'email', placeholder: 'admin@empresa.com' },
+            { name: 'password', label: 'Contrasena inicial', type: 'password', placeholder: 'Min. 8 caracteres' },
+          ].map(({ name, label, type, placeholder }) => (
+            <div key={name}>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
+              <input
+                type={type}
+                name={name}
+                value={form[name]}
+                onChange={cambiar}
+                placeholder={placeholder}
+                className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition"
+              />
+            </div>
+          ))}
+          <div className="flex gap-3 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold py-2.5 rounded-xl transition-colors text-sm"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={cargando}
+              className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl transition-colors text-sm"
+            >
+              {cargando ? 'Creando...' : 'Crear Empresa'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 // ─── Tab Comercios ────────────────────────────────────────────────────────────
 
 function TabComercios({ clave }) {
   const [empresas, setEmpresas] = useState([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
+  const [mostrarModal, setMostrarModal] = useState(false)
 
   const cargarEmpresas = useCallback(async () => {
     setCargando(true)
@@ -376,24 +478,24 @@ function TabComercios({ clave }) {
     )
   }
 
-  if (empresas.length === 0) {
-    return (
-      <div className="flex items-center justify-center py-16 text-slate-400 text-sm">
-        No hay comercios registrados.
-      </div>
-    )
-  }
-
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm text-slate-500">{empresas.length} comercio{empresas.length !== 1 ? 's' : ''} registrado{empresas.length !== 1 ? 's' : ''}</p>
-        <button
-          onClick={cargarEmpresas}
-          className="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
-        >
-          Actualizar
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={cargarEmpresas}
+            className="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
+          >
+            Actualizar
+          </button>
+          <button
+            onClick={() => setMostrarModal(true)}
+            className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-3 py-1.5 rounded-lg transition-colors"
+          >
+            + Nueva Empresa
+          </button>
+        </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {empresas.map((empresa) => (
@@ -405,6 +507,12 @@ function TabComercios({ clave }) {
           />
         ))}
       </div>
+      {mostrarModal && (
+        <ModalNuevaEmpresa
+          onClose={() => setMostrarModal(false)}
+          onCreada={cargarEmpresas}
+        />
+      )}
     </div>
   )
 }
