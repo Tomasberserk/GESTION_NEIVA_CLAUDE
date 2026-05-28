@@ -9,7 +9,6 @@ import Reportes from './pages/Reportes'
 import Soporte from './pages/Soporte'
 import SuperAdmin from './pages/SuperAdmin'
 
-
 export default function App() {
   return (
     <Routes>
