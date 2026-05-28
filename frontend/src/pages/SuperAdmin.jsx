@@ -166,6 +166,27 @@ function EmpresaCard({ empresa, clave, onRefresh }) {
   const [nuevaTrial, setNuevaTrial] = useState(toDatetimeLocalValue(empresa.trial_expires_at))
   const [cargandoTrial, setCargandoTrial] = useState(false)
   const [errorLocal, setErrorLocal] = useState('')
+  const [confirmandoEliminar, setConfirmandoEliminar] = useState(false)
+  const [cargandoEliminar, setCargandoEliminar] = useState(false)
+
+  async function eliminarEmpresa() {
+    setCargandoEliminar(true)
+    setErrorLocal('')
+    try {
+      const res = await apiFetch(`/superadmin/empresas/${empresa.id}`, clave, { method: 'DELETE' })
+      if (res.ok || res.status === 204) {
+        onRefresh()
+      } else {
+        setErrorLocal('Error al eliminar')
+        setConfirmandoEliminar(false)
+      }
+    } catch {
+      setErrorLocal('Error de conexión')
+      setConfirmandoEliminar(false)
+    } finally {
+      setCargandoEliminar(false)
+    }
+  }
 
   async function toggleStatus() {
     setCargandoStatus(true)
@@ -251,6 +272,30 @@ function EmpresaCard({ empresa, clave, onRefresh }) {
         >
           Extender Trial
         </button>
+        {!confirmandoEliminar ? (
+          <button
+            onClick={() => setConfirmandoEliminar(true)}
+            className="text-xs px-3 py-1.5 rounded-lg font-semibold bg-slate-100 hover:bg-red-100 text-slate-600 hover:text-red-700 transition-colors"
+          >
+            Eliminar
+          </button>
+        ) : (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={eliminarEmpresa}
+              disabled={cargandoEliminar}
+              className="text-xs px-3 py-1.5 rounded-lg font-semibold bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 transition-colors"
+            >
+              {cargandoEliminar ? '...' : 'Si, borrar'}
+            </button>
+            <button
+              onClick={() => setConfirmandoEliminar(false)}
+              className="text-xs px-3 py-1.5 rounded-lg font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+            >
+              Cancelar
+            </button>
+          </div>
+        )}
       </div>
 
       {mostrarTrial && (

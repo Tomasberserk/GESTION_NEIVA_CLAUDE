@@ -118,6 +118,19 @@ def listar_todos_tickets(
     )
 
 
+@router.delete("/empresas/{empresa_id}", status_code=status.HTTP_204_NO_CONTENT)
+def eliminar_empresa(
+    empresa_id: UUID,
+    db: Session = Depends(get_db),
+    _: None = Depends(_check_superadmin),
+):
+    empresa = db.query(models.Empresa).filter(models.Empresa.id == empresa_id).first()
+    if not empresa:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+    db.delete(empresa)
+    db.commit()
+
+
 @router.post("/tickets/{ticket_id}/responder")
 def responder_ticket(
     ticket_id: UUID,
