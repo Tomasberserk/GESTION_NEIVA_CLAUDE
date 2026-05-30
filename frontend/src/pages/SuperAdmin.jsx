@@ -359,6 +359,7 @@ function ModalNuevaEmpresa({ onClose, onCreada }) {
         body: JSON.stringify({ ...form, rol: 'admin' }),
       })
       if (res.status === 201 || res.ok) {
+        setForm({ nombre_comercial: '', nit_o_cedula: '', email: '', password: '' })
         onCreada()
         onClose()
       } else {
@@ -366,7 +367,7 @@ function ModalNuevaEmpresa({ onClose, onCreada }) {
         setError(data?.detail || 'Error al crear la empresa.')
       }
     } catch {
-      setError('Error de conexion.')
+      setError('Error de conexión.')
     } finally {
       setCargando(false)
     }
@@ -377,7 +378,8 @@ function ModalNuevaEmpresa({ onClose, onCreada }) {
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 relative">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors text-lg leading-none"
+          disabled={cargando}
+          className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 disabled:opacity-30 transition-colors text-lg leading-none"
         >
           &times;
         </button>
@@ -403,6 +405,7 @@ function ModalNuevaEmpresa({ onClose, onCreada }) {
                 value={form[name]}
                 onChange={cambiar}
                 placeholder={placeholder}
+                autoFocus={name === 'nombre_comercial'}
                 className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition"
               />
             </div>
@@ -411,7 +414,8 @@ function ModalNuevaEmpresa({ onClose, onCreada }) {
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold py-2.5 rounded-xl transition-colors text-sm"
+              disabled={cargando}
+              className="flex-1 border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 text-slate-700 font-semibold py-2.5 rounded-xl transition-colors text-sm"
             >
               Cancelar
             </button>
