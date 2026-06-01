@@ -163,12 +163,12 @@ export default function CuentasPorPagar() {
   }
 
   // KPIs calculados localmente
-  const totalDeudas = cuentas.reduce((s, c) => s + (c.saldo_pendiente ?? 0), 0)
+  const totalDeudas = cuentas.reduce((s, c) => s + (Number(c.saldo_pendiente) || 0), 0)
   const totalVencidas = cuentas.filter(c => {
     const dias = calcDias(c.fecha_vencimiento)
     return c.estado === 'VENCIDA' || (dias !== null && dias < 0)
-  }).reduce((s, c) => s + (c.saldo_pendiente ?? 0), 0)
-  const totalAbonado = cuentas.reduce((s, c) => s + ((c.monto_total ?? 0) - (c.saldo_pendiente ?? 0)), 0)
+  }).reduce((s, c) => s + (Number(c.saldo_pendiente) || 0), 0)
+  const totalAbonado = cuentas.reduce((s, c) => s + ((Number(c.monto_total) || 0) - (Number(c.saldo_pendiente) || 0)), 0)
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
@@ -231,8 +231,10 @@ export default function CuentasPorPagar() {
               const dias = calcDias(cxp.fecha_vencimiento)
               const badge = badgeEstado(cxp.estado, dias)
               const BadgeIcon = badge.icon
-              const pct = cxp.monto_total > 0
-                ? Math.round(((cxp.monto_total - cxp.saldo_pendiente) / cxp.monto_total) * 100)
+              const montoTotalNum = Number(cxp.monto_total) || 0
+              const saldoPendienteNum = Number(cxp.saldo_pendiente) || 0
+              const pct = montoTotalNum > 0
+                ? Math.round(((montoTotalNum - saldoPendienteNum) / montoTotalNum) * 100)
                 : 0
 
               return (

@@ -39,6 +39,29 @@ function toDatetimeLocalValue(iso) {
   }
 }
 
+function formatError(detail) {
+  if (!detail) return 'Ocurrió un error inesperado.'
+  if (typeof detail === 'string') return detail
+  if (Array.isArray(detail)) {
+    return detail.map((err) => {
+      let msg = err.msg || 'Error de validación'
+      if (msg.startsWith('Value error, ')) {
+        msg = msg.replace('Value error, ', '')
+      }
+      if (err.loc && err.loc.length > 1) {
+        const campo = err.loc[err.loc.length - 1]
+        const campoFormateado = campo.charAt(0).toUpperCase() + campo.slice(1)
+        return `${campoFormateado}: ${msg}`
+      }
+      return msg
+    }).join(' | ')
+  }
+  if (typeof detail === 'object') {
+    return detail.msg || JSON.stringify(detail)
+  }
+  return String(detail)
+}
+
 // ─── Badges ───────────────────────────────────────────────────────────────────
 
 const PLAN_COLORS = {
@@ -364,7 +387,7 @@ function ModalNuevaEmpresa({ onClose, onCreada }) {
         onClose()
       } else {
         const data = await res.json().catch(() => ({}))
-        setError(data?.detail || 'Error al crear la empresa.')
+        setError(formatError(data?.detail) || 'Error al crear la empresa.')
       }
     } catch {
       setError('Error de conexión.')
@@ -387,16 +410,16 @@ function ModalNuevaEmpresa({ onClose, onCreada }) {
         <p className="text-sm text-slate-500 mb-5">
           Se creara un usuario administrador junto con la empresa.
         </p>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
           {error && (
             <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
           )}
           {[
-            { name: 'nombre_comercial', label: 'Nombre comercial', type: 'text', placeholder: 'Ej: Tienda Don Pedro' },
-            { name: 'nit_o_cedula', label: 'NIT o Cedula', type: 'text', placeholder: 'Ej: 900123456' },
-            { name: 'email', label: 'Email del admin', type: 'email', placeholder: 'admin@empresa.com' },
-            { name: 'password', label: 'Contrasena inicial', type: 'password', placeholder: 'Min. 8 caracteres' },
-          ].map(({ name, label, type, placeholder }) => (
+            { name: 'nombre_comercial', label: 'Nombre comercial', type: 'text', placeholder: 'Ej: Tienda Don Pedro', autocomplete: 'off' },
+            { name: 'nit_o_cedula', label: 'NIT o Cedula', type: 'text', placeholder: 'Ej: 900123456', autocomplete: 'off' },
+            { name: 'email', label: 'Email del admin', type: 'email', placeholder: 'admin@empresa.com', autocomplete: 'new-email' },
+            { name: 'password', label: 'Contrasena inicial', type: 'password', placeholder: 'Min. 8 caracteres', autocomplete: 'new-password' },
+          ].map(({ name, label, type, placeholder, autocomplete }) => (
             <div key={name}>
               <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
               <input
@@ -406,6 +429,7 @@ function ModalNuevaEmpresa({ onClose, onCreada }) {
                 onChange={cambiar}
                 placeholder={placeholder}
                 autoFocus={name === 'nombre_comercial'}
+                autoComplete={autocomplete}
                 className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition"
               />
             </div>
@@ -734,7 +758,7 @@ function TabSoporte({ clave }) {
       {/* Two-column layout */}
       <div className="flex flex-1 border border-slate-200 rounded-xl overflow-hidden bg-white">
         {/* Left: ticket list */}
-        <div className="w-80 flex-shrink-0 border-r border-slate-200 overflow-y-auto">
+        <div className="w-80 shrink-0 border-r border-slate-200 overflow-y-auto">
           {cargando ? (
             <div className="flex items-center justify-center py-10 text-slate-400 text-sm">
               Cargando...

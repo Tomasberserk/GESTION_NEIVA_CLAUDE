@@ -60,7 +60,7 @@ function BuscadorProducto({ onAgregar }) {
               >
                 <div>
                   <p className="text-sm font-medium text-slate-800">{p.nombre}</p>
-                  <p className="text-xs text-slate-400">{p.codigo_barras} · stock: {p.cantidad_actual}</p>
+                  <p className="text-xs text-slate-400">{p.codigo_barras} · stock: {Number(p.cantidad_actual)}</p>
                 </div>
                 <p className="text-xs text-slate-500 shrink-0 ml-4">${fmt(p.precio_costo)}</p>
               </button>

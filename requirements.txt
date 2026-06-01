@@ -23,6 +23,7 @@ openpyxl==3.1.2
 pytest==7.4.3
 pytest-asyncio==0.21.1
 httpx==0.25.2
+locust==2.24.1
 
-# Async DB
-asyncpg==0.29.0
+# Async DB (Opcional, comentar en Windows para evitar error de compilación C)
+# asyncpg==0.29.0

@@ -79,3 +79,67 @@ def exportar_ventas_excel(
             "Content-Disposition": f"attachment; filename=ventas_{empresa_id}.xlsx"
         },
     )
+
+
+@router.get("/financieros/{empresa_id}")
+def obtener_resumen_financiero(
+    empresa_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(get_current_user),
+):
+    if current_user.empresa_id != empresa_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acceso no autorizado",
+        )
+
+    from sqlalchemy import func
+
+    # 1. Inversion en inventario activo (stock * costo)
+    inversion_activa = db.query(
+        func.sum(models.Producto.cantidad_actual * models.Producto.precio_costo)
+    ).filter(
+        models.Producto.empresa_id == empresa_id,
+        models.Producto.is_active.is_(True),
+    ).scalar() or 0
+
+    # 2. Ingresos totales por ventas
+    ingresos_totales = db.query(
+        func.sum(models.Venta.total)
+    ).filter(
+        models.Venta.empresa_id == empresa_id,
+    ).scalar() or 0
+
+    # 3. Costo de ventas (COGS acumulado)
+    cogs_total = db.query(
+        func.sum(models.DetalleVenta.cantidad * models.Producto.precio_costo)
+    ).join(
+        models.Producto,
+        models.DetalleVenta.producto_id == models.Producto.id,
+    ).filter(
+        models.Producto.empresa_id == empresa_id,
+    ).scalar() or 0
+
+    # 4. Ganancia neta realizada (ingresos - costo de lo vendido)
+    ganancia_neta = float(ingresos_totales) - float(cogs_total)
+
+    # 5. Costo de reposicion para productos con stock bajo (<= 5) para llevarlos a stock ideal de 15
+    productos_bajo_stock = db.query(models.Producto).filter(
+        models.Producto.empresa_id == empresa_id,
+        models.Producto.is_active.is_(True),
+        models.Producto.cantidad_actual <= 5,
+    ).all()
+
+    costo_reposicion_bajo_stock = sum(
+        max(0.0, 15.0 - float(p.cantidad_actual)) * float(p.precio_costo)
+        for p in productos_bajo_stock
+    )
+
+    return {
+        "inversion_activa": float(inversion_activa),
+        "ingresos_totales": float(ingresos_totales),
+        "cogs_total": float(cogs_total),
+        "ganancia_neta": float(ganancia_neta),
+        "costo_reposicion_bajo_stock": float(costo_reposicion_bajo_stock),
+        "costo_reposicion_total_sugerido": float(cogs_total) + float(costo_reposicion_bajo_stock),
+    }

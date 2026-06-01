@@ -88,7 +88,7 @@ def listar_compras(
     # Contar total con mismos filtros
     query = db.query(models.Compra).filter(
         models.Compra.empresa_id == current_user.empresa_id,
-        models.Compra.is_active.is_(True),
+        (models.Compra.is_active.is_(True)) | (models.Compra.estado == "ANULADA"),
     )
     if desde:
         query = query.filter(models.Compra.fecha_compra >= desde)

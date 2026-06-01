@@ -16,6 +16,17 @@ class UsuarioCrear(BaseModel):
     def password_minimo(cls, v: str) -> str:
         if len(v) < 8:
             raise ValueError("La contraseña debe tener al menos 8 caracteres")
+        import re
+        if (
+            not re.search(r"[A-Z]", v)
+            or not re.search(r"[a-z]", v)
+            or not re.search(r"[0-9]", v)
+            or not re.search(r"[!@#$%^&*(),.?\":{}|<>]", v)
+        ):
+            raise ValueError(
+                "La contraseña debe incluir al menos una letra mayúscula, "
+                "una letra minúscula, un número y un carácter especial"
+            )
         return v
 
 
@@ -63,6 +74,17 @@ class UsuarioCrearConEmpresa(BaseModel):
     def password_minimo(cls, v: str) -> str:
         if len(v) < 8:
             raise ValueError("La contraseña debe tener al menos 8 caracteres")
+        import re
+        if (
+            not re.search(r"[A-Z]", v)
+            or not re.search(r"[a-z]", v)
+            or not re.search(r"[0-9]", v)
+            or not re.search(r"[!@#$%^&*(),.?\":{}|<>]", v)
+        ):
+            raise ValueError(
+                "La contraseña debe incluir al menos una letra mayúscula, "
+                "una letra minúscula, un número y un carácter especial"
+            )
         return v
 
 

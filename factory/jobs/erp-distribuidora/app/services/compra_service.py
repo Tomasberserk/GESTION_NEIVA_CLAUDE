@@ -22,7 +22,7 @@ def obtener_compras(
 ) -> List[models.Compra]:
     query = db.query(models.Compra).filter(
         models.Compra.empresa_id == empresa_id,
-        models.Compra.is_active.is_(True),
+        (models.Compra.is_active.is_(True)) | (models.Compra.estado == "ANULADA"),
     )
     if desde:
         query = query.filter(models.Compra.fecha_compra >= desde)
@@ -52,7 +52,7 @@ def obtener_compra_por_id(empresa_id: UUID, compra_id: UUID, db: Session) -> mod
         .filter(
             models.Compra.id == compra_id,
             models.Compra.empresa_id == empresa_id,
-            models.Compra.is_active.is_(True),
+            (models.Compra.is_active.is_(True)) | (models.Compra.estado == "ANULADA"),
         )
         .options(
             joinedload(models.Compra.proveedor),

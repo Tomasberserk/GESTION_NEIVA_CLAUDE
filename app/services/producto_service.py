@@ -153,6 +153,29 @@ async def guardar_imagen_producto(
             detail=f"Extensión no permitida. Usa: {', '.join(_EXTENSIONES_PERMITIDAS)}",
         )
 
+    # 1. Leer el contenido y validar el tamaño límite (máx 5 MB)
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El archivo excede el tamaño máximo permitido de 5 MB",
+        )
+
+    # 2. Validar firma mágica binaria (Magic Bytes) para asegurar la integridad de la imagen
+    es_imagen_valida = False
+    if content.startswith(b"\xff\xd8\xff"):  # JPEG
+        es_imagen_valida = True
+    elif content.startswith(b"\x89PNG\r\n\x1a\n"):  # PNG
+        es_imagen_valida = True
+    elif content.startswith(b"RIFF") and b"WEBP" in content[8:12]:  # WEBP
+        es_imagen_valida = True
+
+    if not es_imagen_valida:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El contenido del archivo no es una imagen válida (debe ser un JPEG, PNG o WEBP real)",
+        )
+
     upload_dir = os.getenv("UPLOAD_DIR", "media")
     os.makedirs(upload_dir, exist_ok=True)
 
@@ -160,7 +183,7 @@ async def guardar_imagen_producto(
     filepath = os.path.join(upload_dir, filename)
 
     with open(filepath, "wb") as f:
-        f.write(await file.read())
+        f.write(content)
 
     producto.foto_url = f"/media/{filename}"
     db.commit()

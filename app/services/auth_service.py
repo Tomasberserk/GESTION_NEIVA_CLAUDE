@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app import models
 from app.schemas.usuario import UsuarioCrear
+from app.core.logging import log_security_event
 
 SECRET_KEY = os.getenv("SECRET_KEY", "")
 if not SECRET_KEY:
@@ -51,11 +52,12 @@ def crear_token_acceso(
 # Registro
 # ---------------------------------------------------------------------------
 
-def registrar_usuario(data: UsuarioCrear, db: Session) -> models.Usuario:
+def registrar_usuario(data: UsuarioCrear, db: Session, ip: str = "unknown") -> models.Usuario:
     # pre-check: email duplicado (previene HTTP 409 / duplicate key en BD)
     if db.query(models.Usuario).filter(
         models.Usuario.email == data.email
     ).first():
+        log_security_event("REGISTRATION_FAILED_EMAIL_DUPLICATE", data.email, ip=ip, level="WARNING")
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Este email ya está registrado",
@@ -67,6 +69,7 @@ def registrar_usuario(data: UsuarioCrear, db: Session) -> models.Usuario:
         models.Empresa.is_active.is_(True),
     ).first()
     if not empresa:
+        log_security_event("REGISTRATION_FAILED_COMPANY_NOT_FOUND", data.email, ip=ip, level="WARNING")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Empresa no encontrada",
@@ -82,6 +85,7 @@ def registrar_usuario(data: UsuarioCrear, db: Session) -> models.Usuario:
     db.add(usuario)
     db.commit()
     db.refresh(usuario)
+    log_security_event("REGISTRATION_SUCCESS", usuario.email, user_id=str(usuario.id), ip=ip)
     return usuario
 
 
@@ -92,9 +96,11 @@ def registrar_usuario_con_empresa(
     password: str,
     rol: models.RolUsuario,
     db: Session,
+    ip: str = "unknown",
 ) -> dict:
     # Pre-check: email duplicado (previene conflict de BD)
     if db.query(models.Usuario).filter(models.Usuario.email == email).first():
+        log_security_event("REGISTRATION_FAILED_EMAIL_DUPLICATE", email, ip=ip, level="WARNING")
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Este email ya está registrado",
@@ -102,6 +108,7 @@ def registrar_usuario_con_empresa(
 
     # Pre-check: NIT duplicado
     if db.query(models.Empresa).filter(models.Empresa.nit_o_cedula == nit_o_cedula).first():
+        log_security_event("REGISTRATION_FAILED_NIT_DUPLICATE", email, ip=ip, level="WARNING")
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Ya existe una empresa con NIT/Cédula '{nit_o_cedula}'",
@@ -128,6 +135,7 @@ def registrar_usuario_con_empresa(
         db.commit()
         db.refresh(usuario)
         token = crear_token_acceso({"sub": str(usuario.id)})
+        log_security_event("REGISTRATION_WITH_COMPANY_SUCCESS", email, user_id=str(usuario.id), ip=ip)
         return {"access_token": token, "token_type": "bearer", "usuario": usuario}  # nosec B105
 
     except HTTPException:
@@ -135,6 +143,7 @@ def registrar_usuario_con_empresa(
         raise
     except Exception as exc:
         db.rollback()
+        log_security_event("REGISTRATION_WITH_COMPANY_ERROR", email, ip=ip, level="ERROR")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error durante el registro: {str(exc)}",
@@ -145,7 +154,7 @@ def registrar_usuario_con_empresa(
 # Login
 # ---------------------------------------------------------------------------
 
-def login_usuario(email: str, password: str, db: Session) -> dict:
+def login_usuario(email: str, password: str, db: Session, ip: str = "unknown") -> dict:
     # Mensaje genérico para no revelar si el email existe (enumeración)
     _credenciales_invalidas = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -159,7 +168,9 @@ def login_usuario(email: str, password: str, db: Session) -> dict:
     ).first()
 
     if not usuario or not verificar_password(password, usuario.hashed_password):
+        log_security_event("LOGIN_FAILED", email, ip=ip, level="WARNING")
         raise _credenciales_invalidas
 
     token = crear_token_acceso({"sub": str(usuario.id)})
+    log_security_event("LOGIN_SUCCESS", usuario.email, user_id=str(usuario.id), ip=ip)
     return {"access_token": token, "token_type": "bearer", "usuario": usuario}  # nosec B105

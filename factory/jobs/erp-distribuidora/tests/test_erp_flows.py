@@ -520,3 +520,53 @@ def test_dashboard_kpis(client):
     assert float(kpis["inventario"]["valor_total_stock"]) == 150000.00
     assert kpis["proveedores"]["total_activos"] == 1
     assert kpis["proveedores"]["con_deuda_activa"] == 1
+
+
+def test_compras_anuladas_visibilidad(client):
+    """Valida que una compra anulada siga apareciendo en el historial/listado general"""
+    headers = get_auth_headers(client, "admin_anul_vis@test.com", "nit_anul_vis")
+
+    p_res = client.post(
+        "/api/productos",
+        json={"nombre": "Folder Anul", "codigo_barras": "anul-1", "precio_costo": 1000.0, "precio_venta": 2000.0, "cantidad_actual": 0.0},
+        headers=headers
+    )
+    prod_id = p_res.json()["id"]
+
+    prov_res = client.post(
+        "/api/proveedores",
+        json={"nit_o_cedula": "999-anul", "razon_social": "Papeles Anul S.A."},
+        headers=headers
+    )
+    prov_id = prov_res.json()["id"]
+
+    # Registrar compra
+    c_res = client.post(
+        "/api/compras",
+        json={
+            "proveedor_id": prov_id,
+            "numero_factura": "FAC-ANUL-VIS-1",
+            "metodo_pago": "EFECTIVO",
+            "items": [{"producto_id": prod_id, "cantidad": 10.0, "precio_costo": 1000.0}]
+        },
+        headers=headers
+    )
+    compra_id = c_res.json()["id"]
+
+    # Anular la compra
+    res_del = client.delete(f"/api/compras/{compra_id}", headers=headers)
+    assert res_del.status_code == 200
+
+    # Listar compras -> debe aparecer la compra anulada en el listado
+    res_listar = client.get("/api/compras", headers=headers)
+    assert res_listar.status_code == 200
+    data = res_listar.json()
+    assert data["total"] == 1
+    assert data["items"][0]["id"] == compra_id
+    assert data["items"][0]["estado"] == "ANULADA"
+
+    # Obtener por ID -> también debe permitir obtener la compra anulada
+    res_obt = client.get(f"/api/compras/{compra_id}", headers=headers)
+    assert res_obt.status_code == 200
+    assert res_obt.json()["estado"] == "ANULADA"
+

@@ -48,47 +48,49 @@ function ModalProducto({ producto, onGuardar, onCerrar }) {
           <h2 className="font-semibold text-slate-900">{producto ? 'Editar producto' : 'Nuevo producto'}</h2>
           <button onClick={onCerrar} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-3">{error}</p>}
-          {[
-            { label: 'Nombre', key: 'nombre', type: 'text', required: true },
-            { label: 'Código de barras', key: 'codigo_barras', type: 'text', required: true },
-            { label: 'Categoría', key: 'categoria', type: 'text' },
-            { label: 'Precio costo', key: 'precio_costo', type: 'number', required: true },
-            { label: 'Precio venta', key: 'precio_venta', type: 'number', required: true },
-            { label: 'Cantidad actual', key: 'cantidad_actual', type: 'number', required: true },
-          ].map(({ label, key, type, required }) => (
-            <div key={key}>
-              <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
-              <input
-                type={type}
-                required={required}
-                step={type === 'number' ? 'any' : undefined}
-                value={form[key]}
-                onChange={set(key)}
+        <div className="flex flex-col max-h-[80vh]">
+          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
+            {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-3">{error}</p>}
+            {[
+              { label: 'Nombre', key: 'nombre', type: 'text', required: true },
+              { label: 'Código de barras', key: 'codigo_barras', type: 'text', required: true },
+              { label: 'Categoría', key: 'categoria', type: 'text' },
+              { label: 'Precio costo', key: 'precio_costo', type: 'number', required: true },
+              { label: 'Precio venta', key: 'precio_venta', type: 'number', required: true },
+              { label: 'Cantidad actual', key: 'cantidad_actual', type: 'number', required: true },
+            ].map(({ label, key, type, required }) => (
+              <div key={key}>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
+                <input
+                  type={type}
+                  required={required}
+                  step={type === 'number' ? 'any' : undefined}
+                  value={form[key]}
+                  onChange={set(key)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                />
+              </div>
+            ))}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Unidad de medida</label>
+              <select
+                value={form.unidad_medida}
+                onChange={set('unidad_medida')}
                 className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-              />
+              >
+                {UNIDADES.map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
             </div>
-          ))}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Unidad de medida</label>
-            <select
-              value={form.unidad_medida}
-              onChange={set('unidad_medida')}
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-            >
-              {UNIDADES.map(u => <option key={u} value={u}>{u}</option>)}
-            </select>
-          </div>
-          <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onCerrar} className="flex-1 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50">
-              Cancelar
-            </button>
-            <button type="submit" disabled={guardando} className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-sm font-medium">
-              {guardando ? 'Guardando...' : 'Guardar'}
-            </button>
-          </div>
-        </form>
+            <div className="border-t border-slate-200 -mx-6 mt-6 pt-4 px-6 flex gap-3">
+              <button type="button" onClick={onCerrar} className="flex-1 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50">
+                Cancelar
+              </button>
+              <button type="submit" disabled={guardando} className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-sm font-medium">
+                {guardando ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   )
@@ -176,8 +178,8 @@ export default function Inventario() {
                   <p className="text-xs text-slate-400">costo: ${fmt(p.precio_costo)}</p>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className={`text-sm font-bold ${p.cantidad_actual <= 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                    {p.cantidad_actual}
+                  <p className={`text-sm font-bold ${Number(p.cantidad_actual) <= 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                    {Number(p.cantidad_actual)}
                   </p>
                   <p className="text-xs text-slate-400">stock</p>
                 </div>

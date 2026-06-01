@@ -9,7 +9,7 @@ _REGISTRO = {
     "nombre_comercial": "Tienda Test",
     "nit_o_cedula": "900100200",
     "email": "test@tienda.com",
-    "password": "password123",
+    "password": "Password123!",
     "rol": "admin",
 }
 
