@@ -1,7 +1,7 @@
 import uuid
 import enum
 from sqlalchemy import (
-    Column, String, Integer, Numeric, Boolean, Date, Text,
+    Column, String, Numeric, Boolean, Date, Text,
     DateTime, ForeignKey, Enum as SAEnum, Index, UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -16,21 +16,27 @@ from app.database import Base
 # ---------------------------------------------------------------------------
 
 class RolUsuario(str, enum.Enum):
-    ADMIN = "admin"
+    ADMIN   = "admin"
     TENDERO = "tendero"
 
 
 class PlanEmpresa(str, enum.Enum):
-    BASIC = "basic"
-    MEDIUM = "medium"
+    BASIC   = "basic"
+    MEDIUM  = "medium"
     PREMIUM = "premium"
 
 
 class UnidadMedida(str, enum.Enum):
     UNIDAD = "unidad"
-    GRAMO = "gramo"
-    LIBRA = "libra"
-    KILO = "kilo"
+    GRAMO  = "gramo"
+    LIBRA  = "libra"
+    KILO   = "kilo"
+    # ERP Distribuidora units — Sprint 7.8
+    CAJA   = "caja"
+    BULTO  = "bulto"
+    KG     = "kg"
+    LITRO  = "litro"
+    METRO  = "metro"
 
 
 class CategoriaProducto(str, enum.Enum):
@@ -43,14 +49,40 @@ class CategoriaProducto(str, enum.Enum):
 
 
 class EstadoTicket(str, enum.Enum):
-    ABIERTO = "abierto"
+    ABIERTO    = "abierto"
     RESPONDIDO = "respondido"
-    CERRADO = "cerrado"
+    CERRADO    = "cerrado"
 
 
 class RemitenteRol(str, enum.Enum):
     SUPERADMIN = "superadmin"
-    USUARIO = "usuario"
+    USUARIO    = "usuario"
+
+
+# ERP Distribuidora enums — Sprint 7.8 (columns stored as String(50) for
+# compatibility with existing compra_service string comparisons)
+class MetodoPagoCompra(str, enum.Enum):
+    EFECTIVO      = "EFECTIVO"
+    CREDITO       = "CREDITO"
+    TRANSFERENCIA = "TRANSFERENCIA"
+
+
+class EstadoCompra(str, enum.Enum):
+    PAGADA    = "PAGADA"
+    PENDIENTE = "PENDIENTE"
+    ANULADA   = "ANULADA"
+
+
+class EstadoCuentaPorPagar(str, enum.Enum):
+    PENDIENTE = "PENDIENTE"
+    PAGADA    = "PAGADA"
+    VENCIDA   = "VENCIDA"
+
+
+class MetodoPagoAbono(str, enum.Enum):
+    EFECTIVO      = "EFECTIVO"
+    TRANSFERENCIA = "TRANSFERENCIA"
+    CHEQUE        = "CHEQUE"
 
 
 # ---------------------------------------------------------------------------
@@ -58,16 +90,7 @@ class RemitenteRol(str, enum.Enum):
 # ---------------------------------------------------------------------------
 
 class AuditMixin:
-    """
-    Campos de auditoría heredados por todas las tablas principales.
-
-    - created_at  : timestamp de inserción, asignado por el servidor de BD.
-    - updated_at  : timestamp de última modificación. El ORM lo actualiza
-                    vía onupdate; el trigger de BD lo mantiene para updates
-                    que no pasen por el ORM.
-    - is_active   : flag para Soft Delete. Nunca se borra físicamente un
-                    registro: se pone is_active=False.
-    """
+    """created_at/updated_at/is_active inherited by all main tables."""
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -76,14 +99,10 @@ class AuditMixin:
     updated_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),
-        onupdate=func.now(),  # ORM-level; el trigger cubre updates directos en BD
+        onupdate=func.now(),
         nullable=False,
     )
-    is_active = Column(
-        Boolean,
-        server_default="true",
-        nullable=False,
-    )
+    is_active = Column(Boolean, server_default="true", nullable=False)
 
 
 # ---------------------------------------------------------------------------
@@ -103,32 +122,13 @@ class Empresa(AuditMixin, Base):
     )
     trial_expires_at = Column(DateTime(timezone=True), nullable=True)
 
-    # Factory Launcher — campos para upgrade a Medium (ERP Distribuidora)
-    factory_upgrade_solicitado = Column(Boolean, default=False, server_default="false", nullable=False)
-    factory_url = Column(String(500), nullable=True)
-    factory_trial_expires_at = Column(DateTime(timezone=True), nullable=True)
-
-    # Relaciones (cascade: si se borra la empresa, se borran sus hijos)
-    usuarios = relationship(
-        "Usuario",
-        back_populates="empresa",
-        cascade="all, delete-orphan",
-    )
-    productos = relationship(
-        "Producto",
-        back_populates="empresa",
-        cascade="all, delete-orphan",
-    )
-    ventas = relationship(
-        "Venta",
-        back_populates="empresa",
-        cascade="all, delete-orphan",
-    )
-    soporte_tickets = relationship(
-        "SoporteTicket",
-        back_populates="empresa",
-        cascade="all, delete-orphan",
-    )
+    usuarios          = relationship("Usuario",        back_populates="empresa", cascade="all, delete-orphan")
+    productos         = relationship("Producto",       back_populates="empresa", cascade="all, delete-orphan")
+    ventas            = relationship("Venta",          back_populates="empresa", cascade="all, delete-orphan")
+    soporte_tickets   = relationship("SoporteTicket",  back_populates="empresa", cascade="all, delete-orphan")
+    proveedores       = relationship("Proveedor",      back_populates="empresa", cascade="all, delete-orphan")
+    compras           = relationship("Compra",         back_populates="empresa", cascade="all, delete-orphan")
+    cuentas_por_pagar = relationship("CuentaPorPagar", back_populates="empresa", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Empresa {self.nombre_comercial!r}>"
@@ -156,6 +156,7 @@ class Usuario(AuditMixin, Base):
     )
 
     empresa = relationship("Empresa", back_populates="usuarios")
+    compras = relationship("Compra", back_populates="usuario")
 
     __table_args__ = (
         Index("idx_usuarios_email", "email"),
@@ -196,11 +197,8 @@ class Producto(AuditMixin, Base):
     foto_url = Column(String, nullable=True)
 
     empresa = relationship("Empresa", back_populates="productos")
-    detalles_venta = relationship(
-        "DetalleVenta",
-        back_populates="producto",
-        passive_deletes=True,
-    )
+    detalles_venta = relationship("DetalleVenta", back_populates="producto", passive_deletes=True)
+    detalles_compra = relationship("DetalleCompra", back_populates="producto", passive_deletes=True)
 
     __table_args__ = (
         UniqueConstraint("empresa_id", "codigo_barras", name="uq_producto_empresa_barras"),
@@ -212,7 +210,7 @@ class Producto(AuditMixin, Base):
 
 
 # ---------------------------------------------------------------------------
-# Venta (documento maestro de transacción POS)
+# Venta
 # ---------------------------------------------------------------------------
 
 class Venta(AuditMixin, Base):
@@ -224,21 +222,11 @@ class Venta(AuditMixin, Base):
         ForeignKey("empresas.id", ondelete="CASCADE"),
         nullable=False,
     )
-    # fecha_venta es el momento de negocio de la venta (puede diferir de
-    # created_at en escenarios de venta offline o corrección manual)
-    fecha_venta = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-    )
+    fecha_venta = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     total = Column(Numeric(10, 2), nullable=False, server_default="0.00")
 
-    empresa = relationship("Empresa", back_populates="ventas")
-    detalles = relationship(
-        "DetalleVenta",
-        back_populates="venta",
-        cascade="all, delete-orphan",
-    )
+    empresa  = relationship("Empresa", back_populates="ventas")
+    detalles = relationship("DetalleVenta", back_populates="venta", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index("idx_ventas_empresa_fecha", "empresa_id", "fecha_venta"),
@@ -249,7 +237,7 @@ class Venta(AuditMixin, Base):
 
 
 # ---------------------------------------------------------------------------
-# DetalleVenta (línea de producto dentro de una venta)
+# DetalleVenta
 # ---------------------------------------------------------------------------
 
 class DetalleVenta(AuditMixin, Base):
@@ -263,17 +251,14 @@ class DetalleVenta(AuditMixin, Base):
     )
     producto_id = Column(
         UUID(as_uuid=True),
-        # RESTRICT: no permite borrar un producto que ya fue vendido
         ForeignKey("productos.id", ondelete="RESTRICT"),
         nullable=False,
     )
     cantidad = Column(Numeric(10, 3), nullable=False)
-    # Snapshot del precio en el momento de la venta; no cambia si el
-    # precio del producto se modifica después
     precio_unitario = Column(Numeric(10, 2), nullable=False)
     subtotal = Column(Numeric(10, 2), nullable=False)
 
-    venta = relationship("Venta", back_populates="detalles")
+    venta    = relationship("Venta", back_populates="detalles")
     producto = relationship("Producto", back_populates="detalles_venta")
 
     __table_args__ = (
@@ -281,14 +266,11 @@ class DetalleVenta(AuditMixin, Base):
     )
 
     def __repr__(self) -> str:
-        return (
-            f"<DetalleVenta venta={self.venta_id} "
-            f"producto={self.producto_id} qty={self.cantidad}>"
-        )
+        return f"<DetalleVenta venta={self.venta_id} producto={self.producto_id} qty={self.cantidad}>"
 
 
 # ---------------------------------------------------------------------------
-# SoporteTicket (hilo de conversación de soporte)
+# SoporteTicket
 # ---------------------------------------------------------------------------
 
 class SoporteTicket(AuditMixin, Base):
@@ -312,8 +294,8 @@ class SoporteTicket(AuditMixin, Base):
         server_default="abierto",
     )
 
-    empresa = relationship("Empresa", back_populates="soporte_tickets")
-    usuario = relationship("Usuario", foreign_keys=[usuario_id], viewonly=True)
+    empresa  = relationship("Empresa", back_populates="soporte_tickets")
+    usuario  = relationship("Usuario", foreign_keys=[usuario_id], viewonly=True)
     mensajes = relationship(
         "SoporteMensaje",
         back_populates="ticket",
@@ -330,7 +312,7 @@ class SoporteTicket(AuditMixin, Base):
 
 
 # ---------------------------------------------------------------------------
-# SoporteMensaje (mensaje individual dentro de un ticket)
+# SoporteMensaje
 # ---------------------------------------------------------------------------
 
 class SoporteMensaje(Base):
@@ -348,11 +330,7 @@ class SoporteMensaje(Base):
     )
     remitente_email = Column(String(255), nullable=False)
     mensaje = Column(Text, nullable=False)
-    created_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-    )
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     ticket = relationship("SoporteTicket", back_populates="mensajes")
 
@@ -365,40 +343,132 @@ class SoporteMensaje(Base):
 
 
 # ---------------------------------------------------------------------------
-# SSOToken (token de un solo uso para login automático en factory apps)
+# ERP Distribuidora — Sprint 7.8
 # ---------------------------------------------------------------------------
 
-class SSOToken(Base):
-    __tablename__ = "sso_tokens"
+class Proveedor(AuditMixin, Base):
+    __tablename__ = "proveedores"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    empresa_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("empresas.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    usuario_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("usuarios.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    # Token opaco de un solo uso — UUID v4 sin guiones
-    token = Column(String(64), unique=True, nullable=False)
-    expires_at = Column(DateTime(timezone=True), nullable=False)
-    usado = Column(Boolean, default=False, server_default="false", nullable=False)
-    created_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-    )
+    id              = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    empresa_id      = Column(UUID(as_uuid=True), ForeignKey("empresas.id", ondelete="CASCADE"), nullable=False)
+    nit_o_cedula    = Column(String(50), nullable=False)
+    razon_social    = Column(String(150), nullable=False)
+    contacto_nombre = Column(String(100), nullable=True)
+    telefono        = Column(String(50), nullable=True)
+    email           = Column(String(255), nullable=True)
+    direccion       = Column(String(255), nullable=True)
 
-    empresa = relationship("Empresa")
-    usuario = relationship("Usuario")
+    empresa           = relationship("Empresa", back_populates="proveedores")
+    compras           = relationship("Compra", back_populates="proveedor", passive_deletes=True)
+    cuentas_por_pagar = relationship("CuentaPorPagar", back_populates="proveedor", passive_deletes=True)
 
     __table_args__ = (
-        Index("idx_sso_tokens_token", "token"),
-        Index("idx_sso_tokens_empresa", "empresa_id"),
+        UniqueConstraint("empresa_id", "nit_o_cedula", name="uq_proveedor_empresa_nit"),
+        Index("idx_proveedores_empresa", "empresa_id"),
+        Index("idx_proveedores_razon_social", "razon_social"),
     )
 
     def __repr__(self) -> str:
-        return f"<SSOToken empresa={self.empresa_id} usado={self.usado}>"
+        return f"<Proveedor {self.razon_social!r} NIT={self.nit_o_cedula}>"
+
+
+class Compra(AuditMixin, Base):
+    __tablename__ = "compras"
+
+    id                = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    empresa_id        = Column(UUID(as_uuid=True), ForeignKey("empresas.id", ondelete="CASCADE"), nullable=False)
+    proveedor_id      = Column(UUID(as_uuid=True), ForeignKey("proveedores.id", ondelete="RESTRICT"), nullable=False)
+    usuario_id        = Column(UUID(as_uuid=True), ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    numero_factura    = Column(String(100), nullable=True)
+    fecha_compra      = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    metodo_pago       = Column(String(50), nullable=False, default="EFECTIVO")
+    fecha_vencimiento = Column(DateTime(timezone=True), nullable=True)
+    estado            = Column(String(50), nullable=False, default="PAGADA")
+    total             = Column(Numeric(12, 2), server_default="0.00", nullable=False)
+
+    empresa          = relationship("Empresa", back_populates="compras")
+    proveedor        = relationship("Proveedor", back_populates="compras")
+    usuario          = relationship("Usuario", back_populates="compras")
+    detalles         = relationship("DetalleCompra", back_populates="compra", cascade="all, delete-orphan")
+    cuenta_por_pagar = relationship("CuentaPorPagar", back_populates="compra", uselist=False, cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index("idx_compras_empresa", "empresa_id"),
+        Index("idx_compras_proveedor", "proveedor_id"),
+        Index("idx_compras_fecha", "fecha_compra"),
+        Index("idx_compras_estado", "estado"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<Compra id={self.id} total={self.total}>"
+
+
+class DetalleCompra(AuditMixin, Base):
+    __tablename__ = "detalle_compras"
+
+    id           = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    compra_id    = Column(UUID(as_uuid=True), ForeignKey("compras.id", ondelete="CASCADE"), nullable=False)
+    producto_id  = Column(UUID(as_uuid=True), ForeignKey("productos.id", ondelete="RESTRICT"), nullable=False)
+    cantidad     = Column(Numeric(10, 3), nullable=False)
+    precio_costo = Column(Numeric(12, 2), nullable=False)
+    subtotal     = Column(Numeric(12, 2), nullable=False)
+
+    compra   = relationship("Compra", back_populates="detalles")
+    producto = relationship("Producto", back_populates="detalles_compra")
+
+    __table_args__ = (
+        Index("idx_detalle_compra_compra", "compra_id"),
+        Index("idx_detalle_compra_producto", "producto_id"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<DetalleCompra compra={self.compra_id} producto={self.producto_id}>"
+
+
+class CuentaPorPagar(AuditMixin, Base):
+    __tablename__ = "cuentas_por_pagar"
+
+    id                = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    empresa_id        = Column(UUID(as_uuid=True), ForeignKey("empresas.id", ondelete="CASCADE"), nullable=False)
+    compra_id         = Column(UUID(as_uuid=True), ForeignKey("compras.id", ondelete="RESTRICT"), nullable=False)
+    proveedor_id      = Column(UUID(as_uuid=True), ForeignKey("proveedores.id", ondelete="RESTRICT"), nullable=False)
+    monto_total       = Column(Numeric(12, 2), nullable=False)
+    saldo_pendiente   = Column(Numeric(12, 2), nullable=False)
+    fecha_vencimiento = Column(DateTime(timezone=True), nullable=False)
+    estado            = Column(String(50), nullable=False, default="PENDIENTE")
+
+    empresa   = relationship("Empresa", back_populates="cuentas_por_pagar")
+    compra    = relationship("Compra", back_populates="cuenta_por_pagar")
+    proveedor = relationship("Proveedor", back_populates="cuentas_por_pagar")
+    abonos    = relationship("AbonoCuentaPorPagar", back_populates="cuenta_por_pagar", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index("idx_cuentas_pagar_empresa", "empresa_id"),
+        Index("idx_cuentas_pagar_proveedor", "proveedor_id"),
+        Index("idx_cuentas_pagar_estado", "estado"),
+        Index("idx_cuentas_pagar_vencimiento", "fecha_vencimiento"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<CuentaPorPagar id={self.id} saldo={self.saldo_pendiente}>"
+
+
+class AbonoCuentaPorPagar(AuditMixin, Base):
+    __tablename__ = "abonos_cuentas_por_pagar"
+
+    id                  = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    cuenta_por_pagar_id = Column(UUID(as_uuid=True), ForeignKey("cuentas_por_pagar.id", ondelete="CASCADE"), nullable=False)
+    monto               = Column(Numeric(12, 2), nullable=False)
+    fecha_abono         = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    metodo_pago         = Column(String(50), nullable=False, default="EFECTIVO")
+    nota                = Column(String(500), nullable=True)
+
+    cuenta_por_pagar = relationship("CuentaPorPagar", back_populates="abonos")
+
+    __table_args__ = (
+        Index("idx_abonos_cxp", "cuenta_por_pagar_id"),
+        Index("idx_abonos_fecha", "fecha_abono"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<Abono id={self.id} monto={self.monto}>"
