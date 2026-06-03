@@ -87,6 +87,54 @@ def obtener_ticket(
     return ticket
 
 
+@router.post("/solicitar-upgrade", status_code=status.HTTP_201_CREATED)
+def solicitar_upgrade_medium(
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(get_current_user),
+):
+    """
+    Solicita el upgrade a Plan Medium (ERP Distribuidora).
+    Marca el flag en la empresa y crea un ticket de soporte automático.
+    Idempotente: devuelve 409 si ya fue solicitado.
+    """
+    empresa = db.query(models.Empresa).filter(
+        models.Empresa.id == current_user.empresa_id
+    ).first()
+
+    if empresa.factory_upgrade_solicitado:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="El upgrade ya fue solicitado. El equipo de soporte revisará tu caso.",
+        )
+
+    empresa.factory_upgrade_solicitado = True
+    db.flush()
+
+    ticket = models.SoporteTicket(
+        empresa_id=current_user.empresa_id,
+        usuario_id=current_user.id,
+        asunto="Solicitud de upgrade a Plan Medium (ERP Distribuidora)",
+        is_active=True,
+    )
+    db.add(ticket)
+    db.flush()
+
+    mensaje = models.SoporteMensaje(
+        ticket_id=ticket.id,
+        remitente_rol=models.RemitenteRol.USUARIO,
+        remitente_email=current_user.email,
+        mensaje=(
+            f"Hola, soy {current_user.email} de la empresa {empresa.nombre_comercial}. "
+            "Me interesa probar el Plan Medium con el ERP Distribuidora. "
+            "Por favor actívenme el trial de 8 días."
+        ),
+    )
+    db.add(mensaje)
+    db.commit()
+
+    return {"mensaje": "Solicitud enviada. El equipo revisará tu caso pronto.", "ticket_id": ticket.id}
+
+
 @router.post("/tickets/{ticket_id}/responder")
 def responder_ticket(
     ticket_id: UUID,

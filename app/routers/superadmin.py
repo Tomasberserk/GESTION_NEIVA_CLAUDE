@@ -8,6 +8,7 @@ from app import models
 from app.database import get_db
 from app.schemas.soporte import (
     ActualizarEstado,
+    ActualizarFactoryConfig,
     ActualizarTrial,
     EmpresaAdminOut,
     TicketListOut,
@@ -62,6 +63,9 @@ def listar_empresas(
             is_active=e.is_active,
             trial_expires_at=e.trial_expires_at,
             total_usuarios=counts.get(e.id, 0),
+            factory_upgrade_solicitado=e.factory_upgrade_solicitado,
+            factory_url=e.factory_url,
+            factory_trial_expires_at=e.factory_trial_expires_at,
         ))
     return result
 
@@ -100,6 +104,32 @@ def actualizar_estado(
     empresa.is_active = data.is_active
     db.commit()
     return {"mensaje": "Estado actualizado", "is_active": empresa.is_active}
+
+
+@router.put("/empresas/{empresa_id}/factory-config")
+def actualizar_factory_config(
+    empresa_id: UUID,
+    data: ActualizarFactoryConfig,
+    db: Session = Depends(get_db),
+    _: None = Depends(_check_superadmin),
+):
+    """
+    Asigna la URL del ERP y activa el trial de 8 días para una empresa.
+    Llamado por el superadmin cuando aprueba una solicitud de upgrade.
+    """
+    empresa = db.query(models.Empresa).filter(models.Empresa.id == empresa_id).first()
+    if not empresa:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+    if data.factory_url is not None:
+        empresa.factory_url = data.factory_url
+    if data.factory_trial_expires_at is not None:
+        empresa.factory_trial_expires_at = data.factory_trial_expires_at
+    db.commit()
+    return {
+        "mensaje": "Configuración de factory actualizada",
+        "factory_url": empresa.factory_url,
+        "factory_trial_expires_at": empresa.factory_trial_expires_at,
+    }
 
 
 @router.get("/tickets", response_model=list[TicketListOut])

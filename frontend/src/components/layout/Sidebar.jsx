@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -7,19 +8,57 @@ import {
   MessageCircle,
   Settings,
   X,
+  Rocket,
+  ExternalLink,
+  Loader2,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
+import authService from '../../services/authService'
+
+const BASE = import.meta.env.VITE_API_URL || '/api'
 
 const navItems = [
-  { to: '/dashboard',     label: 'Dashboard',     icon: LayoutDashboard },
-  { to: '/inventario',    label: 'Inventario',    icon: Package },
-  { to: '/ventas',        label: 'Ventas',        icon: ShoppingCart },
-  { to: '/reportes',      label: 'Reportes',      icon: BarChart3 },
-  { to: '/soporte',       label: 'Soporte Técnico', icon: MessageCircle },
-  { to: '/configuracion', label: 'Configuración', icon: Settings },
+  { to: '/dashboard',       label: 'Dashboard',        icon: LayoutDashboard },
+  { to: '/inventario',      label: 'Inventario',        icon: Package },
+  { to: '/ventas',          label: 'Ventas',            icon: ShoppingCart },
+  { to: '/reportes',        label: 'Reportes',          icon: BarChart3 },
+  { to: '/soporte',         label: 'Soporte Técnico',   icon: MessageCircle },
+  { to: '/fabrica-apps',    label: 'Fábrica Apps',      icon: Rocket },
+  { to: '/configuracion',   label: 'Configuración',     icon: Settings },
 ]
 
 export default function Sidebar({ abierto, onCerrar }) {
+  const [empresa, setEmpresa] = useState(null)
+  const [lanzando, setLanzando] = useState(false)
+
+  useEffect(() => {
+    authService
+      .fetchAuth(`${BASE}/empresas/mi-empresa`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => setEmpresa(data))
+      .catch(() => {})
+  }, [])
+
+  async function lanzarERP() {
+    if (lanzando) return
+    setLanzando(true)
+    try {
+      const res = await authService.fetchAuth(`${BASE}/sso/token`, { method: 'POST' })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        alert(err?.detail || 'Error al generar el token SSO')
+        return
+      }
+      const { token } = await res.json()
+      const url = `${empresa.factory_url}?sso_token=${token}`
+      window.open(url, '_blank', 'noopener,noreferrer')
+    } catch {
+      alert('Error de conexión al lanzar el ERP')
+    } finally {
+      setLanzando(false)
+    }
+  }
+
   return (
     <>
       {/* Backdrop — solo mobile cuando el menú está abierto */}
@@ -72,6 +111,22 @@ export default function Sidebar({ abierto, onCerrar }) {
               {label}
             </NavLink>
           ))}
+
+          {/* Botón dinámico ERP — solo aparece cuando el factory trial está activo */}
+          {empresa?.factory_activa && (
+            <button
+              onClick={lanzarERP}
+              disabled={lanzando}
+              className="w-full flex items-center gap-3 px-3 py-3 rounded-md text-sm font-medium transition-colors bg-emerald-700 hover:bg-emerald-600 text-white disabled:opacity-60"
+            >
+              {lanzando ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <ExternalLink size={18} />
+              )}
+              ERP Distribuidora
+            </button>
+          )}
         </nav>
       </aside>
     </>

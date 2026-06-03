@@ -7,6 +7,7 @@ import Inventario from './pages/Inventario'
 import Ventas from './pages/Ventas'
 import Reportes from './pages/Reportes'
 import Soporte from './pages/Soporte'
+import FabricaApps from './pages/FabricaApps'
 import SuperAdmin from './pages/SuperAdmin'
 
 export default function App() {
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="/ventas" element={<Ventas />} />
           <Route path="/reportes" element={<Reportes />} />
           <Route path="/soporte" element={<Soporte />} />
+          <Route path="/fabrica-apps" element={<FabricaApps />} />
         </Route>
       </Route>
 

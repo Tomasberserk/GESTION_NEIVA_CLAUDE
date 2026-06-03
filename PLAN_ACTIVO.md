@@ -21,7 +21,8 @@
 [✅] Sprint 5 — Pipeline funcional tier basic (COMPLETO)
 [✅] Sprint 6 — Template medium (COMPLETO)
 [✅] Sprint 7 — Template professional (Diseño & Especificaciones en factory/templates/professional/ COMPLETO)
-[🔄] Sprint 8 — Despliegue y Activación de Hermes-3 + Landing Page (SIGUIENTE)
+[🔄] Sprint 7.8 — Launcher de Factory & SSO Seguro (EN CURSO)
+[ ] Sprint 8 — Despliegue y Activación de Hermes-3 + Landing Page (SIGUIENTE)
 ```
 
 ---
@@ -240,6 +241,31 @@
 3. ✅ Superadmin puede responder tickets (estado → `respondido`)
 4. ✅ Flujo end-to-end: Crear ticket → Responder como admin → Ver actualización en hilo del cliente
 5. ✅ 16/16 tests passing (auth + OWASP + soporte CRM), build frontend sin errores
+
+---
+
+## Sprint 7.8 — Launcher de Factory & SSO Seguro (EN CURSO)
+
+**Objetivo:** Desarrollar el launcher modular que permite a las tiendas del Plan Básico solicitar un trial de 8 días del Plan Medium (ERP Distribuidora) y acceder mediante SSO seguro en nueva pestaña.
+
+| # | Tarea | Recurso / Archivo | Estado |
+|---|-------|-------------------|--------|
+| 1 | **[Architect/Claude]** Modificar modelo Empresa (3 nuevos campos) + SSOToken | `app/models.py` | ✅ Completado |
+| 2 | **[Architect/Claude]** Crear y aplicar migración Alembic 007 | `alembic/versions/007_factory_launcher_sso.py` | ✅ Completado |
+| 3 | **[Haiku]** Actualizar schemas de Soporte, Empresa + nuevo sso.py | `app/schemas/` | ✅ Completado |
+| 4 | **[Haiku]** Router superadmin (factory-config endpoint) | `app/routers/superadmin.py` | ✅ Completado |
+| 5 | **[Haiku]** Router soporte (solicitar-upgrade + auto-ticket) | `app/routers/soporte.py` | ✅ Completado |
+| 6 | **[Architect/Claude]** Router SSO (POST /sso/token + GET /sso/login) | `app/routers/sso.py` | ✅ Completado |
+| 7 | **[Haiku]** 12 tests integración SSO (28/28 total passing) | `tests/test_sso.py` | ✅ Completado |
+| 8 | **[Sonnet]** Frontend: Sidebar dinámico + botón ERP con SSO | `Sidebar.jsx` | ✅ Completado |
+| 9 | **[Sonnet]** Frontend: Página FabricaApps.jsx (solicitar upgrade + lanzar ERP) | `pages/FabricaApps.jsx` | ✅ Completado |
+| 10| **[Sonnet]** Frontend: SuperAdmin — factory config panel por empresa | `pages/SuperAdmin.jsx` | ✅ Completado |
+
+### Criterios de éxito Sprint 7.8
+1. Se puede solicitar upgrade a Medium desde el POS; esto crea un ticket de soporte automático y marca el flag en la DB.
+2. El Super Admin ve la solicitud, asigna una URL y activa el trial de 8 días.
+3. Al habilitarse la URL, el Sidebar cambia a "ERP Distribuidora".
+4. Al hacer clic, abre una pestaña nueva y loguea automáticamente al usuario mediante el flujo seguro de SSO.
 
 ---
 

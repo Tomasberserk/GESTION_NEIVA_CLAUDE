@@ -36,6 +36,15 @@ def crear_empresa(data: EmpresaCrear, db: Session = Depends(get_db)):
     }
 
 
+@router.get("/mi-empresa", response_model=EmpresaRespuesta)
+def mi_empresa(
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(get_current_user),
+):
+    """Devuelve la empresa del usuario autenticado con factory config incluida."""
+    return empresa_service.obtener_empresa(current_user.empresa_id, db)
+
+
 @router.get("/{empresa_id}", response_model=EmpresaRespuesta)
 def obtener_empresa(
     empresa_id: UUID,

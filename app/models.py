@@ -103,6 +103,11 @@ class Empresa(AuditMixin, Base):
     )
     trial_expires_at = Column(DateTime(timezone=True), nullable=True)
 
+    # Factory Launcher — campos para upgrade a Medium (ERP Distribuidora)
+    factory_upgrade_solicitado = Column(Boolean, default=False, server_default="false", nullable=False)
+    factory_url = Column(String(500), nullable=True)
+    factory_trial_expires_at = Column(DateTime(timezone=True), nullable=True)
+
     # Relaciones (cascade: si se borra la empresa, se borran sus hijos)
     usuarios = relationship(
         "Usuario",
@@ -357,3 +362,43 @@ class SoporteMensaje(Base):
 
     def __repr__(self) -> str:
         return f"<SoporteMensaje rol={self.remitente_rol!r}>"
+
+
+# ---------------------------------------------------------------------------
+# SSOToken (token de un solo uso para login automático en factory apps)
+# ---------------------------------------------------------------------------
+
+class SSOToken(Base):
+    __tablename__ = "sso_tokens"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    empresa_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("empresas.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    usuario_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("usuarios.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    # Token opaco de un solo uso — UUID v4 sin guiones
+    token = Column(String(64), unique=True, nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    usado = Column(Boolean, default=False, server_default="false", nullable=False)
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    empresa = relationship("Empresa")
+    usuario = relationship("Usuario")
+
+    __table_args__ = (
+        Index("idx_sso_tokens_token", "token"),
+        Index("idx_sso_tokens_empresa", "empresa_id"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<SSOToken empresa={self.empresa_id} usado={self.usado}>"
