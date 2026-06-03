@@ -359,8 +359,8 @@ class Proveedor(AuditMixin, Base):
     direccion       = Column(String(255), nullable=True)
 
     empresa           = relationship("Empresa", back_populates="proveedores")
-    compras           = relationship("Compra", back_populates="proveedor", passive_deletes=True)
-    cuentas_por_pagar = relationship("CuentaPorPagar", back_populates="proveedor", passive_deletes=True)
+    compras           = relationship("Compra", back_populates="proveedor")
+    cuentas_por_pagar = relationship("CuentaPorPagar", back_populates="proveedor")
 
     __table_args__ = (
         UniqueConstraint("empresa_id", "nit_o_cedula", name="uq_proveedor_empresa_nit"),
@@ -430,7 +430,7 @@ class CuentaPorPagar(AuditMixin, Base):
 
     id                = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     empresa_id        = Column(UUID(as_uuid=True), ForeignKey("empresas.id", ondelete="CASCADE"), nullable=False)
-    compra_id         = Column(UUID(as_uuid=True), ForeignKey("compras.id", ondelete="RESTRICT"), nullable=False)
+    compra_id         = Column(UUID(as_uuid=True), ForeignKey("compras.id", ondelete="CASCADE"), nullable=False)
     proveedor_id      = Column(UUID(as_uuid=True), ForeignKey("proveedores.id", ondelete="RESTRICT"), nullable=False)
     monto_total       = Column(Numeric(12, 2), nullable=False)
     saldo_pendiente   = Column(Numeric(12, 2), nullable=False)

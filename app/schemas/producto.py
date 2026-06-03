@@ -4,7 +4,7 @@ from decimal import Decimal
 from typing import Optional, List, Literal
 from pydantic import BaseModel, ConfigDict, field_validator
 
-UNIDADES    = Literal["unidad", "gramo", "libra", "kilo"]
+UNIDADES    = Literal["unidad", "gramo", "libra", "kilo", "caja", "bulto", "kg", "litro", "metro"]
 CATEGORIAS  = Literal["Bebidas", "Snacks", "Aseo", "Lacteos", "Limpieza", "Panaderia"]
 
 
