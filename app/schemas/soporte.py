@@ -1,4 +1,3 @@
-# app/schemas/soporte.py
 from uuid import UUID
 from datetime import datetime
 from typing import Optional
@@ -47,9 +46,6 @@ class EmpresaAdminOut(BaseModel):
     is_active: bool
     trial_expires_at: Optional[datetime]
     total_usuarios: int
-    factory_upgrade_solicitado: bool
-    factory_url: Optional[str]
-    factory_trial_expires_at: Optional[datetime]
 
     model_config = {"from_attributes": True}
 
@@ -62,6 +58,5 @@ class ActualizarEstado(BaseModel):
     is_active: bool
 
 
-class ActualizarFactoryConfig(BaseModel):
-    factory_url: Optional[str] = None
-    factory_trial_expires_at: Optional[datetime] = None
+class ActualizarPlan(BaseModel):
+    plan: str  # "basic" | "medium" | "premium"

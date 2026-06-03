@@ -8,7 +8,7 @@ from app import models
 from app.database import get_db
 from app.schemas.soporte import (
     ActualizarEstado,
-    ActualizarFactoryConfig,
+    ActualizarPlan,
     ActualizarTrial,
     EmpresaAdminOut,
     TicketListOut,
@@ -53,9 +53,8 @@ def listar_empresas(
     # Single query for all empresas
     empresas = db.query(models.Empresa).order_by(models.Empresa.created_at.desc()).all()
 
-    result = []
-    for e in empresas:
-        result.append(EmpresaAdminOut(
+    return [
+        EmpresaAdminOut(
             id=e.id,
             nombre_comercial=e.nombre_comercial,
             nit_o_cedula=e.nit_o_cedula,
@@ -63,11 +62,9 @@ def listar_empresas(
             is_active=e.is_active,
             trial_expires_at=e.trial_expires_at,
             total_usuarios=counts.get(e.id, 0),
-            factory_upgrade_solicitado=e.factory_upgrade_solicitado,
-            factory_url=e.factory_url,
-            factory_trial_expires_at=e.factory_trial_expires_at,
-        ))
-    return result
+        )
+        for e in empresas
+    ]
 
 
 @router.put("/empresas/{empresa_id}/trial")
@@ -106,30 +103,31 @@ def actualizar_estado(
     return {"mensaje": "Estado actualizado", "is_active": empresa.is_active}
 
 
-@router.put("/empresas/{empresa_id}/factory-config")
-def actualizar_factory_config(
+@router.put("/empresas/{empresa_id}/plan")
+def actualizar_plan(
     empresa_id: UUID,
-    data: ActualizarFactoryConfig,
+    data: ActualizarPlan,
     db: Session = Depends(get_db),
     _: None = Depends(_check_superadmin),
 ):
     """
-    Asigna la URL del ERP y activa el trial de 8 días para una empresa.
-    Llamado por el superadmin cuando aprueba una solicitud de upgrade.
+    Cambia el plan de una empresa (basic / medium / premium).
+    Activa/desactiva los módulos ERP en el frontend automáticamente.
     """
+    from app.models import PlanEmpresa
+    try:
+        nuevo_plan = PlanEmpresa(data.plan)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Plan inválido. Valores permitidos: {[p.value for p in PlanEmpresa]}",
+        )
     empresa = db.query(models.Empresa).filter(models.Empresa.id == empresa_id).first()
     if not empresa:
         raise HTTPException(status_code=404, detail="Empresa no encontrada")
-    if data.factory_url is not None:
-        empresa.factory_url = data.factory_url
-    if data.factory_trial_expires_at is not None:
-        empresa.factory_trial_expires_at = data.factory_trial_expires_at
+    empresa.plan = nuevo_plan
     db.commit()
-    return {
-        "mensaje": "Configuración de factory actualizada",
-        "factory_url": empresa.factory_url,
-        "factory_trial_expires_at": empresa.factory_trial_expires_at,
-    }
+    return {"mensaje": "Plan actualizado", "plan": empresa.plan.value}
 
 
 @router.get("/tickets", response_model=list[TicketListOut])
