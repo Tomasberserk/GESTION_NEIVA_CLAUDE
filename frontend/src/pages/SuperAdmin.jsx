@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 
-const API = import.meta.env.VITE_API_URL || ''
+const API = import.meta.env.VITE_API_URL || '/api'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -191,9 +191,9 @@ function EmpresaCard({ empresa, clave, onRefresh }) {
   const [errorLocal, setErrorLocal] = useState('')
   const [confirmandoEliminar, setConfirmandoEliminar] = useState(false)
   const [cargandoEliminar, setCargandoEliminar] = useState(false)
-  const [mostrarFactory, setMostrarFactory] = useState(false)
-  const [factoryUrl, setFactoryUrl] = useState(empresa.factory_url || '')
-  const [cargandoFactory, setCargandoFactory] = useState(false)
+  const [mostrarPlan, setMostrarPlan] = useState(false)
+  const [planSeleccionado, setPlanSeleccionado] = useState(empresa.plan || 'basic')
+  const [cargandoPlan, setCargandoPlan] = useState(false)
 
   async function eliminarEmpresa() {
     setCargandoEliminar(true)
@@ -256,26 +256,25 @@ function EmpresaCard({ empresa, clave, onRefresh }) {
     }
   }
 
-  async function confirmarFactory() {
-    if (!factoryUrl.trim()) return
-    setCargandoFactory(true)
+  async function confirmarPlan() {
+    setCargandoPlan(true)
     setErrorLocal('')
     try {
-      const trialExpires = new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString()
-      const res = await apiFetch(`/superadmin/empresas/${empresa.id}/factory-config`, clave, {
+      const res = await apiFetch(`/superadmin/empresas/${empresa.id}/plan`, clave, {
         method: 'PUT',
-        body: JSON.stringify({ factory_url: factoryUrl.trim(), factory_trial_expires_at: trialExpires }),
+        body: JSON.stringify({ plan: planSeleccionado }),
       })
       if (res.ok) {
-        setMostrarFactory(false)
+        setMostrarPlan(false)
         onRefresh()
       } else {
-        setErrorLocal('Error al guardar la config. de factory')
+        const err = await res.json().catch(() => ({}))
+        setErrorLocal(err?.detail || 'Error al actualizar el plan')
       }
     } catch {
       setErrorLocal('Error de conexión')
     } finally {
-      setCargandoFactory(false)
+      setCargandoPlan(false)
     }
   }
 
@@ -292,29 +291,12 @@ function EmpresaCard({ empresa, clave, onRefresh }) {
       <div className="flex flex-wrap gap-2 items-center">
         <PlanBadge plan={empresa.plan} />
         <span className="text-xs text-slate-500">{empresa.total_usuarios} usuario{empresa.total_usuarios !== 1 ? 's' : ''}</span>
-        {empresa.factory_upgrade_solicitado && (
-          <span className="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-700">
-            Upgrade solicitado
-          </span>
-        )}
-        {empresa.factory_url && (
-          <span className="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-700">
-            Factory activo
-          </span>
-        )}
       </div>
 
       <div className="text-xs text-slate-600">
         <span className="font-medium">Trial:</span>{' '}
         {formatFecha(empresa.trial_expires_at)}
       </div>
-
-      {empresa.factory_url && (
-        <div className="text-xs text-slate-600 truncate">
-          <span className="font-medium">ERP URL:</span>{' '}
-          <span className="text-indigo-600">{empresa.factory_url}</span>
-        </div>
-      )}
 
       {errorLocal && (
         <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1">{errorLocal}</p>
@@ -339,14 +321,10 @@ function EmpresaCard({ empresa, clave, onRefresh }) {
           Extender Trial
         </button>
         <button
-          onClick={() => setMostrarFactory((v) => !v)}
-          className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-colors ${
-            empresa.factory_upgrade_solicitado && !empresa.factory_url
-              ? 'bg-amber-500 hover:bg-amber-600 text-white'
-              : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700'
-          }`}
+          onClick={() => setMostrarPlan((v) => !v)}
+          className="text-xs px-3 py-1.5 rounded-lg font-semibold bg-violet-50 hover:bg-violet-100 text-violet-700 transition-colors"
         >
-          {empresa.factory_url ? 'Editar Factory' : 'Config. Factory'}
+          Cambiar Plan
         </button>
         {!confirmandoEliminar ? (
           <button
@@ -374,29 +352,30 @@ function EmpresaCard({ empresa, clave, onRefresh }) {
         )}
       </div>
 
-      {mostrarFactory && (
-        <div className="border border-emerald-200 bg-emerald-50 rounded-lg p-3 flex flex-col gap-2">
-          <label className="text-xs font-medium text-emerald-700">URL del ERP (factory_url)</label>
-          <input
-            type="url"
-            value={factoryUrl}
-            onChange={(e) => setFactoryUrl(e.target.value)}
-            placeholder="https://erp.tudominio.com"
-            className="text-xs border border-emerald-300 rounded px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
-          />
-          <p className="text-xs text-emerald-600">
-            Se activará un trial de 8 días desde ahora.
-          </p>
-          <div className="flex gap-2">
-            <button
-              onClick={confirmarFactory}
-              disabled={cargandoFactory || !factoryUrl.trim()}
-              className="text-xs px-3 py-1.5 rounded-lg font-semibold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 transition-colors"
+      {mostrarPlan && (
+        <div className="border border-violet-200 bg-violet-50 rounded-lg p-3 flex flex-col gap-2">
+          <label className="text-xs font-medium text-violet-700">Seleccionar Plan</label>
+          <div className="relative">
+            <select
+              value={planSeleccionado}
+              onChange={(e) => setPlanSeleccionado(e.target.value)}
+              className="w-full text-xs border border-violet-300 rounded px-2.5 py-1.5 bg-white focus:outline-none"
             >
-              {cargandoFactory ? 'Guardando...' : 'Activar Factory'}
+              <option value="basic">Basic (POS simple)</option>
+              <option value="medium">Medium (ERP Distribuidora)</option>
+              <option value="premium">Premium (Acceso total)</option>
+            </select>
+          </div>
+          <div className="flex gap-2 mt-1">
+            <button
+              onClick={confirmarPlan}
+              disabled={cargandoPlan}
+              className="text-xs px-3 py-1.5 rounded-lg font-semibold bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-50 transition-colors"
+            >
+              {cargandoPlan ? 'Guardando...' : 'Confirmar'}
             </button>
             <button
-              onClick={() => setMostrarFactory(false)}
+              onClick={() => setMostrarPlan(false)}
               className="text-xs px-3 py-1.5 rounded-lg font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
             >
               Cancelar

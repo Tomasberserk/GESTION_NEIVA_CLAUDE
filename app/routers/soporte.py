@@ -97,18 +97,27 @@ def solicitar_upgrade_medium(
     Marca el flag en la empresa y crea un ticket de soporte automático.
     Idempotente: devuelve 409 si ya fue solicitado.
     """
-    empresa = db.query(models.Empresa).filter(
-        models.Empresa.id == current_user.empresa_id
-    ).first()
+    # Verificar si ya existe una solicitud abierta para evitar spam
+    ticket_existente = (
+        db.query(models.SoporteTicket)
+        .filter(
+            models.SoporteTicket.empresa_id == current_user.empresa_id,
+            models.SoporteTicket.asunto == "Solicitud de upgrade a Plan Medium (ERP Distribuidora)",
+            models.SoporteTicket.estado != models.EstadoTicket.CERRADO,
+            models.SoporteTicket.is_active.is_(True),
+        )
+        .first()
+    )
 
-    if empresa.factory_upgrade_solicitado:
+    if ticket_existente:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="El upgrade ya fue solicitado. El equipo de soporte revisará tu caso.",
         )
 
-    empresa.factory_upgrade_solicitado = True
-    db.flush()
+    empresa = db.query(models.Empresa).filter(
+        models.Empresa.id == current_user.empresa_id
+    ).first()
 
     ticket = models.SoporteTicket(
         empresa_id=current_user.empresa_id,

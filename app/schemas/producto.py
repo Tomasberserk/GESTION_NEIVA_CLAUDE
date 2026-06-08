@@ -17,7 +17,7 @@ class ProductoCrear(BaseModel):
     unidad_medida: UNIDADES = "unidad"
     fecha_vencimiento: Optional[date] = None
     categoria: Optional[CATEGORIAS] = None
-    empresa_id: UUID
+    empresa_id: Optional[UUID] = None  # Inyectado por el router desde JWT
 
     @field_validator("nombre")
     @classmethod

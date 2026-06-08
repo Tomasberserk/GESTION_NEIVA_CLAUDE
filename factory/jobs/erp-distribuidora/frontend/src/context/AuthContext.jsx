@@ -10,6 +10,28 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const verificar = async () => {
       try {
+        // 1. Verificamos si venimos con un token SSO en la URL
+        const params = new URLSearchParams(window.location.search)
+        const ssoToken = params.get('sso_token')
+
+        if (ssoToken) {
+          const BASE = import.meta.env.VITE_API_URL || ''
+          const res = await fetch(`${BASE}/sso/login?token=${ssoToken}`)
+          if (res.ok) {
+            const data = await res.json()
+            authService.setToken(data.access_token)
+
+            // Limpiamos los parámetros de la URL para estética
+            window.history.replaceState({}, document.title, window.location.pathname)
+
+            const user = await authService.getMe()
+            setUsuario(user)
+            setCargando(false)
+            return
+          }
+        }
+
+        // 2. Flujo local normal
         const token = authService.getToken()
         if (token) {
           const user = await authService.getMe()

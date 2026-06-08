@@ -108,3 +108,28 @@ def test_flujo_completo_ticket_respuesta(client, monkeypatch):
     assert data["estado"] == "respondido"
     assert len(data["mensajes"]) == 2
     assert data["mensajes"][1]["remitente_rol"] == "superadmin"
+
+
+def test_solicitar_upgrade_medium(client, monkeypatch):
+    monkeypatch.setenv("SUPERADMIN_KEY", SUPERADMIN_KEY)
+    headers = _registrar_empresa_y_usuario(client, "crm6")
+
+    # 1. Solicitar upgrade
+    resp = client.post("/soporte/solicitar-upgrade", headers=headers)
+    assert resp.status_code == 201
+    data = resp.json()
+    assert "Solicitud enviada" in data["mensaje"]
+    ticket_id = data["ticket_id"]
+
+    # 2. Intentar solicitar nuevamente -> debe fallar con 409
+    resp_dup = client.post("/soporte/solicitar-upgrade", headers=headers)
+    assert resp_dup.status_code == 409
+
+    # 3. Superadmin ve el ticket generado
+    resp_tickets = client.get("/superadmin/tickets", headers={"x-superadmin-key": SUPERADMIN_KEY})
+    assert resp_tickets.status_code == 200
+    tickets = resp_tickets.json()
+    ticket = next((t for t in tickets if str(t["id"]) == ticket_id), None)
+    assert ticket is not None
+    assert "Solicitud de upgrade" in ticket["asunto"]
+

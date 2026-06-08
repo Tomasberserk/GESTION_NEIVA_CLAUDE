@@ -35,9 +35,6 @@ class EmpresaRespuesta(BaseModel):
     trial_expires_at: Optional[datetime] = None
     created_at: datetime
     is_active: bool
-    factory_upgrade_solicitado: bool = False
-    factory_url: Optional[str] = None
-    factory_trial_expires_at: Optional[datetime] = None
 
     @computed_field
     @property
@@ -46,15 +43,3 @@ class EmpresaRespuesta(BaseModel):
             return None
         delta = self.trial_expires_at - datetime.now(timezone.utc)
         return max(0, delta.days)
-
-    @computed_field
-    @property
-    def factory_activa(self) -> bool:
-        if not self.factory_url:
-            return False
-        if self.factory_trial_expires_at is None:
-            return True
-        exp = self.factory_trial_expires_at
-        if exp.tzinfo is None:
-            exp = exp.replace(tzinfo=timezone.utc)
-        return exp > datetime.now(timezone.utc)

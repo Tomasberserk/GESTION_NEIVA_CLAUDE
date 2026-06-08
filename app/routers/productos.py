@@ -17,7 +17,7 @@ from app.services import producto_service
 router = APIRouter(prefix="/productos", tags=["Productos"])
 
 
-@router.post("/", response_model=ProductoRespuesta, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ProductoRespuesta, status_code=status.HTTP_201_CREATED)
 def crear_producto(
     data: ProductoCrear,
     db: Session = Depends(get_db),
@@ -29,15 +29,23 @@ def crear_producto(
     )
 
 
-@router.get("/{empresa_id}", response_model=InventarioRespuesta)
+@router.get("", response_model=InventarioRespuesta)
 def listar_productos(
-    empresa_id: UUID,
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(get_current_user),
 ):
-    if current_user.empresa_id != empresa_id:
-        raise HTTPException(status_code=403, detail="Acceso no autorizado")
-    return producto_service.obtener_productos_empresa(empresa_id, db)
+    return producto_service.obtener_productos_empresa(current_user.empresa_id, db)
+
+
+@router.get("/{producto_id}", response_model=ProductoRespuesta)
+def obtener_producto(
+    producto_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(get_current_user),
+):
+    return producto_service.obtener_producto_por_id(
+        producto_id, current_user.empresa_id, db
+    )
 
 
 @router.put("/{producto_id}", response_model=ProductoRespuesta)

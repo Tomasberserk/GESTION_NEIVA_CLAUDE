@@ -1,3 +1,5 @@
+const BASE = import.meta.env.VITE_API_URL || ''
+
 const authService = {
   setToken(token) {
     localStorage.setItem('access_token', token)
@@ -12,7 +14,7 @@ const authService = {
   },
 
   async login(email, password) {
-    const res = await fetch('/token', {
+    const res = await fetch(`${BASE}/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
@@ -27,7 +29,7 @@ const authService = {
   },
 
   async registro(payload) {
-    const res = await fetch('/auth/registro-completo', {
+    const res = await fetch(`${BASE}/auth/registro-completo`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -58,7 +60,7 @@ const authService = {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     }
-    const res = await fetch(url, { ...options, headers })
+    const res = await fetch(`${BASE}${url}`, { ...options, headers })
     if (res.status === 401) {
       this.clearToken()
       window.location.href = '/login'

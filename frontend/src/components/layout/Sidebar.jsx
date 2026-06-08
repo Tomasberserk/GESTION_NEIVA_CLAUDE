@@ -9,8 +9,9 @@ import {
   Settings,
   X,
   Rocket,
-  ExternalLink,
-  Loader2,
+  Users,
+  CreditCard,
+  Receipt,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import authService from '../../services/authService'
@@ -21,6 +22,9 @@ const navItems = [
   { to: '/dashboard',       label: 'Dashboard',        icon: LayoutDashboard },
   { to: '/inventario',      label: 'Inventario',        icon: Package },
   { to: '/ventas',          label: 'Ventas',            icon: ShoppingCart },
+  { to: '/proveedores',     label: 'Proveedores',      icon: Users,          planes: ['medium', 'premium'] },
+  { to: '/compras',         label: 'Compras',          icon: Receipt,        planes: ['medium', 'premium'] },
+  { to: '/cuentas-por-pagar', label: 'Cuentas por Pagar', icon: CreditCard,   planes: ['medium', 'premium'] },
   { to: '/reportes',        label: 'Reportes',          icon: BarChart3 },
   { to: '/soporte',         label: 'Soporte Técnico',   icon: MessageCircle },
   { to: '/fabrica-apps',    label: 'Fábrica Apps',      icon: Rocket },
@@ -29,7 +33,6 @@ const navItems = [
 
 export default function Sidebar({ abierto, onCerrar }) {
   const [empresa, setEmpresa] = useState(null)
-  const [lanzando, setLanzando] = useState(false)
 
   useEffect(() => {
     authService
@@ -38,26 +41,6 @@ export default function Sidebar({ abierto, onCerrar }) {
       .then((data) => setEmpresa(data))
       .catch(() => {})
   }, [])
-
-  async function lanzarERP() {
-    if (lanzando) return
-    setLanzando(true)
-    try {
-      const res = await authService.fetchAuth(`${BASE}/sso/token`, { method: 'POST' })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        alert(err?.detail || 'Error al generar el token SSO')
-        return
-      }
-      const { token } = await res.json()
-      const url = `${empresa.factory_url}?sso_token=${token}`
-      window.open(url, '_blank', 'noopener,noreferrer')
-    } catch {
-      alert('Error de conexión al lanzar el ERP')
-    } finally {
-      setLanzando(false)
-    }
-  }
 
   return (
     <>
@@ -93,40 +76,26 @@ export default function Sidebar({ abierto, onCerrar }) {
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {navItems.map(({ to, label, icon: Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              onClick={onCerrar}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 px-3 py-3 rounded-md text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-indigo-600 text-white'
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-white',
-                )
-              }
-            >
-              <Icon size={18} />
-              {label}
-            </NavLink>
-          ))}
-
-          {/* Botón dinámico ERP — solo aparece cuando el factory trial está activo */}
-          {empresa?.factory_activa && (
-            <button
-              onClick={lanzarERP}
-              disabled={lanzando}
-              className="w-full flex items-center gap-3 px-3 py-3 rounded-md text-sm font-medium transition-colors bg-emerald-700 hover:bg-emerald-600 text-white disabled:opacity-60"
-            >
-              {lanzando ? (
-                <Loader2 size={18} className="animate-spin" />
-              ) : (
-                <ExternalLink size={18} />
-              )}
-              ERP Distribuidora
-            </button>
-          )}
+          {navItems
+            .filter((item) => !item.planes || item.planes.includes(empresa?.plan || 'basic'))
+            .map(({ to, label, icon: Icon }) => (
+              <NavLink
+                key={to}
+                to={to}
+                onClick={onCerrar}
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center gap-3 px-3 py-3 rounded-md text-sm font-medium transition-colors',
+                    isActive
+                      ? 'bg-indigo-600 text-white'
+                      : 'text-slate-400 hover:bg-slate-800 hover:text-white',
+                  )
+                }
+              >
+                <Icon size={18} />
+                {label}
+              </NavLink>
+            ))}
         </nav>
       </aside>
     </>

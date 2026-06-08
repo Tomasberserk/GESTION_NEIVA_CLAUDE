@@ -21,7 +21,7 @@
 [✅] Sprint 5 — Pipeline funcional tier basic (COMPLETO)
 [✅] Sprint 6 — Template medium (COMPLETO)
 [✅] Sprint 7 — Template professional (Diseño & Especificaciones en factory/templates/professional/ COMPLETO)
-[🔄] Sprint 7.8 — Launcher de Factory & SSO Seguro (EN CURSO)
+[✅] Sprint 7.8 — Fusión e Integración del ERP Distribuidora en el POS (COMPLETO)
 [ ] Sprint 8 — Despliegue y Activación de Hermes-3 + Landing Page (SIGUIENTE)
 ```
 
@@ -244,28 +244,30 @@
 
 ---
 
-## Sprint 7.8 — Launcher de Factory & SSO Seguro (EN CURSO)
+## Sprint 7.8 — Fusión e Integración del ERP Distribuidora en el POS (COMPLETO)
 
-**Objetivo:** Desarrollar el launcher modular que permite a las tiendas del Plan Básico solicitar un trial de 8 días del Plan Medium (ERP Distribuidora) y acceder mediante SSO seguro en nueva pestaña.
+**Objetivo:** Integrar completamente los módulos de la fábrica (ERP Distribuidora: compras, proveedores y cuentas por pagar) en la misma aplicación monolítica multi-tenant de Gestión Neiva, habilitándose dinámicamente según el plan de la empresa.
 
 | # | Tarea | Recurso / Archivo | Estado |
 |---|-------|-------------------|--------|
-| 1 | **[Architect/Claude]** Modificar modelo Empresa (3 nuevos campos) + SSOToken | `app/models.py` | ✅ Completado |
-| 2 | **[Architect/Claude]** Crear y aplicar migración Alembic 007 | `alembic/versions/007_factory_launcher_sso.py` | ✅ Completado |
-| 3 | **[Haiku]** Actualizar schemas de Soporte, Empresa + nuevo sso.py | `app/schemas/` | ✅ Completado |
-| 4 | **[Haiku]** Router superadmin (factory-config endpoint) | `app/routers/superadmin.py` | ✅ Completado |
-| 5 | **[Haiku]** Router soporte (solicitar-upgrade + auto-ticket) | `app/routers/soporte.py` | ✅ Completado |
-| 6 | **[Architect/Claude]** Router SSO (POST /sso/token + GET /sso/login) | `app/routers/sso.py` | ✅ Completado |
-| 7 | **[Haiku]** 12 tests integración SSO (28/28 total passing) | `tests/test_sso.py` | ✅ Completado |
-| 8 | **[Sonnet]** Frontend: Sidebar dinámico + botón ERP con SSO | `Sidebar.jsx` | ✅ Completado |
-| 9 | **[Sonnet]** Frontend: Página FabricaApps.jsx (solicitar upgrade + lanzar ERP) | `pages/FabricaApps.jsx` | ✅ Completado |
-| 10| **[Sonnet]** Frontend: SuperAdmin — factory config panel por empresa | `pages/SuperAdmin.jsx` | ✅ Completado |
+| 1 | **[Architect/Claude]** Fusionar modelos Proveedor, Compra, CxP en models | `app/models.py` | ✅ Completado |
+| 2 | **[Architect/Claude]** Crear y aplicar migración Alembic de nuevas tablas | `alembic/versions/` | ✅ Completado |
+| 3 | **[Haiku]** Copiar y adaptar esquemas Pydantic del ERP | `app/schemas/` | ✅ Completado |
+| 4 | **[Haiku]** Copiar y registrar servicios de compra y deudas | `app/services/` | ✅ Completado |
+| 5 | **[Haiku]** Registrar nuevos routers del ERP y deshabilitar router SSO | `app/main.py` + `app/routers/` | ✅ Completado |
+| 6 | **[Haiku]** Adaptar y fusionar pruebas de integración del ERP al core | `tests/test_erp_flows.py` | ✅ Completado |
+| 7 | **[Sonnet]** Frontend: Copiar componentes, páginas y hooks del ERP | `frontend/src/` | ✅ Completado |
+| 8 | **[Sonnet]** Frontend: Registrar rutas en App.jsx con protección de plan | `App.jsx` | ✅ Completado |
+| 9 | **[Sonnet]** Frontend: Sidebar condicional y dinámico según `empresa.plan` | `Sidebar.jsx` | ✅ Completado |
+| 10| **[Sonnet]** Frontend: Cambiar control de URL por selector de Plan en admin | `pages/SuperAdmin.jsx` | ✅ Completado |
 
 ### Criterios de éxito Sprint 7.8
-1. Se puede solicitar upgrade a Medium desde el POS; esto crea un ticket de soporte automático y marca el flag en la DB.
-2. El Super Admin ve la solicitud, asigna una URL y activa el trial de 8 días.
-3. Al habilitarse la URL, el Sidebar cambia a "ERP Distribuidora".
-4. Al hacer clic, abre una pestaña nueva y loguea automáticamente al usuario mediante el flujo seguro de SSO.
+1. Las 5 tablas del ERP están integradas en la base de datos de Gestión Neiva mediante Alembic.
+2. Los endpoints del ERP responden de forma multi-tenant (`empresa_id` aislado).
+3. Si el plan de una empresa es `basic`, los menús del ERP no se muestran.
+4. Si el plan de una empresa cambia a `medium` desde el Superadmin, se muestran instantáneamente *Compras, Proveedores y Cuentas por Pagar*.
+5. Todo el flujo (proveedor -> compra crédito -> abono CxP) se ejecuta en la misma pantalla.
+6. 100% de los tests pasan sin errores (`pytest tests/`).
 
 ---
 

@@ -1,28 +1,43 @@
 import { useState, useEffect } from 'react'
-import { Rocket, CheckCircle, Clock, ExternalLink, Loader2, AlertTriangle } from 'lucide-react'
+import { Rocket, CheckCircle, Clock, Loader2, AlertTriangle } from 'lucide-react'
 import authService from '../services/authService'
 
 const BASE = import.meta.env.VITE_API_URL || '/api'
 
 export default function FabricaApps() {
   const [empresa, setEmpresa] = useState(null)
+  const [solicitado, setSolicitado] = useState(false)
   const [cargando, setCargando] = useState(true)
   const [solicitando, setSolicitando] = useState(false)
-  const [lanzando, setLanzando] = useState(false)
   const [mensaje, setMensaje] = useState(null) // { tipo: 'ok'|'error', texto: '' }
 
-  async function cargarEmpresa() {
+  async function cargarDatos() {
     try {
-      const res = await authService.fetchAuth(`${BASE}/empresas/mi-empresa`)
-      if (res.ok) setEmpresa(await res.json())
+      const [resEmpresa, resTickets] = await Promise.all([
+        authService.fetchAuth(`${BASE}/empresas/mi-empresa`),
+        authService.fetchAuth(`${BASE}/soporte/tickets`),
+      ])
+      if (resEmpresa.ok) {
+        const emp = await resEmpresa.json()
+        setEmpresa(emp)
+      }
+      if (resTickets.ok) {
+        const tickets = await resTickets.json()
+        const tieneSolicitud = tickets.some(
+          (t) => t.asunto === 'Solicitud de upgrade a Plan Medium (ERP Distribuidora)' && t.estado !== 'cerrado'
+        )
+        setSolicitado(tieneSolicitud)
+      }
     } catch {
-      // silencioso — empresa quedará null
+      // silencioso
     } finally {
       setCargando(false)
     }
   }
 
-  useEffect(() => { cargarEmpresa() }, [])
+  useEffect(() => {
+    cargarDatos()
+  }, [])
 
   async function solicitarUpgrade() {
     setSolicitando(true)
@@ -32,7 +47,7 @@ export default function FabricaApps() {
       const data = await res.json().catch(() => ({}))
       if (res.ok) {
         setMensaje({ tipo: 'ok', texto: data.mensaje || 'Solicitud enviada correctamente.' })
-        await cargarEmpresa()
+        await cargarDatos()
       } else {
         setMensaje({ tipo: 'error', texto: data.detail || 'Error al enviar la solicitud.' })
       }
@@ -41,39 +56,6 @@ export default function FabricaApps() {
     } finally {
       setSolicitando(false)
     }
-  }
-
-  async function lanzarERP() {
-    if (lanzando || !empresa?.factory_url) return
-    setLanzando(true)
-    setMensaje(null)
-    try {
-      const res = await authService.fetchAuth(`${BASE}/sso/token`, { method: 'POST' })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setMensaje({ tipo: 'error', texto: data.detail || 'Error al generar acceso SSO.' })
-        return
-      }
-      const url = `${empresa.factory_url}?sso_token=${data.token}`
-      window.open(url, '_blank', 'noopener,noreferrer')
-    } catch {
-      setMensaje({ tipo: 'error', texto: 'Error de conexión.' })
-    } finally {
-      setLanzando(false)
-    }
-  }
-
-  function formatFecha(iso) {
-    if (!iso) return '—'
-    try {
-      return new Date(iso).toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' })
-    } catch { return iso }
-  }
-
-  function diasRestantes(iso) {
-    if (!iso) return null
-    const diff = new Date(iso) - new Date()
-    return Math.max(0, Math.ceil(diff / 86400000))
   }
 
   if (cargando) {
@@ -85,7 +67,7 @@ export default function FabricaApps() {
     )
   }
 
-  const trialDias = diasRestantes(empresa?.factory_trial_expires_at)
+  const esPlanMediumOPremium = empresa?.plan === 'medium' || empresa?.plan === 'premium'
 
   return (
     <div className="max-w-2xl mx-auto py-10 px-4 space-y-6">
@@ -95,7 +77,7 @@ export default function FabricaApps() {
           Fábrica de Apps
         </h1>
         <p className="text-slate-500 text-sm mt-1">
-          Amplía tu negocio con módulos adicionales generados por IA.
+          Amplía tu negocio con módulos adicionales integrados en el POS.
         </p>
       </div>
 
@@ -107,8 +89,11 @@ export default function FabricaApps() {
             {empresa?.plan || 'Basic'}
           </span>
         </div>
-        <p className="text-slate-600 text-sm">
-          Plan Basic — POS para tiendas de barrio con inventario, ventas y reportes.
+        <p className="text-slate-600 text-sm font-medium">
+          {esPlanMediumOPremium 
+            ? 'Plan Medium — Disfruta de la integración del ERP Distribuidora con compras, proveedores y cuentas por pagar.'
+            : 'Plan Basic — POS para tiendas de barrio con inventario, ventas y reportes.'
+          }
         </p>
       </div>
 
@@ -116,16 +101,16 @@ export default function FabricaApps() {
       <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
         <div className="flex items-start justify-between">
           <div>
-            <h2 className="font-semibold text-slate-800">ERP Distribuidora — Plan Medium</h2>
+            <h2 className="font-semibold text-slate-800 text-base">ERP Distribuidora — Plan Medium</h2>
             <p className="text-slate-500 text-sm mt-0.5">
-              Proveedores, compras a crédito, cuentas por pagar y más.
+              Administración de proveedores, compras a crédito y deudas (cuentas por pagar).
             </p>
           </div>
-          {empresa?.factory_activa ? (
+          {esPlanMediumOPremium ? (
             <span className="text-xs bg-emerald-100 text-emerald-700 font-semibold px-2.5 py-1 rounded-full shrink-0 ml-3">
               Activo
             </span>
-          ) : empresa?.factory_upgrade_solicitado ? (
+          ) : solicitado ? (
             <span className="text-xs bg-amber-100 text-amber-700 font-semibold px-2.5 py-1 rounded-full shrink-0 ml-3">
               Pendiente
             </span>
@@ -136,45 +121,34 @@ export default function FabricaApps() {
           )}
         </div>
 
-        {/* Estado activo — mostrar launcher */}
-        {empresa?.factory_activa && (
-          <div className="bg-emerald-50 rounded-xl p-4 space-y-3">
-            <div className="flex items-center gap-2 text-emerald-700 text-sm font-medium">
+        {/* Estado activo */}
+        {esPlanMediumOPremium && (
+          <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 space-y-2">
+            <div className="flex items-center gap-2 text-emerald-700 text-sm font-semibold">
               <CheckCircle size={16} />
-              Trial activo
-              {trialDias !== null && (
-                <span className="ml-auto text-xs text-emerald-600">
-                  {trialDias} día{trialDias !== 1 ? 's' : ''} restante{trialDias !== 1 ? 's' : ''}
-                </span>
-              )}
+              Módulo ERP Integrado
             </div>
-            <p className="text-xs text-emerald-600">Vence: {formatFecha(empresa.factory_trial_expires_at)}</p>
-            <button
-              onClick={lanzarERP}
-              disabled={lanzando}
-              className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl transition-colors text-sm"
-            >
-              {lanzando ? <Loader2 size={16} className="animate-spin" /> : <ExternalLink size={16} />}
-              Abrir ERP Distribuidora
-            </button>
+            <p className="text-xs text-emerald-600">
+              Los menús de <strong>Proveedores</strong>, <strong>Compras</strong> y <strong>Cuentas por Pagar</strong> ya están habilitados directamente en tu menú lateral izquierdo.
+            </p>
           </div>
         )}
 
         {/* Estado pendiente — esperando activación */}
-        {!empresa?.factory_activa && empresa?.factory_upgrade_solicitado && (
+        {!esPlanMediumOPremium && solicitado && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
             <Clock size={18} className="text-amber-500 shrink-0 mt-0.5" />
             <p className="text-amber-700 text-sm">
-              Tu solicitud fue recibida. El equipo de soporte activará el trial en breve.
+              Tu solicitud fue recibida. El equipo de soporte activará el módulo en breve y te notificará por el ticket.
             </p>
           </div>
         )}
 
         {/* Estado no solicitado — mostrar botón de solicitud */}
-        {!empresa?.factory_upgrade_solicitado && (
+        {!esPlanMediumOPremium && !solicitado && (
           <div className="space-y-2">
             <div className="text-sm text-slate-500">
-              <strong>8 días gratis.</strong> Sin tarjeta de crédito. El equipo activa el acceso en 24 horas.
+              <strong>Prueba gratis por 8 días.</strong> Solicita la activación y el equipo de soporte lo habilitará directamente en tu POS.
             </div>
             <button
               onClick={solicitarUpgrade}
@@ -182,7 +156,7 @@ export default function FabricaApps() {
               className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl transition-colors text-sm"
             >
               {solicitando ? <Loader2 size={16} className="animate-spin" /> : <Rocket size={16} />}
-              Solicitar trial de 8 días
+              Solicitar activación de prueba (8 días)
             </button>
           </div>
         )}

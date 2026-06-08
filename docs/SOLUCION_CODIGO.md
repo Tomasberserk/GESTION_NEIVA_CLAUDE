@@ -84,9 +84,45 @@ def registrar_usuario_con_empresa(
         nombre_comercial: Nombre de la tienda
         nit_o_cedula: NIT o Cédula único
         email: Email único para el usuario administrador
-        password: Contraseña (mínimo 8 caracteres)
-        rol: Rol del usuario (normalmente ADMIN en el primer registro)
-        db: Sesión de base de datos
+      * Al arrancar, Locust levanta su Web UI local en `http://localhost:8089`.
+  * Permite configurar el total de usuarios virtuales concurrentes y la tasa de crecimiento por segundo, exponiendo hermosos gráficos interactivos en vivo del rendimiento del backend.
+
+---
+
+## 🏬 Sprint 7.8 — Fusión e Integración del ERP Distribuidora en el POS (COMPLETO)
+
+Hemos finalizado la fusión de la aplicación **ERP Distribuidora** en el mismo sistema multi-tenant monolítico de **Gestión Neiva**. Los módulos de compras, proveedores y deudas (cuentas por pagar) ahora corren de manera nativa en el mismo backend y frontend, controlados dinámicamente según el plan de suscripción de la empresa.
+
+### 1. Migración y Fusión de Base de Datos
+* **Archivo de Migración:** [008_erp_monolito.py](file:///C:/Users/merid/Documents/GESTION_NEIVA_CLAUDE/alembic/versions/008_erp_monolito.py)
+* **Acciones:**
+  * Eliminamos la antigua tabla `sso_tokens` y las columnas obsoletas `factory_url`, `factory_upgrade_solicitado`, `factory_trial_expires_at` de la tabla `empresas` en favor del esquema monolítico.
+  * Añadimos soporte para unidades de medida de distribuidor (`caja`, `bulto`, `kg`, `litro`, `metro`) al tipo enum `unidadmedida`.
+  * Creamos las tablas `proveedores`, `compras`, `detalle_compras`, `cuentas_por_pagar`, y `abonos_cuentas_por_pagar`, todas vinculadas a nivel multi-tenant mediante `empresa_id` con índices de alto rendimiento.
+
+### 2. Capa de Negocio y Enrutamiento Backend
+* **Servicios & Routers Creados:**
+  * [proveedor_service.py](file:///C:/Users/merid/Documents/GESTION_NEIVA_CLAUDE/app/services/proveedor_service.py) y [proveedores.py](file:///C:/Users/merid/Documents/GESTION_NEIVA_CLAUDE/app/routers/proveedores.py)
+  * [compra_service.py](file:///C:/Users/merid/Documents/GESTION_NEIVA_CLAUDE/app/services/compra_service.py) y [compras.py](file:///C:/Users/merid/Documents/GESTION_NEIVA_CLAUDE/app/routers/compras.py)
+  * [cxp_service.py](file:///C:/Users/merid/Documents/GESTION_NEIVA_CLAUDE/app/services/cxp_service.py) y [cuentas_por_pagar.py](file:///C:/Users/merid/Documents/GESTION_NEIVA_CLAUDE/app/routers/cuentas_por_pagar.py)
+* **Características:**
+  * Restricción estricta por `empresa_id` para garantizar el aislamiento multi-tenant.
+  * Endpoints transaccionales para compras a crédito que crean deudas en `cuentas_por_pagar`.
+  * Registro de abonos con saldos descendentes automáticos y actualización del estado de las obligaciones (`PENDIENTE` / `PAGADA`).
+
+### 3. Frontend Integrado y Control de Acceso
+* **Protección de Rutas:** Implementamos [PlanProtectedRoute.jsx](file:///C:/Users/merid/Documents/GESTION_NEIVA_CLAUDE/frontend/src/components/PlanProtectedRoute.jsx), el cual restringe el acceso a las rutas `/proveedores`, `/compras`, `/compras/nueva` y `/cuentas-por-pagar` según el plan de la empresa (`medium` o `premium`).
+* **Sidebar Dinámico:** Modificamos [Sidebar.jsx](file:///C:/Users/merid/Documents/GESTION_NEIVA_CLAUDE/frontend/src/components/layout/Sidebar.jsx) para evaluar los permisos del plan del usuario y renderizar los módulos ERP únicamente si corresponden al plan contratado.
+* **Administración de Planes en SuperAdmin:** Refacturamos [SuperAdmin.jsx](file:///C:/Users/merid/Documents/GESTION_NEIVA_CLAUDE/frontend/src/pages/SuperAdmin.jsx) para cambiar los campos de configuración externa de URL por un menú desplegable de selección de plan (`basic`, `medium`, `premium`) conectado a `/superadmin/empresas/{id}/plan` en el backend.
+* **Fábrica de Apps:** Adaptamos [FabricaApps.jsx](file:///C:/Users/merid/Documents/GESTION_NEIVA_CLAUDE/frontend/src/pages/FabricaApps.jsx) para notificar al usuario sobre su plan activo y la disponibilidad de los módulos ERP directamente en el menú de navegación izquierdo.
+
+### 4. Resolución de Bugs Críticos
+* **SuperAdmin.jsx:** Corregimos un error de variables duplicadas de estado en la declaración del componente React que causaba fallos de compilación en el build de producción de Vite.
+* **Soporte.py:** Modificamos el endpoint de `/solicitar-upgrade` para verificar los tickets de soporte abiertos con el asunto específico de upgrade, en reemplazo de la columna eliminada `factory_upgrade_solicitado`.
+
+### 5. Validación y Pruebas Exitosas
+* **Tests de Integración Backend:** 22/22 pruebas pasadas con éxito, incluyendo el flujo completo del ERP (`tests/test_erp_flows.py`) y la gestión de tickets de soporte (`tests/test_soporte_crm.py`).
+* **Compilación de Producción Frontend:** El build de producción de Vite compila sin advertencias ni fallos.
     
     Returns:
         dict con access_token, token_type y usuario

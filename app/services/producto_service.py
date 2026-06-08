@@ -75,11 +75,22 @@ def crear_producto(data: ProductoCrear, db: Session) -> models.Producto:
         precio_costo=data.precio_costo,
         precio_venta=data.precio_venta,
         cantidad_actual=data.cantidad_actual,
+        unidad_medida=data.unidad_medida,
+        fecha_vencimiento=data.fecha_vencimiento,
+        categoria=data.categoria,
+        is_active=True,
     )
     db.add(producto)
     db.commit()
     db.refresh(producto)
     return producto
+
+
+def obtener_producto_por_id(
+    producto_id: UUID, empresa_id: UUID, db: Session
+) -> models.Producto:
+    """Obtiene un producto específico validando pertenencia a la empresa."""
+    return _obtener_producto_activo(producto_id, empresa_id, db)
 
 
 def obtener_productos_empresa(empresa_id: UUID, db: Session) -> dict:
