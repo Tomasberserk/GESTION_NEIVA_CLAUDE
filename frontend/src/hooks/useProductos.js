@@ -16,7 +16,7 @@ export function useProductos() {
     setCargando(true)
     setError(null)
     try {
-      const res = await authService.fetchAuth(`${BASE}/productos/${usuario.empresa_id}`)
+      const res = await authService.fetchAuth(`${BASE}/productos`)
       if (!res.ok) throw new Error('Error cargando productos')
       const data = await res.json()
       setProductos(data.inventario)
