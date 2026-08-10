@@ -197,24 +197,17 @@ def verify_webhook(mode: str, token: str, challenge: str) -> str | None:
 
     Meta envía una solicitud GET con hub.mode, hub.verify_token y hub.challenge.
     Si el token coincide, se debe devolver el challenge para confirmar la suscripción.
-
-    Args:
-        mode: Valor de hub.mode (debe ser "subscribe").
-        token: Valor de hub.verify_token enviado por Meta.
-        challenge: Valor de hub.challenge que se debe devolver si es válido.
-
-    Returns:
-        El challenge si la verificación es exitosa, None si falla.
     """
-    config = _get_config()
+    expected_token = os.getenv("WHATSAPP_VERIFY_TOKEN", "tiendapp_secret_token")
 
-    if mode == "subscribe" and token == config["verify_token"]:
-        logger.info("Webhook verificado exitosamente")
+    if mode == "subscribe" and token == expected_token:
+        logger.info("Webhook verificado exitosamente con token: %s", token)
         return challenge
 
     logger.warning(
-        "Verificación de webhook fallida: mode=%s, token_match=%s",
+        "Verificación de webhook fallida: mode=%s, token_recibido=%s, token_esperado=%s",
         mode,
-        token == config["verify_token"],
+        token,
+        expected_token,
     )
     return None
