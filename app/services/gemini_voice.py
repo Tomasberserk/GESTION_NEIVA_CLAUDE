@@ -290,26 +290,22 @@ def execute_inventory_action(
     action = intent.get("action", "desconocido")
     product_name = intent.get("product_name")
 
-    # 1. Caso: Audio inaudible / ruidoso
-    if action == "audio_ruidoso":
+    # 1. Caso: Consulta de ayuda, fuera de alcance, saludo o intención desconocida
+    if action in ["fuera_de_alcance", "desconocido", "ayuda", "audio_ruidoso"] or not action:
         return (
-            "🔊 *No logré escuchar bien tu mensaje*\n\n"
-            "Hubo ruido de fondo o la voz no fue clara. Por favor habla más cerca al micrófono e intenta enviar tu nota de voz nuevamente."
+            "🤖 *Asistente de Inventario — Gestión Neiva*\n\n"
+            "¡Hola! Soy tu asistente de IA y puedo ayudarte a gestionar el inventario de tu tienda por nota de voz o mensaje de texto.\n\n"
+            "📌 *¿Qué soy capaz de hacer?*\n\n"
+            "1. 📦 *Registrar un producto nuevo:*\n"
+            "   👉 *Dime:* \"Registrar Pan Bimbo costó 4500 lo vendo a 6500 con 12 unidades\"\n\n"
+            "2. ➕ *Reabastecer mercancía existente:*\n"
+            "   👉 *Dime:* \"Llegaron 20 gaseosas\" o \"Reabastecer 10 unidades de Café\"\n\n"
+            "3. 📋 *Consultar stock o precios:*\n"
+            "   👉 *Dime:* \"¿Cuántas achiras quedan?\" o \"¿A cómo es el precio del café?\"\n\n"
+            "💡 *Prueba enviándome un mensaje de voz o texto con cualquiera de estos comandos.*"
         )
 
-    # 2. Caso: Consulta fuera de alcance (preguntas no de inventario, saludos, etc.)
-    if action == "fuera_de_alcance":
-        return (
-            "ℹ️ *Función no disponible*\n\n"
-            "Soy tu asistente de inventario y mi único trabajo es ayudarte a gestionar los productos de tu tienda por WhatsApp.\n\n"
-            "📌 *¿Qué puedes pedirme?*\n"
-            "• *Registrar producto nuevo:* 'Registrar Pan Bimbo costó 4500 lo vendo a 6500 con 12 unidades'\n"
-            "• *Reabastecer stock:* 'Llegaron 20 gaseosas Coca Cola'\n"
-            "• *Consultar inventario:* '¿Cuántas achiras quedan?'\n"
-            "• *Consultar precio:* '¿A cómo es el precio del café?'"
-        )
-
-    # 3. Caso: Datos incompletos (reabastecer sin cantidad)
+    # 2. Caso: Datos incompletos (reabastecer sin cantidad)
     if action == "datos_incompletos":
         if product_name:
             return f"⚠️ Entendí que quieres reabastecer *{product_name}*, pero no escuché la cantidad. ¿Cuántas unidades llegaron?"
