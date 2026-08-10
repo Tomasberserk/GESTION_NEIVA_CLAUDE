@@ -17,8 +17,8 @@ app = FastAPI(
     title="Tiendapp API",
     description="Sistema POS SaaS — Gestión Inteligente Neiva",
     version="2.0.0",
-    docs_url="/docs" if _DEBUG else None,
-    redoc_url="/redoc" if _DEBUG else None,
+    docs_url="/docs",
+    redoc_url="/redoc",
 )
 
 # ---------------------------------------------------------------------------
@@ -105,7 +105,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 def health_check():
     return {"status": "ok", "version": "2.0.0"}
 
-@app.get("/", include_in_schema=False)
+@app.get("/", tags=["Sistema"])
 def root():
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="/docs")
+    return {"status": "ok", "message": "Tiendapp API — Gestión Neiva", "version": "2.0.0"}
