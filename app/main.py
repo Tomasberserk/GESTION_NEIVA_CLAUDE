@@ -32,6 +32,7 @@ _CORS_DEFAULT = ",".join([
     "http://localhost:5174",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:5174",
+    "https://gestion-neiva-claude.vercel.app",
 ])
 _origins_raw = os.getenv("CORS_ORIGINS", _CORS_DEFAULT)
 _origins = [o.strip() for o in _origins_raw.split(",") if o.strip()]
@@ -40,9 +41,11 @@ _origins = [o.strip() for o in _origins_raw.split(",") if o.strip()]
 _frontend_url = os.getenv("FRONTEND_URL", "").strip()
 if _frontend_url and _frontend_url not in _origins:
     _origins.append(_frontend_url)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],   # incluye OPTIONS para preflight — previene 405
     allow_headers=["*"],
