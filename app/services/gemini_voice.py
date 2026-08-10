@@ -70,14 +70,19 @@ ACCIONES POSIBLES:
 LISTA DE PRODUCTOS REGISTRADOS EN ESTA TIENDA:
 {product_list}
 
+CATEGORÍAS PERMITIDAS EN EL SISTEMA:
+- Bebidas, Snacks, Aseo, Lacteos, Limpieza, Panaderia.
+
 INSTRUCCIONES DE INTERPRETACIÓN:
-1. Si el tendero dice "crear", "nuevo producto", "agregar producto", "registrar producto" o menciona un producto nuevo con precio (ej: "Registrar Pan Bimbo a 6500 pesos y 12 unidades"), usa "action": "crear_producto".
+1. Si el tendero dice "crear", "nuevo producto", "agregar producto", "registrar producto" o menciona un producto nuevo con precios (ej: "Registrar Pan Bimbo me costó 4500 lo vendo a 6500 con 12 unidades"), usa "action": "crear_producto".
 2. Para "crear_producto", extrae:
    - "product_name": Nombre del nuevo producto.
-   - "precio_venta": Precio de venta al público si lo menciona (número flotante o entero, sin puntos de miles).
-   - "precio_costo": Precio de costo si lo menciona, si no 0.
-   - "quantity": Cantidad o stock inicial si la menciona, si no 0.
+   - "precio_costo": Precio de costo al que lo compró el tendero (número flotante o entero, sin puntos de miles).
+   - "precio_venta": Precio de venta al público (número flotante o entero, sin puntos de miles).
+   - "quantity": Cantidad o stock inicial (número flotante o entero).
    - "unit": Unidad de medida (unidad, caja, bulto, kilo, libra, gramo, litro, metro).
+   - "categoria": Una de las categorías permitidas si la menciona, si no null.
+   - "fecha_vencimiento": Fecha YYYY-MM-DD si la menciona (ej: "vence el 30 de agosto de 2026" -> "2026-08-30"), si no null.
 3. Si el producto mencionado coincide o se parece a alguno de la lista, extrae "product_name" y usa "reabastecer" o "consultar_stock".
 4. Si el mensaje no es sobre inventario ni productos, usa "action": "fuera_de_alcance".
 5. Si el audio es inaudible o distorsionado, usa "action": "audio_ruidoso".
@@ -86,11 +91,13 @@ RESPONDE ÚNICAMENTE con un JSON válido (sin markdown, sin bloques de código `
 {{
     "action": "reabastecer|consultar_stock|crear_producto|audio_ruidoso|fuera_de_alcance|datos_incompletos",
     "product_name": "nombre del producto como aparece en la lista o el mencionado",
+    "precio_costo": 4500,
     "precio_venta": 6500,
-    "precio_costo": 0,
     "quantity": 10,
     "confidence": 0.95,
     "unit": "unidad",
+    "categoria": "Panaderia",
+    "fecha_vencimiento": null,
     "raw_text": "texto original transcrito"
 }}"""
 
@@ -299,7 +306,7 @@ def execute_inventory_action(
             "ℹ️ *Función no disponible*\n\n"
             "Soy tu asistente de inventario y mi único trabajo es ayudarte a gestionar los productos de tu tienda por WhatsApp.\n\n"
             "📌 *¿Qué puedes pedirme?*\n"
-            "• *Registrar producto nuevo:* 'Registrar Pan Bimbo a 6500 pesos y 12 unidades'\n"
+            "• *Registrar producto nuevo:* 'Registrar Pan Bimbo costó 4500 lo vendo a 6500 con 12 unidades'\n"
             "• *Reabastecer stock:* 'Llegaron 20 gaseosas Coca Cola'\n"
             "• *Consultar inventario:* '¿Cuántas achiras quedan?'\n"
             "• *Consultar precio:* '¿A cómo es el precio del café?'"
@@ -327,12 +334,13 @@ def execute_inventory_action(
     if action == "crear_producto":
         if not product_name:
             return (
-                "📝 *Para registrar un nuevo producto necesito estos datos:*\n\n"
-                "Envíame una nota de voz o mensaje diciendo:\n"
+                "📝 *Para registrar un nuevo producto necesito los datos obligatorios:*\n\n"
+                "Envíame una nota de voz o mensaje con la siguiente estructura:\n"
                 "1. 📦 *Nombre del producto* (ej: 'Pan Bimbo Blanco')\n"
-                "2. 💰 *Precio de venta* (ej: 'a 6500 pesos')\n"
-                "3. 📊 *Cantidad inicial* (ej: 'tengo 12 unidades')\n\n"
-                "💡 *Ejemplo completo:* \"Registrar Pan Bimbo a 6500 pesos con 12 unidades\""
+                "2. 💵 *Precio Costo* (a cómo lo compraste, ej: 'costó 4500')\n"
+                "3. 💰 *Precio Venta* (a cómo lo vendes, ej: 'lo vendo a 6500')\n"
+                "4. 📊 *Stock Inicial* (ej: 'tengo 12 unidades')\n\n"
+                "💡 *Ejemplo completo:* \"Registrar Pan Bimbo costó 4500 lo vendo a 6500 con 12 unidades\""
             )
 
         # Validar si el producto ya existe en la tienda
@@ -347,14 +355,20 @@ def execute_inventory_action(
             )
 
         precio_venta = intent.get("precio_venta")
+        precio_costo = intent.get("precio_costo")
+
+        # Guiar si faltan precios
         if not precio_venta or float(precio_venta) <= 0:
             return (
-                f"📝 *Para registrar \"{product_name}\" en tu tienda falta el precio:*\n\n"
-                f"Por favor envíame una nota de voz diciendo a cómo lo vas a vender.\n\n"
-                f"💡 *Ejemplo:* \"Registrar {product_name} a 6500 pesos y 10 unidades\""
+                f"📝 *Para registrar \"{product_name}\" en tu tienda faltan los precios:*\n\n"
+                f"Envíame una nota de voz aclarando a cómo lo compraste y a cómo lo vendes.\n\n"
+                f"💡 *Ejemplo:* \"Registrar {product_name} costó 4500 lo vendo a 6500 con 10 unidades\""
             )
 
-        precio_costo = intent.get("precio_costo") or 0
+        if not precio_costo or float(precio_costo) <= 0:
+            # Si el tendero solo dijo 1 precio, asumimos que dijo el precio de venta y le sugerimos/pedimos el costo
+            precio_costo = float(precio_venta) * 0.7  # Estimado por defecto 70% del precio de venta
+
         quantity = intent.get("quantity") or 0
         unit_str = intent.get("unit", "unidad").lower().strip()
 
@@ -364,6 +378,24 @@ def execute_inventory_action(
             if u.value == unit_str:
                 unidad_enum = u
                 break
+
+        # Mapear categoría si la mencionó
+        cat_str = intent.get("categoria")
+        categoria_enum = None
+        if cat_str:
+            for c in models.CategoriaProducto:
+                if c.value.lower() == cat_str.lower():
+                    categoria_enum = c
+                    break
+
+        # Mapear fecha de vencimiento si la mencionó
+        fecha_venc = None
+        if intent.get("fecha_vencimiento"):
+            try:
+                from datetime import datetime
+                fecha_venc = datetime.strptime(intent["fecha_vencimiento"], "%Y-%m-%d").date()
+            except Exception:
+                fecha_venc = None
 
         try:
             import uuid
@@ -377,18 +409,25 @@ def execute_inventory_action(
                 precio_venta=Decimal(str(precio_venta)),
                 cantidad_actual=Decimal(str(quantity)),
                 unidad_medida=unidad_enum,
+                categoria=categoria_enum,
+                fecha_vencimiento=fecha_venc,
             )
             db.add(nuevo_prod)
             db.commit()
             db.refresh(nuevo_prod)
 
+            info_cat = f"\n🏷️ *Categoría:* {nuevo_prod.categoria.value}" if nuevo_prod.categoria else ""
+            info_venc = f"\n📅 *Vencimiento:* {nuevo_prod.fecha_vencimiento}" if nuevo_prod.fecha_vencimiento else ""
+
             return (
                 f"🎉 *¡Producto nuevo registrado exitosamente!*\n\n"
                 f"📦 *Producto:* {nuevo_prod.nombre}\n"
+                f"💵 *Precio Costo:* ${float(nuevo_prod.precio_costo):,.0f} COP\n"
                 f"💰 *Precio Venta:* ${float(nuevo_prod.precio_venta):,.0f} COP\n"
-                f"📊 *Stock Inicial:* {float(nuevo_prod.cantidad_actual)} {nuevo_prod.unidad_medida.value}(s)\n"
+                f"📊 *Stock Inicial:* {float(nuevo_prod.cantidad_actual)} {nuevo_prod.unidad_medida.value}(s)"
+                f"{info_cat}{info_venc}\n"
                 f"🏷️ *Código Barcode:* {nuevo_prod.codigo_barras}\n\n"
-                f"💡 *Ya está disponible en tu Punto de Venta (POS) y puedes consultarlo o reabastecerlo por WhatsApp en cualquier momento.*"
+                f"💡 *Ya está listo en tu Punto de Venta (POS) y lo puedes consultar o vender de inmediato.*"
             )
 
         except Exception as exc:
