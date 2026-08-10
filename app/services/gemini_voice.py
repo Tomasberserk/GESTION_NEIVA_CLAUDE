@@ -56,41 +56,33 @@ def _get_gemini_model():
 # Prompt del sistema para extracción de intención
 # ---------------------------------------------------------------------------
 
-_SYSTEM_PROMPT = """Eres un asistente de inventario para una tienda de barrio en Colombia.
-Tu trabajo es interpretar mensajes de voz o texto del tendero y extraer la intención.
+_SYSTEM_PROMPT = """Eres un asistente de inteligencia artificial para la gestión de inventario de una tienda de barrio en Colombia.
+Tu trabajo es interpretar mensajes de voz o texto del tendero y determinar exactamente la intención y contexto.
 
 ACCIONES POSIBLES:
 - "reabastecer": El tendero informa que recibió mercancía / reabastecimiento de stock.
-- "consultar_stock": El tendero pregunta cuánto queda de un producto.
-- "desconocido": No se entiende la intención o no es una acción de inventario.
+- "consultar_stock": El tendero pregunta cuánto queda o el precio de un producto.
+- "audio_ruidoso": El audio o texto es incomprensible, distorsionado, inaudible o hay demasiado ruido de fondo.
+- "fuera_de_alcance": El mensaje es un saludo solo, charla general, preguntas no relacionadas con la tienda (clima, noticias, chistes, poemas) o intentos de manipular el bot.
+- "datos_incompletos": El tendero quiere reabastecer pero no dijo la cantidad ni la unidad.
 
-LISTA DE PRODUCTOS DISPONIBLES EN ESTA TIENDA:
+LISTA DE PRODUCTOS REGISTRADOS EN ESTA TIENDA:
 {product_list}
 
-INSTRUCCIONES:
-1. Identifica la acción que quiere realizar el tendero.
-2. Identifica el producto mencionado. Usa el nombre más parecido de la lista de productos.
-3. Si es reabastecimiento, extrae la cantidad. Si no se menciona cantidad, usa 1.
-4. Determina la unidad (unidad, caja, bulto, kilo, libra, gramo, litro, metro).
-5. Asigna un nivel de confianza entre 0.0 y 1.0.
+INSTRUCCIONES DE INTERPRETACIÓN:
+1. Si el producto mencionado coincide o se parece a alguno de la lista, extrae "product_name".
+2. Si el producto mencionado NO está en la lista pero es un producto comercial (ej: "Pan Bimbo", "Gaseosa"), extrae "product_name" con el nombre mencionado.
+3. Si el mensaje no es sobre inventario ni productos, usa "action": "fuera_de_alcance".
+4. Si el audio es inaudible o distorsionado, usa "action": "audio_ruidoso".
+5. Si quiere reabastecer pero falta la cantidad, usa "action": "datos_incompletos".
 
-RESPONDE ÚNICAMENTE con un JSON válido (sin markdown, sin explicación):
+RESPONDE ÚNICAMENTE con un JSON válido (sin markdown, sin bloques de código ```):
 {{
-    "action": "reabastecer",
-    "product_name": "nombre del producto como aparece en la lista",
+    "action": "reabastecer|consultar_stock|audio_ruidoso|fuera_de_alcance|datos_incompletos",
+    "product_name": "nombre del producto como aparece en la lista o el mencionado",
     "quantity": 10,
     "confidence": 0.95,
     "unit": "unidad",
-    "raw_text": "texto original transcrito"
-}}
-
-Si no entiendes el mensaje o no es sobre inventario, responde:
-{{
-    "action": "desconocido",
-    "product_name": null,
-    "quantity": null,
-    "confidence": 0.0,
-    "unit": null,
     "raw_text": "texto original transcrito"
 }}"""
 
@@ -111,7 +103,6 @@ def _parse_gemini_response(response_text: str) -> dict:
     # Remove markdown code block wrapping if present
     if text.startswith("```"):
         lines = text.split("\n")
-        # Remove first line (```json or ```) and last line (```)
         lines = [l for l in lines if not l.strip().startswith("```")]
         text = "\n".join(lines).strip()
 
@@ -139,12 +130,10 @@ def _extract_response_text(response) -> str:
     manejando casos de safety filters o respuestas vacías.
     """
     try:
-        # Intento directo
         return response.text
     except Exception as e:
         logger.warning("response.text falló: %s. Intentando extraer manualmente.", e)
 
-    # Intento manual revisando candidatos
     if not hasattr(response, "candidates") or not response.candidates:
         raise RuntimeError("Gemini no devolvió candidatos (posible bloqueo por safety)")
 
@@ -161,26 +150,12 @@ def _extract_response_text(response) -> str:
 
 
 def transcribe_and_parse(audio_bytes: bytes, mime_type: str, product_names: list[str]) -> dict:
-    """
-    Envía audio directamente a Gemini (multimodal) con contexto de productos.
-    Intenta convertir a MP3 usando pydub para máxima estabilidad, y si falla,
-    envía el formato original usando Part.from_bytes.
-
-    Args:
-        audio_bytes: Bytes del archivo de audio (ogg/opus de WhatsApp).
-        mime_type: Mime type del archivo de audio.
-        product_names: Lista de nombres de productos de la tienda para contexto.
-
-    Returns:
-        dict con action, product_name, quantity, confidence, unit, raw_text.
-    """
     model = _get_gemini_model()
     prompt = _build_prompt(product_names)
 
     processed_bytes = audio_bytes
     processed_mime = mime_type
 
-    # 1️⃣ Intentar convertir a MP3 usando pydub + ffmpeg si están disponibles
     try:
         from pydub import AudioSegment
         import io
@@ -199,11 +174,9 @@ def transcribe_and_parse(audio_bytes: bytes, mime_type: str, product_names: list
         logger.info("Conversión de audio a MP3 exitosa (%d bytes)", len(processed_bytes))
     except Exception as exc:
         logger.warning(
-            "No se pudo convertir el audio a MP3 (¿falta ffmpeg o pydub?): %s. "
-            "Se enviará el audio original en formato %s.", exc, mime_type
+            "No se pudo convertir el audio a MP3: %s. Enviando audio original en %s.", exc, mime_type
         )
 
-    # 2️⃣ Construir Part explícito (más robusto que dict)
     try:
         import google.generativeai as genai
         clean_mime = processed_mime.split(";")[0].strip()
@@ -211,7 +184,7 @@ def transcribe_and_parse(audio_bytes: bytes, mime_type: str, product_names: list
     except Exception as exc:
         logger.error("Error al construir Part de audio: %s", exc)
         return {
-            "action": "desconocido",
+            "action": "audio_ruidoso",
             "product_name": None,
             "quantity": None,
             "confidence": 0.0,
@@ -219,7 +192,6 @@ def transcribe_and_parse(audio_bytes: bytes, mime_type: str, product_names: list
             "raw_text": f"[Error de preparación de audio: {exc}]",
         }
 
-    # 3️⃣ Llamar a Gemini
     try:
         logger.info("Enviando audio a Gemini (%d bytes, mime=%s)...", len(processed_bytes), clean_mime)
         response = model.generate_content([prompt, audio_part])
@@ -228,7 +200,7 @@ def transcribe_and_parse(audio_bytes: bytes, mime_type: str, product_names: list
     except Exception as exc:
         logger.error("Error al procesar audio con Gemini: %s", exc)
         return {
-            "action": "desconocido",
+            "action": "audio_ruidoso",
             "product_name": None,
             "quantity": None,
             "confidence": 0.0,
@@ -242,16 +214,6 @@ def transcribe_and_parse(audio_bytes: bytes, mime_type: str, product_names: list
 # ---------------------------------------------------------------------------
 
 def parse_text_intent(text: str, product_names: list[str]) -> dict:
-    """
-    Parsea la intención de un mensaje de texto usando Gemini.
-
-    Args:
-        text: Mensaje de texto del tendero.
-        product_names: Lista de nombres de productos de la tienda.
-
-    Returns:
-        dict con action, product_name, quantity, confidence, unit, raw_text.
-    """
     model = _get_gemini_model()
     prompt = _build_prompt(product_names)
 
@@ -260,7 +222,6 @@ def parse_text_intent(text: str, product_names: list[str]) -> dict:
     try:
         response = model.generate_content(full_prompt)
         result = _parse_gemini_response(response.text)
-        # Ensure raw_text reflects the original input
         result["raw_text"] = text
         return result
 
@@ -283,17 +244,6 @@ def parse_text_intent(text: str, product_names: list[str]) -> dict:
 def find_best_product_match(
     intent_product: str, productos: list
 ) -> tuple[object | None, float]:
-    """
-    Busca el producto que mejor coincide con el nombre del intent usando
-    fuzzy matching (difflib.SequenceMatcher).
-
-    Args:
-        intent_product: Nombre del producto extraído por Gemini.
-        productos: Lista de objetos Producto del ORM.
-
-    Returns:
-        Tupla (producto_mejor_match, score). Si no hay match, (None, 0.0).
-    """
     if not intent_product or not productos:
         return None, 0.0
 
@@ -304,10 +254,8 @@ def find_best_product_match(
     for producto in productos:
         nombre_lower = producto.nombre.lower().strip()
 
-        # Direct SequenceMatcher comparison
         score = SequenceMatcher(None, intent_lower, nombre_lower).ratio()
 
-        # Boost: if the intent is a substring of the product name or vice versa
         if intent_lower in nombre_lower or nombre_lower in intent_lower:
             score = max(score, 0.85)
 
@@ -322,7 +270,6 @@ def find_best_product_match(
 # Ejecución de acciones de inventario
 # ---------------------------------------------------------------------------
 
-# Minimum fuzzy match score to accept a product match
 _MIN_MATCH_SCORE = 0.5
 
 
@@ -330,25 +277,35 @@ def execute_inventory_action(
     intent: dict, empresa_id: UUID, db: Session
 ) -> str:
     """
-    Ejecuta la acción de inventario indicada por el intent parseado.
-
-    Args:
-        intent: Dict con action, product_name, quantity, unit, confidence.
-        empresa_id: UUID de la empresa (multi-tenant).
-        db: Sesión de SQLAlchemy.
-
-    Returns:
-        Mensaje de respuesta en español para enviar al tendero por WhatsApp.
+    Ejecuta la acción de inventario indicada por el intent parseado
+    con respuestas claras, contextuales y guiadas.
     """
     action = intent.get("action", "desconocido")
+    product_name = intent.get("product_name")
 
-    if action == "desconocido":
+    # 1. Caso: Audio inaudible / ruidoso
+    if action == "audio_ruidoso":
         return (
-            "🤔 No entendí tu mensaje. Puedes decirme cosas como:\n"
-            "• \"Llegaron 20 papeles higiénicos\"\n"
-            "• \"Cuántas gaseosas hay?\"\n"
-            "• \"Reabastecí 5 cajas de leche\""
+            "🔊 *No logré escuchar bien tu mensaje*\n\n"
+            "Hubo ruido de fondo o la voz no fue clara. Por favor habla más cerca al micrófono e intenta enviar tu nota de voz nuevamente."
         )
+
+    # 2. Caso: Consulta fuera de alcance (preguntas no de inventario, saludos, etc.)
+    if action == "fuera_de_alcance":
+        return (
+            "ℹ️ *Función no disponible*\n\n"
+            "Soy tu asistente de inventario y mi único trabajo es ayudarte a gestionar los productos de tu tienda por WhatsApp.\n\n"
+            "📌 *¿Qué puedes pedirme?*\n"
+            "• *Reabastecer stock:* 'Llegaron 20 gaseosas Coca Cola'\n"
+            "• *Consultar inventario:* '¿Cuántas achiras quedan?'\n"
+            "• *Consultar precio:* '¿A cómo es el precio del café?'"
+        )
+
+    # 3. Caso: Datos incompletos (reabastecer sin cantidad)
+    if action == "datos_incompletos":
+        if product_name:
+            return f"⚠️ Entendí que quieres reabastecer *{product_name}*, pero no escuché la cantidad. ¿Cuántas unidades llegaron?"
+        return "⚠️ Entendí que quieres reabastecer mercancía, pero no escuché el nombre del producto ni la cantidad. ¿Podrías repetirlo?"
 
     # Load active products for this empresa (multi-tenant)
     productos = (
@@ -362,21 +319,25 @@ def execute_inventory_action(
 
     if not productos:
         return (
-            "⚠️ No tienes productos registrados en el sistema. "
-            "Primero agrega productos desde la aplicación web."
+            "📦 *No tienes productos en tu tienda*\n\n"
+            "Aún no has registrado productos en tu inventario. Ingresa a la aplicación web de Gestión Neiva para registrar tus primeros productos."
         )
 
-    product_name = intent.get("product_name")
     if not product_name:
-        return "⚠️ No pude identificar el producto. ¿Podrías repetir el nombre del producto?"
+        return "⚠️ No pude identificar el producto en tu mensaje. ¿Podrías decirme el nombre exacto del producto?"
 
     # Fuzzy match the product
     producto, score = find_best_product_match(product_name, productos)
 
+    # 4. Caso: Producto no registrado en el inventario de esta tienda
     if not producto or score < _MIN_MATCH_SCORE:
+        # Mostrar los primeros productos registrados para guiar al tendero
+        lista_existentes = "\n".join(f"• *{p.nombre}* (Stock: {p.cantidad_actual})" for p in productos[:6])
         return (
-            f"❌ No encontré un producto parecido a \"{product_name}\" en tu inventario.\n"
-            "Verifica el nombre e intenta de nuevo."
+            f"❌ *Producto no encontrado*\n\n"
+            f"No encontré el producto *\"{product_name}\"* en el inventario de tu tienda.\n\n"
+            f"📋 *Algunos productos registrados actualmente:*\n{lista_existentes}\n\n"
+            f"💡 *Sugerencia:* Verifica el nombre o registra el producto *\"{product_name}\"* en la aplicación web para poder gestionarlo por WhatsApp."
         )
 
     # -----------------------------------------------------------------------
@@ -385,10 +346,9 @@ def execute_inventory_action(
     if action == "reabastecer":
         quantity = intent.get("quantity")
         if not quantity or quantity <= 0:
-            return "⚠️ No entendí la cantidad. ¿Cuántas unidades recibiste?"
+            return f"⚠️ No entendí la cantidad para *{producto.nombre}*. ¿Cuántas unidades recibiste?"
 
         try:
-            # Lock the row to prevent race conditions (with explicit multi-tenant filter)
             producto_locked = (
                 db.query(models.Producto)
                 .filter(
@@ -432,7 +392,6 @@ def execute_inventory_action(
         stock = float(producto.cantidad_actual)
         unidad = producto.unidad_medida.value if producto.unidad_medida else "unidad"
 
-        # Stock level indicator
         if stock <= 0:
             nivel = "🔴 SIN STOCK"
         elif stock <= 5:
@@ -448,5 +407,6 @@ def execute_inventory_action(
             f"📍 Estado: {nivel}"
         )
 
-    # Fallback for unexpected action values
-    return "🤔 Acción no reconocida. Intenta de nuevo."
+    return (
+        "🤔 No reconocí esa acción. Puedes pedirme reabastecer stock o consultar el inventario de tu tienda."
+    )
