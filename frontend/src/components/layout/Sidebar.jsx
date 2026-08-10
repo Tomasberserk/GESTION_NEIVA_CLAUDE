@@ -12,6 +12,7 @@ import {
   Users,
   CreditCard,
   Receipt,
+  Bot,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import authService from '../../services/authService'
@@ -28,6 +29,7 @@ const navItems = [
   { to: '/reportes',        label: 'Reportes',          icon: BarChart3 },
   { to: '/soporte',         label: 'Soporte Técnico',   icon: MessageCircle },
   { to: '/fabrica-apps',    label: 'Fábrica Apps',      icon: Rocket },
+  { to: '/whatsapp',        label: 'WhatsApp IA',        icon: Bot },
   { to: '/configuracion',   label: 'Configuración',     icon: Settings },
 ]
 

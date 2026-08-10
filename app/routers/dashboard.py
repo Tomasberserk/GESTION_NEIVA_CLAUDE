@@ -89,7 +89,10 @@ def resumen_dashboard(
 
     dias_trial_restantes = None
     if empresa and empresa.trial_expires_at:
-        delta = empresa.trial_expires_at - datetime.now(timezone.utc)
+        trial_dt = empresa.trial_expires_at
+        if trial_dt.tzinfo is None:
+            trial_dt = trial_dt.replace(tzinfo=timezone.utc)
+        delta = trial_dt - datetime.now(timezone.utc)
         dias_trial_restantes = max(0, delta.days)
 
     return {

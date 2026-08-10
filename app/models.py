@@ -154,6 +154,7 @@ class Usuario(AuditMixin, Base):
         nullable=False,
         default=RolUsuario.TENDERO,
     )
+    telefono_whatsapp = Column(String(20), nullable=True, unique=True)
 
     empresa = relationship("Empresa", back_populates="usuarios")
     compras = relationship("Compra", back_populates="usuario")
