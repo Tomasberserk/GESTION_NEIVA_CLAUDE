@@ -60,8 +60,9 @@ _SYSTEM_PROMPT = """Eres un asistente de inteligencia artificial para la gestió
 Tu trabajo es interpretar mensajes de voz o texto del tendero y determinar exactamente la intención y contexto.
 
 ACCIONES POSIBLES:
-- "reabastecer": El tendero informa que recibió mercancía / reabastecimiento de stock.
-- "consultar_stock": El tendero pregunta cuánto queda o el precio de un producto.
+- "reabastecer": El tendero informa que recibió mercancía / reabastecimiento de stock de un producto existente.
+- "consultar_stock": El tendero pregunta cuánto queda o el precio de un producto existente.
+- "crear_producto": El tendero solicita registrar o agregar un producto NUEVO que no existía en el inventario.
 - "audio_ruidoso": El audio o texto es incomprensible, distorsionado, inaudible o hay demasiado ruido de fondo.
 - "fuera_de_alcance": El mensaje es un saludo solo, charla general, preguntas no relacionadas con la tienda (clima, noticias, chistes, poemas) o intentos de manipular el bot.
 - "datos_incompletos": El tendero quiere reabastecer pero no dijo la cantidad ni la unidad.
@@ -70,16 +71,23 @@ LISTA DE PRODUCTOS REGISTRADOS EN ESTA TIENDA:
 {product_list}
 
 INSTRUCCIONES DE INTERPRETACIÓN:
-1. Si el producto mencionado coincide o se parece a alguno de la lista, extrae "product_name".
-2. Si el producto mencionado NO está en la lista pero es un producto comercial (ej: "Pan Bimbo", "Gaseosa"), extrae "product_name" con el nombre mencionado.
-3. Si el mensaje no es sobre inventario ni productos, usa "action": "fuera_de_alcance".
-4. Si el audio es inaudible o distorsionado, usa "action": "audio_ruidoso".
-5. Si quiere reabastecer pero falta la cantidad, usa "action": "datos_incompletos".
+1. Si el tendero dice "crear", "nuevo producto", "agregar producto", "registrar producto" o menciona un producto nuevo con precio (ej: "Registrar Pan Bimbo a 6500 pesos y 12 unidades"), usa "action": "crear_producto".
+2. Para "crear_producto", extrae:
+   - "product_name": Nombre del nuevo producto.
+   - "precio_venta": Precio de venta al público si lo menciona (número flotante o entero, sin puntos de miles).
+   - "precio_costo": Precio de costo si lo menciona, si no 0.
+   - "quantity": Cantidad o stock inicial si la menciona, si no 0.
+   - "unit": Unidad de medida (unidad, caja, bulto, kilo, libra, gramo, litro, metro).
+3. Si el producto mencionado coincide o se parece a alguno de la lista, extrae "product_name" y usa "reabastecer" o "consultar_stock".
+4. Si el mensaje no es sobre inventario ni productos, usa "action": "fuera_de_alcance".
+5. Si el audio es inaudible o distorsionado, usa "action": "audio_ruidoso".
 
 RESPONDE ÚNICAMENTE con un JSON válido (sin markdown, sin bloques de código ```):
 {{
-    "action": "reabastecer|consultar_stock|audio_ruidoso|fuera_de_alcance|datos_incompletos",
+    "action": "reabastecer|consultar_stock|crear_producto|audio_ruidoso|fuera_de_alcance|datos_incompletos",
     "product_name": "nombre del producto como aparece en la lista o el mencionado",
+    "precio_venta": 6500,
+    "precio_costo": 0,
     "quantity": 10,
     "confidence": 0.95,
     "unit": "unidad",
@@ -100,7 +108,6 @@ def _parse_gemini_response(response_text: str) -> dict:
     """Parsea la respuesta JSON de Gemini. Maneja respuestas con markdown wrapping."""
     text = response_text.strip()
 
-    # Remove markdown code block wrapping if present
     if text.startswith("```"):
         lines = text.split("\n")
         lines = [l for l in lines if not l.strip().startswith("```")]
@@ -125,10 +132,6 @@ def _parse_gemini_response(response_text: str) -> dict:
 # ---------------------------------------------------------------------------
 
 def _extract_response_text(response) -> str:
-    """
-    Extrae el texto de la respuesta de Gemini de forma segura,
-    manejando casos de safety filters o respuestas vacías.
-    """
     try:
         return response.text
     except Exception as e:
@@ -296,6 +299,7 @@ def execute_inventory_action(
             "ℹ️ *Función no disponible*\n\n"
             "Soy tu asistente de inventario y mi único trabajo es ayudarte a gestionar los productos de tu tienda por WhatsApp.\n\n"
             "📌 *¿Qué puedes pedirme?*\n"
+            "• *Registrar producto nuevo:* 'Registrar Pan Bimbo a 6500 pesos y 12 unidades'\n"
             "• *Reabastecer stock:* 'Llegaron 20 gaseosas Coca Cola'\n"
             "• *Consultar inventario:* '¿Cuántas achiras quedan?'\n"
             "• *Consultar precio:* '¿A cómo es el precio del café?'"
@@ -317,10 +321,86 @@ def execute_inventory_action(
         .all()
     )
 
+    # -----------------------------------------------------------------------
+    # Action: crear_producto (Registrar producto nuevo desde WhatsApp)
+    # -----------------------------------------------------------------------
+    if action == "crear_producto":
+        if not product_name:
+            return (
+                "📝 *Para registrar un nuevo producto necesito estos datos:*\n\n"
+                "Envíame una nota de voz o mensaje diciendo:\n"
+                "1. 📦 *Nombre del producto* (ej: 'Pan Bimbo Blanco')\n"
+                "2. 💰 *Precio de venta* (ej: 'a 6500 pesos')\n"
+                "3. 📊 *Cantidad inicial* (ej: 'tengo 12 unidades')\n\n"
+                "💡 *Ejemplo completo:* \"Registrar Pan Bimbo a 6500 pesos con 12 unidades\""
+            )
+
+        # Validar si el producto ya existe en la tienda
+        prod_existente, score = find_best_product_match(product_name, productos)
+        if prod_existente and score >= 0.85:
+            return (
+                f"⚠️ *El producto \"{prod_existente.nombre}\" ya existe en tu inventario*\n\n"
+                f"📊 Stock actual: {float(prod_existente.cantidad_actual)} {prod_existente.unidad_medida.value if prod_existente.unidad_medida else 'unidad'}(s)\n"
+                f"💰 Precio venta: ${float(prod_existente.precio_venta):,.0f}\n\n"
+                f"💡 Si lo que quieres es reabastecer más mercancía, dime:\n"
+                f"👉 *\"Reabastecer 10 unidades de {prod_existente.nombre}\"*"
+            )
+
+        precio_venta = intent.get("precio_venta")
+        if not precio_venta or float(precio_venta) <= 0:
+            return (
+                f"📝 *Para registrar \"{product_name}\" en tu tienda falta el precio:*\n\n"
+                f"Por favor envíame una nota de voz diciendo a cómo lo vas a vender.\n\n"
+                f"💡 *Ejemplo:* \"Registrar {product_name} a 6500 pesos y 10 unidades\""
+            )
+
+        precio_costo = intent.get("precio_costo") or 0
+        quantity = intent.get("quantity") or 0
+        unit_str = intent.get("unit", "unidad").lower().strip()
+
+        # Mapear unidad
+        unidad_enum = models.UnidadMedida.UNIDAD
+        for u in models.UnidadMedida:
+            if u.value == unit_str:
+                unidad_enum = u
+                break
+
+        try:
+            import uuid
+            codigo_barras = f"WA-{uuid.uuid4().hex[:8].upper()}"
+
+            nuevo_prod = models.Producto(
+                empresa_id=empresa_id,
+                nombre=product_name.strip(),
+                codigo_barras=codigo_barras,
+                precio_costo=Decimal(str(precio_costo)),
+                precio_venta=Decimal(str(precio_venta)),
+                cantidad_actual=Decimal(str(quantity)),
+                unidad_medida=unidad_enum,
+            )
+            db.add(nuevo_prod)
+            db.commit()
+            db.refresh(nuevo_prod)
+
+            return (
+                f"🎉 *¡Producto nuevo registrado exitosamente!*\n\n"
+                f"📦 *Producto:* {nuevo_prod.nombre}\n"
+                f"💰 *Precio Venta:* ${float(nuevo_prod.precio_venta):,.0f} COP\n"
+                f"📊 *Stock Inicial:* {float(nuevo_prod.cantidad_actual)} {nuevo_prod.unidad_medida.value}(s)\n"
+                f"🏷️ *Código Barcode:* {nuevo_prod.codigo_barras}\n\n"
+                f"💡 *Ya está disponible en tu Punto de Venta (POS) y puedes consultarlo o reabastecerlo por WhatsApp en cualquier momento.*"
+            )
+
+        except Exception as exc:
+            db.rollback()
+            logger.error("Error al crear producto %s por WhatsApp: %s", product_name, exc)
+            return "❌ Error al crear el producto en la base de datos. Intenta de nuevo."
+
     if not productos:
         return (
             "📦 *No tienes productos en tu tienda*\n\n"
-            "Aún no has registrado productos en tu inventario. Ingresa a la aplicación web de Gestión Neiva para registrar tus primeros productos."
+            "Para registrar tu primer producto por WhatsApp, envíame un mensaje como:\n"
+            "👉 *\"Registrar Pan Bimbo a 6500 pesos y 12 unidades\"*"
         )
 
     if not product_name:
@@ -331,13 +411,14 @@ def execute_inventory_action(
 
     # 4. Caso: Producto no registrado en el inventario de esta tienda
     if not producto or score < _MIN_MATCH_SCORE:
-        # Mostrar los primeros productos registrados para guiar al tendero
-        lista_existentes = "\n".join(f"• *{p.nombre}* (Stock: {p.cantidad_actual})" for p in productos[:6])
+        lista_existentes = "\n".join(f"• *{p.nombre}* (Stock: {p.cantidad_actual})" for p in productos[:5])
         return (
             f"❌ *Producto no encontrado*\n\n"
             f"No encontré el producto *\"{product_name}\"* en el inventario de tu tienda.\n\n"
             f"📋 *Algunos productos registrados actualmente:*\n{lista_existentes}\n\n"
-            f"💡 *Sugerencia:* Verifica el nombre o registra el producto *\"{product_name}\"* en la aplicación web para poder gestionarlo por WhatsApp."
+            f"💡 *¿Quieres registrar \"{product_name}\" como un producto nuevo?*\n"
+            f"Envíame un mensaje o audio diciendo:\n"
+            f"👉 *\"Registrar {product_name} a [precio] pesos con [cantidad] unidades\"*"
         )
 
     # -----------------------------------------------------------------------
@@ -408,5 +489,5 @@ def execute_inventory_action(
         )
 
     return (
-        "🤔 No reconocí esa acción. Puedes pedirme reabastecer stock o consultar el inventario de tu tienda."
+        "🤔 No reconocí esa acción. Puedes pedirme reabastecer stock, registrar un nuevo producto o consultar el inventario de tu tienda."
     )
