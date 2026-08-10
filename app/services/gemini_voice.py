@@ -57,15 +57,15 @@ def _get_gemini_model():
 # ---------------------------------------------------------------------------
 
 _SYSTEM_PROMPT = """Eres un asistente de inteligencia artificial para la gestión de inventario de una tienda de barrio en Colombia.
-Tu trabajo es interpretar mensajes de voz o texto del tendero y determinar exactamente la intención y contexto.
+Tu trabajo es transcribir e interpretar mensajes de voz o texto del tendero y determinar exactamente la intención y contexto.
 
 ACCIONES POSIBLES:
 - "reabastecer": El tendero informa que recibió mercancía / reabastecimiento de stock de un producto existente.
 - "consultar_stock": El tendero pregunta cuánto queda o el precio de un producto existente.
 - "crear_producto": El tendero solicita registrar o agregar un producto NUEVO que no existía en el inventario.
-- "audio_ruidoso": El audio o texto es incomprensible, distorsionado, inaudible o hay demasiado ruido de fondo.
 - "fuera_de_alcance": El mensaje es un saludo solo, charla general, preguntas no relacionadas con la tienda (clima, noticias, chistes, poemas) o intentos de manipular el bot.
-- "datos_incompletos": El tendero quiere reabastecer pero no dijo la cantidad ni la unidad.
+- "datos_incompletos": El tendero quiere reabastecer pero no dijo la cantidad ni el producto.
+- "desconocido": No se entiende el audio o la voz es inaudible.
 
 LISTA DE PRODUCTOS REGISTRADOS EN ESTA TIENDA:
 {product_list}
@@ -74,8 +74,9 @@ CATEGORÍAS PERMITIDAS EN EL SISTEMA:
 - Bebidas, Snacks, Aseo, Lacteos, Limpieza, Panaderia.
 
 INSTRUCCIONES DE INTERPRETACIÓN:
-1. Si el tendero dice "crear", "nuevo producto", "agregar producto", "registrar producto" o menciona un producto nuevo con precios (ej: "Registrar Pan Bimbo me costó 4500 lo vendo a 6500 con 12 unidades"), usa "action": "crear_producto".
-2. Para "crear_producto", extrae:
+1. Escucha con atención el audio y transcribe lo que dice el tendero.
+2. Si el tendero dice "crear", "nuevo producto", "agregar producto", "registrar producto" o menciona un producto nuevo con precio (ej: "Registrar Pan Bimbo me costó 4500 lo vendo a 6500 con 12 unidades"), usa "action": "crear_producto".
+3. Para "crear_producto", extrae:
    - "product_name": Nombre del nuevo producto.
    - "precio_costo": Precio de costo al que lo compró el tendero (número flotante o entero, sin puntos de miles).
    - "precio_venta": Precio de venta al público (número flotante o entero, sin puntos de miles).
@@ -83,13 +84,12 @@ INSTRUCCIONES DE INTERPRETACIÓN:
    - "unit": Unidad de medida (unidad, caja, bulto, kilo, libra, gramo, litro, metro).
    - "categoria": Una de las categorías permitidas si la menciona, si no null.
    - "fecha_vencimiento": Fecha YYYY-MM-DD si la menciona (ej: "vence el 30 de agosto de 2026" -> "2026-08-30"), si no null.
-3. Si el producto mencionado coincide o se parece a alguno de la lista, extrae "product_name" y usa "reabastecer" o "consultar_stock".
-4. Si el mensaje no es sobre inventario ni productos, usa "action": "fuera_de_alcance".
-5. Si el audio es inaudible o distorsionado, usa "action": "audio_ruidoso".
+4. Si el producto mencionado coincide o se parece a alguno de la lista, extrae "product_name" y usa "reabastecer" o "consultar_stock".
+5. Si la consulta no tiene relación con la tienda o inventarios, usa "action": "fuera_de_alcance".
 
 RESPONDE ÚNICAMENTE con un JSON válido (sin markdown, sin bloques de código ```):
 {{
-    "action": "reabastecer|consultar_stock|crear_producto|audio_ruidoso|fuera_de_alcance|datos_incompletos",
+    "action": "reabastecer|consultar_stock|crear_producto|fuera_de_alcance|datos_incompletos|desconocido",
     "product_name": "nombre del producto como aparece en la lista o el mencionado",
     "precio_costo": 4500,
     "precio_venta": 6500,
@@ -98,7 +98,7 @@ RESPONDE ÚNICAMENTE con un JSON válido (sin markdown, sin bloques de código `
     "unit": "unidad",
     "categoria": "Panaderia",
     "fecha_vencimiento": null,
-    "raw_text": "texto original transcrito"
+    "raw_text": "texto transcrito del audio"
 }}"""
 
 
@@ -163,60 +163,57 @@ def transcribe_and_parse(audio_bytes: bytes, mime_type: str, product_names: list
     model = _get_gemini_model()
     prompt = _build_prompt(product_names)
 
-    processed_bytes = audio_bytes
-    processed_mime = mime_type
+    import tempfile
+    import os
+    import google.generativeai as genai
+
+    audio_file = None
+    tmp_path = None
 
     try:
-        from pydub import AudioSegment
-        import io
+        # Extensión para el archivo temporal
+        ext = ".ogg"
+        if "mp3" in mime_type:
+            ext = ".mp3"
+        elif "wav" in mime_type:
+            ext = ".wav"
+        elif "m4a" in mime_type:
+            ext = ".m4a"
 
-        fmt = "ogg" if "ogg" in mime_type else None
-        if fmt:
-            audio = AudioSegment.from_file(io.BytesIO(audio_bytes), format=fmt)
-        else:
-            audio = AudioSegment.from_file(io.BytesIO(audio_bytes))
+        with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+            tmp.write(audio_bytes)
+            tmp_path = tmp.name
 
-        audio = audio.set_channels(1).set_frame_rate(16000)
-        output_buffer = io.BytesIO()
-        audio.export(output_buffer, format="mp3", bitrate="64k")
-        processed_bytes = output_buffer.getvalue()
-        processed_mime = "audio/mp3"
-        logger.info("Conversión de audio a MP3 exitosa (%d bytes)", len(processed_bytes))
-    except Exception as exc:
-        logger.warning(
-            "No se pudo convertir el audio a MP3: %s. Enviando audio original en %s.", exc, mime_type
-        )
+        clean_mime = mime_type.split(";")[0].strip()
+        logger.info("Subiendo audio a Gemini File API (%d bytes, mime=%s)...", len(audio_bytes), clean_mime)
+        audio_file = genai.upload_file(tmp_path, mime_type=clean_mime)
 
-    try:
-        import google.generativeai as genai
-        clean_mime = processed_mime.split(";")[0].strip()
-        audio_part = genai.Part.from_bytes(data=processed_bytes, mime_type=clean_mime)
-    except Exception as exc:
-        logger.error("Error al construir Part de audio: %s", exc)
-        return {
-            "action": "audio_ruidoso",
-            "product_name": None,
-            "quantity": None,
-            "confidence": 0.0,
-            "unit": None,
-            "raw_text": f"[Error de preparación de audio: {exc}]",
-        }
-
-    try:
-        logger.info("Enviando audio a Gemini (%d bytes, mime=%s)...", len(processed_bytes), clean_mime)
-        response = model.generate_content([prompt, audio_part])
+        logger.info("Enviando prompt y audio a Gemini 2.0 Flash...")
+        response = model.generate_content([prompt, audio_file])
         response_text = _extract_response_text(response)
         return _parse_gemini_response(response_text)
+
     except Exception as exc:
-        logger.error("Error al procesar audio con Gemini: %s", exc)
+        logger.error("Error al procesar audio con Gemini File API: %s", exc, exc_info=True)
         return {
-            "action": "audio_ruidoso",
+            "action": "desconocido",
             "product_name": None,
             "quantity": None,
             "confidence": 0.0,
             "unit": None,
-            "raw_text": f"[Error de transcripción: {exc}]",
+            "raw_text": f"[Error de procesamiento de audio: {exc}]",
         }
+    finally:
+        if audio_file:
+            try:
+                genai.delete_file(audio_file.name)
+            except Exception:
+                pass
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
 
 
 # ---------------------------------------------------------------------------
