@@ -365,36 +365,277 @@ def find_best_product_match(
 
 
 # ---------------------------------------------------------------------------
-# Ejecución de acciones de inventario
+# Generador de Respuestas Conversacionales Naturales (IA Humana)
 # ---------------------------------------------------------------------------
 
-_MIN_MATCH_SCORE = 0.5
+def generate_natural_response(
+    context_info: dict, action_result: dict, raw_user_message: str
+) -> str:
+    """
+    Genera una respuesta fluida, cálida, natural y colombiana usando Gemini 1.5 Flash,
+    adaptada al contexto del negocio y a la voz del tendero.
+    """
+    model = _get_gemini_model()
+
+    nombre_tienda = context_info.get("nombre_tienda", "tu tienda")
+    nombre_usuario = context_info.get("nombre_usuario", "amigo tendero")
+
+    system_instruction = f"""Eres el Asistente Inteligente de Inventario para la tienda "{nombre_tienda}".
+Tu interlocutor es {nombre_usuario}.
+
+REGLAS DE COMUNICACIÓN:
+1. Responde siempre de forma amable, cercana, fluida y natural en español colombiano.
+2. NUNCA respondas con plantillas estáticas ni digas "🤖 Asistente de Inventario...". Sé un asistente humano y conversacional.
+3. Confirma la transacción con precisión según los datos de la base de datos (precios, stock, producto).
+4. Sé breve, directo y servicial (ideal para WhatsApp)."""
+
+    prompt = f"""
+{system_instruction}
+
+MENSAJE DEL TENDERO:
+"{raw_user_message}"
+
+DATOS REALES RESULTANTES DE LA BASE DE DATOS:
+{json.dumps(action_result, ensure_ascii=False, indent=2)}
+
+Redacta la respuesta conversacional para WhatsApp:"""
+
+    try:
+        response = model.generate_content(
+            prompt,
+            generation_config={"temperature": 0.6}
+        )
+        texto = _extract_response_text(response).strip()
+        if texto:
+            return texto
+    except Exception as exc:
+        logger.warning("Error al generar respuesta natural con Gemini: %s", exc)
+
+    # Fallback conversacional si la API falla
+    return action_result.get("fallback_message", "¡Listo! Tu transacción fue procesada correctamente.")
 
 
 def execute_inventory_action(
-    intent: dict, empresa_id: UUID, db: Session
+    intent: dict, empresa_id: UUID, db: Session, context_info: dict = None
 ) -> str:
     """
     Ejecuta la acción de inventario indicada por el intent parseado
-    con respuestas claras, contextuales y guiadas.
+    y genera una respuesta conversacional 100% natural.
     """
+    if context_info is None:
+        context_info = {"nombre_tienda": "tu tienda", "nombre_usuario": "tendero"}
+
     action = intent.get("action", "desconocido")
     product_name = intent.get("product_name")
+    raw_text = intent.get("raw_text", "")
 
-    # 1. Caso: Consulta de ayuda, fuera de alcance, saludo o intención desconocida
+    # 1. Caso: Ayuda, Saludos o Consultas Generales
     if action in ["fuera_de_alcance", "desconocido", "ayuda", "audio_ruidoso"] or not action:
-        return (
-            "🤖 *Asistente de Inventario — Gestión Neiva*\n\n"
-            "¡Hola! Soy tu asistente de IA y puedo ayudarte a gestionar el inventario de tu tienda por nota de voz o mensaje de texto.\n\n"
-            "📌 *¿Qué soy capaz de hacer?*\n\n"
-            "1. 📦 *Registrar un producto nuevo:*\n"
-            "   👉 *Dime:* \"Registrar Pan Bimbo costó 4500 lo vendo a 6500 con 12 unidades\"\n\n"
-            "2. ➕ *Reabastecer mercancía existente:*\n"
-            "   👉 *Dime:* \"Llegaron 20 gaseosas\" o \"Reabastecer 10 unidades de Café\"\n\n"
-            "3. 📋 *Consultar stock o precios:*\n"
-            "   👉 *Dime:* \"¿Cuántas achiras quedan?\" o \"¿A cómo es el precio del café?\"\n\n"
-            "💡 *Prueba enviándome un mensaje de voz o texto con cualquiera de estos comandos.*"
+        act_res = {
+            "status": "info",
+            "tipo_accion": "bienvenida_ayuda",
+            "fallback_message": (
+                f"¡Hola! Te hablo del sistema de inventario de {context_info.get('nombre_tienda', 'tu tienda')}. "
+                "Puedes pedirme registrar un producto nuevo, reabastecer stock o consultar precios y cantidades."
+            )
+        }
+        return generate_natural_response(context_info, act_res, raw_text or "Hola")
+
+    # Load active products for this empresa (multi-tenant)
+    productos = (
+        db.query(models.Producto)
+        .filter(
+            models.Producto.empresa_id == empresa_id,
+            models.Producto.is_active.is_(True),
         )
+        .all()
+    )
+
+    # -----------------------------------------------------------------------
+    # Action: crear_producto (Registrar producto nuevo desde WhatsApp)
+    # -----------------------------------------------------------------------
+    if action == "crear_producto":
+        if not product_name:
+            act_res = {
+                "status": "incompleto",
+                "falta": "nombre_producto",
+                "fallback_message": "Para registrar un producto nuevo, por favor dime el nombre, precio costo, precio venta y la cantidad inicial."
+            }
+            return generate_natural_response(context_info, act_res, raw_text)
+
+        # Validar si el producto ya existe en la tienda
+        prod_existente, score = find_best_product_match(product_name, productos)
+        if prod_existente and score >= 0.85:
+            act_res = {
+                "status": "ya_existe",
+                "producto": prod_existente.nombre,
+                "stock_actual": float(prod_existente.cantidad_actual),
+                "precio_venta": float(prod_existente.precio_venta),
+                "fallback_message": f"El producto {prod_existente.nombre} ya existe en tu tienda con {float(prod_existente.cantidad_actual)} unidades."
+            }
+            return generate_natural_response(context_info, act_res, raw_text)
+
+        precio_venta = intent.get("precio_venta")
+        precio_costo = intent.get("precio_costo")
+
+        if not precio_venta or float(precio_venta) <= 0:
+            act_res = {
+                "status": "incompleto",
+                "falta": "precio_venta",
+                "producto": product_name,
+                "fallback_message": f"Para registrar {product_name}, por favor indícame a cómo lo vas a vender."
+            }
+            return generate_natural_response(context_info, act_res, raw_text)
+
+        if not precio_costo or float(precio_costo) <= 0:
+            precio_costo = float(precio_venta) * 0.7
+
+        quantity = intent.get("quantity") or 0
+        unit_str = intent.get("unit", "unidad").lower().strip()
+
+        unidad_enum = models.UnidadMedida.UNIDAD
+        for u in models.UnidadMedida:
+            if u.value == unit_str:
+                unidad_enum = u
+                break
+
+        try:
+            import uuid
+            codigo_barras = f"WA-{uuid.uuid4().hex[:8].upper()}"
+
+            nuevo_prod = models.Producto(
+                empresa_id=empresa_id,
+                nombre=product_name.strip(),
+                codigo_barras=codigo_barras,
+                precio_costo=Decimal(str(precio_costo)),
+                precio_venta=Decimal(str(precio_venta)),
+                cantidad_actual=Decimal(str(quantity)),
+                unidad_medida=unidad_enum,
+            )
+            db.add(nuevo_prod)
+            db.commit()
+            db.refresh(nuevo_prod)
+
+            act_res = {
+                "status": "exito",
+                "tipo_accion": "crear_producto",
+                "producto": nuevo_prod.nombre,
+                "precio_costo": float(nuevo_prod.precio_costo),
+                "precio_venta": float(nuevo_prod.precio_venta),
+                "stock_inicial": float(nuevo_prod.cantidad_actual),
+                "unidad": nuevo_prod.unidad_medida.value,
+                "codigo_barras": nuevo_prod.codigo_barras,
+                "fallback_message": f"¡Listo! Se creó el producto {nuevo_prod.nombre} a ${float(nuevo_prod.precio_venta):,.0f} con {float(nuevo_prod.cantidad_actual)} unidades."
+            }
+            return generate_natural_response(context_info, act_res, raw_text)
+
+        except Exception as exc:
+            db.rollback()
+            logger.error("Error al crear producto %s por WhatsApp: %s", product_name, exc)
+            return "Ocurrió un error al intentar crear el producto en tu base de datos. Por favor intenta de nuevo."
+
+    if not productos:
+        act_res = {
+            "status": "sin_productos",
+            "fallback_message": "Aún no tienes productos en tu inventario. Puedes decirme: 'Registrar Pan Bimbo costó 4500 lo vendo a 6500 con 12 unidades'."
+        }
+        return generate_natural_response(context_info, act_res, raw_text)
+
+    if not product_name:
+        act_res = {
+            "status": "incompleto",
+            "falta": "nombre_producto",
+            "fallback_message": "No logré identificar el producto en tu mensaje. ¿Me repites el nombre?"
+        }
+        return generate_natural_response(context_info, act_res, raw_text)
+
+    # Fuzzy match the product
+    producto, score = find_best_product_match(product_name, productos)
+
+    if not producto or score < _MIN_MATCH_SCORE:
+        act_res = {
+            "status": "no_encontrado",
+            "busqueda": product_name,
+            "productos_sugeridos": [p.nombre for p in productos[:4]],
+            "fallback_message": f"No encontré '{product_name}' en tu tienda. Si es un producto nuevo, dime: 'Registrar {product_name} costó X lo vendo a Y con Z unidades'."
+        }
+        return generate_natural_response(context_info, act_res, raw_text)
+
+    # -----------------------------------------------------------------------
+    # Action: reabastecer
+    # -----------------------------------------------------------------------
+    if action == "reabastecer":
+        quantity = intent.get("quantity")
+        if not quantity or quantity <= 0:
+            act_res = {
+                "status": "incompleto",
+                "falta": "cantidad",
+                "producto": producto.nombre,
+                "fallback_message": f"¿Cuántas unidades de {producto.nombre} recibiste?"
+            }
+            return generate_natural_response(context_info, act_res, raw_text)
+
+        try:
+            producto_locked = (
+                db.query(models.Producto)
+                .filter(
+                    models.Producto.id == producto.id,
+                    models.Producto.empresa_id == empresa_id,
+                )
+                .with_for_update()
+                .first()
+            )
+
+            if producto_locked is None:
+                db.rollback()
+                return "El producto seleccionado no pertenece a tu tienda."
+
+            stock_anterior = float(producto_locked.cantidad_actual)
+            producto_locked.cantidad_actual += Decimal(str(quantity))
+            db.commit()
+            db.refresh(producto_locked)
+
+            unit = intent.get("unit", "unidad")
+            act_res = {
+                "status": "exito",
+                "tipo_accion": "reabastecer",
+                "producto": producto_locked.nombre,
+                "cantidad_agregada": float(quantity),
+                "stock_anterior": stock_anterior,
+                "stock_nuevo": float(producto_locked.cantidad_actual),
+                "unidad": unit,
+                "fallback_message": f"Se agregaron {quantity} unidades a {producto_locked.nombre}. Nuevo stock: {float(producto_locked.cantidad_actual)}."
+            }
+            return generate_natural_response(context_info, act_res, raw_text)
+
+        except Exception as exc:
+            db.rollback()
+            logger.error("Error al reabastecer %s: %s", producto.nombre, exc)
+            return "Ocurrió un error al intentar actualizar el stock en tu base de datos."
+
+    # -----------------------------------------------------------------------
+    # Action: consultar_stock
+    # -----------------------------------------------------------------------
+    if action == "consultar_stock":
+        stock = float(producto.cantidad_actual)
+        unidad = producto.unidad_medida.value if producto.unidad_medida else "unidad"
+
+        act_res = {
+            "status": "exito",
+            "tipo_accion": "consultar_stock",
+            "producto": producto.nombre,
+            "stock_actual": stock,
+            "precio_venta": float(producto.precio_venta),
+            "unidad": unidad,
+            "fallback_message": f"De {producto.nombre} te quedan {stock} {unidad}(s) a ${float(producto.precio_venta):,.0f}."
+        }
+        return generate_natural_response(context_info, act_res, raw_text)
+
+    act_res = {
+        "status": "desconocido",
+        "fallback_message": "No entendí muy bien la solicitud. Puedo ayudarte a consultar stock, reabastecer o registrar productos."
+    }
+    return generate_natural_response(context_info, act_res, raw_text)
 
     # 2. Caso: Datos incompletos (reabastecer sin cantidad)
     if action == "datos_incompletos":

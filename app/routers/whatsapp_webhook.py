@@ -102,8 +102,16 @@ def _process_whatsapp_message(phone: str, msg: dict) -> None:
                 )
             return
 
-        # Step 2 — user is linked: fetch product names & empresa_id
+        # Step 2 — user is linked: fetch product names, empresa_id & context_info
         empresa_id = usuario.empresa_id
+        empresa = usuario.empresa
+        nombre_tienda = empresa.nombre_comercial if empresa else "tu tienda"
+        nombre_usuario = usuario.email.split("@")[0].capitalize() if usuario.email else "tendero"
+        context_info = {
+            "nombre_tienda": nombre_tienda,
+            "nombre_usuario": nombre_usuario,
+        }
+
         productos = db.query(models.Producto).filter(
             models.Producto.empresa_id == empresa_id,
             models.Producto.is_active.is_(True),
@@ -131,7 +139,7 @@ def _process_whatsapp_message(phone: str, msg: dict) -> None:
 
         # Step 4 — execute the parsed intent in a fresh, isolated DB session
         with app.database.SessionLocal() as db2:
-            result = gemini_voice.execute_inventory_action(intent, empresa_id, db2)
+            result = gemini_voice.execute_inventory_action(intent, empresa_id, db2, context_info=context_info)
 
         # Step 5 — respond to user
         whatsapp_service.send_text_message(phone, result)
