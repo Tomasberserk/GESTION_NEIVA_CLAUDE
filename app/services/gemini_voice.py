@@ -11,6 +11,7 @@ Usa la API multimodal de Gemini para:
 import json
 import logging
 import os
+import re
 from decimal import Decimal
 from difflib import SequenceMatcher
 from uuid import UUID
@@ -188,10 +189,16 @@ def transcribe_and_parse(audio_bytes: bytes, mime_type: str, product_names: list
         logger.info("Subiendo audio a Gemini File API (%d bytes, mime=%s)...", len(audio_bytes), clean_mime)
         audio_file = genai.upload_file(tmp_path, mime_type=clean_mime)
 
-        logger.info("Enviando prompt y audio a Gemini 2.0 Flash...")
+        logger.info("Enviando prompt y audio a Gemini 1.5 Flash...")
         response = model.generate_content([prompt, audio_file])
         response_text = _extract_response_text(response)
-        return _parse_gemini_response(response_text)
+        parsed_res = _parse_gemini_response(response_text)
+        raw_t = parsed_res.get("raw_text") or response_text
+        if parsed_res.get("action") in ["desconocido", "fuera_de_alcance"] and raw_t:
+            quick_check = quick_parse_intent(raw_t)
+            if quick_check and quick_check.get("action") not in ["desconocido", "ayuda"]:
+                return quick_check
+        return parsed_res
 
     except Exception as exc:
         logger.error("Error al procesar audio con Gemini File API: %s", exc, exc_info=True)
@@ -217,10 +224,94 @@ def transcribe_and_parse(audio_bytes: bytes, mime_type: str, product_names: list
 
 
 # ---------------------------------------------------------------------------
+# Parser determinístico rápido (Regex NLP)
+# ---------------------------------------------------------------------------
+
+def quick_parse_intent(text: str) -> dict | None:
+    """
+    Parser determinístico rápido para frases y comandos comunes de tenderos.
+    Retorna un diccionario de intent si detecta una estructura clara, o None si debe delegar a Gemini.
+    """
+    if not text or not isinstance(text, str):
+        return None
+
+    text_lower = text.lower().strip()
+
+    # 0. Ayuda o Saludos explícitos
+    if any(k in text_lower for k in ["ayuda", "que puedes hacer", "qué puedes hacer", "que haces", "qué haces", "instrucciones", "hola", "buenos dias", "buenas tardes"]):
+        return {"action": "ayuda", "raw_text": text}
+
+    # 1. Crear producto nuevo
+    if any(k in text_lower for k in ["registrar", "crear", "nuevo producto", "agregar producto"]):
+        m_costo = re.search(r'(?:costó|costo|compré a|comprados a|comprado a)\s+(\d+)', text_lower)
+        precio_costo = float(m_costo.group(1)) if m_costo else None
+
+        m_venta = re.search(r'(?:lo vendo a|vendo a|precio|venta a|a)\s+(\d+)', text_lower)
+        precio_venta = float(m_venta.group(1)) if m_venta else None
+
+        m_qty = re.search(r'(?:con|llegaron|tengo|stock)\s+(\d+)', text_lower)
+        qty = float(m_qty.group(1)) if m_qty else 0.0
+
+        m_name = re.search(r'(?:registrar|crear|agregar producto|nuevo producto)\s+(?:a\s+)?([^\d]+?)(?=\s+(?:costó|costo|lo vendo|a\s+\d|con\s+\d|\d+)|$)', text_lower)
+        name = m_name.group(1).strip() if m_name else text
+
+        name = re.sub(r'\b(producto|nuevo)\b', '', name, flags=re.IGNORECASE).strip()
+
+        return {
+            "action": "crear_producto",
+            "product_name": name.title() if name else "Nuevo Producto",
+            "precio_costo": precio_costo,
+            "precio_venta": precio_venta,
+            "quantity": qty,
+            "unit": "unidad",
+            "confidence": 0.98,
+            "raw_text": text,
+        }
+
+    # 2. Reabastecer stock
+    if any(k in text_lower for k in ["reabastecer", "llegaron", "ingresaron", "recibí", "recibi"]):
+        m_qty = re.search(r'(\d+)', text_lower)
+        qty = float(m_qty.group(1)) if m_qty else 1.0
+
+        clean_text = re.sub(r'\b(reabastecer|llegaron|ingresaron|recibí|recibi|unidades|unidad|cajas|caja|bultos|bulto|de)\b', '', text_lower)
+        clean_text = re.sub(r'\d+', '', clean_text).strip()
+
+        return {
+            "action": "reabastecer",
+            "product_name": clean_text.title() if clean_text else None,
+            "quantity": qty,
+            "unit": "unidad",
+            "confidence": 0.95,
+            "raw_text": text,
+        }
+
+    # 3. Consultar stock o precio
+    if any(k in text_lower for k in ["cuanto", "cuántas", "cuántos", "cuantos", "stock", "quedan", "queda", "hay", "precio"]):
+        clean_text = re.sub(r'\b(cuanto|cuántas|cuántos|cuantos|stock|quedan|queda|hay|precio|de|a|cómo|como|es|el|la|los|las|tengo)\b', '', text_lower)
+        clean_text = clean_text.replace("?", "").replace("¿", "").strip()
+
+        return {
+            "action": "consultar_stock",
+            "product_name": clean_text.title() if clean_text else None,
+            "confidence": 0.95,
+            "raw_text": text,
+        }
+
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Parsing de intención desde texto
 # ---------------------------------------------------------------------------
 
 def parse_text_intent(text: str, product_names: list[str]) -> dict:
+    # 1. Intentar con el parser determinístico súper rápido primero
+    quick_res = quick_parse_intent(text)
+    if quick_res is not None:
+        logger.info("Intención reconocida por quick_parse_intent: %s", quick_res["action"])
+        return quick_res
+
+    # 2. Si es una frase compleja, usar Gemini 1.5 Flash
     model = _get_gemini_model()
     prompt = _build_prompt(product_names)
 
