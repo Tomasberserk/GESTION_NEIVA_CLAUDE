@@ -22,6 +22,8 @@ from app import models
 
 logger = logging.getLogger(__name__)
 
+_MIN_MATCH_SCORE = 0.6
+
 # ---------------------------------------------------------------------------
 # Configuración de Gemini (lazy — no falla al importar si falta la key)
 # ---------------------------------------------------------------------------
@@ -375,7 +377,11 @@ def generate_natural_response(
     Genera una respuesta fluida, cálida, natural y colombiana usando Gemini 1.5 Flash,
     adaptada al contexto del negocio y a la voz del tendero.
     """
-    model = _get_gemini_model()
+    model = None
+    try:
+        model = _get_gemini_model()
+    except Exception as exc:
+        logger.warning("Gemini no disponible para respuesta natural: %s", exc)
 
     nombre_tienda = context_info.get("nombre_tienda", "tu tienda")
     nombre_usuario = context_info.get("nombre_usuario", "amigo tendero")
@@ -401,6 +407,8 @@ DATOS REALES RESULTANTES DE LA BASE DE DATOS:
 Redacta la respuesta conversacional para WhatsApp:"""
 
     try:
+        if model is None:
+            raise RuntimeError("Modelo Gemini no inicializado")
         response = model.generate_content(
             prompt,
             generation_config={"temperature": 0.6}
@@ -499,6 +507,22 @@ def execute_inventory_action(
                 unidad_enum = u
                 break
 
+        categoria_enum = None
+        cat_str = intent.get("categoria")
+        if cat_str:
+            for c in models.CategoriaProducto:
+                if c.value.lower() == cat_str.lower():
+                    categoria_enum = c
+                    break
+
+        fecha_venc = None
+        if intent.get("fecha_vencimiento"):
+            try:
+                from datetime import datetime
+                fecha_venc = datetime.strptime(intent["fecha_vencimiento"], "%Y-%m-%d").date()
+            except Exception:
+                fecha_venc = None
+
         try:
             import uuid
             codigo_barras = f"WA-{uuid.uuid4().hex[:8].upper()}"
@@ -511,6 +535,8 @@ def execute_inventory_action(
                 precio_venta=Decimal(str(precio_venta)),
                 cantidad_actual=Decimal(str(quantity)),
                 unidad_medida=unidad_enum,
+                categoria=categoria_enum,
+                fecha_vencimiento=fecha_venc,
             )
             db.add(nuevo_prod)
             db.commit()
@@ -525,6 +551,8 @@ def execute_inventory_action(
                 "stock_inicial": float(nuevo_prod.cantidad_actual),
                 "unidad": nuevo_prod.unidad_medida.value,
                 "codigo_barras": nuevo_prod.codigo_barras,
+                "categoria": nuevo_prod.categoria.value if nuevo_prod.categoria else None,
+                "fecha_vencimiento": str(nuevo_prod.fecha_vencimiento) if nuevo_prod.fecha_vencimiento else None,
                 "fallback_message": f"¡Listo! Se creó el producto {nuevo_prod.nombre} a ${float(nuevo_prod.precio_venta):,.0f} con {float(nuevo_prod.cantidad_actual)} unidades."
             }
             return generate_natural_response(context_info, act_res, raw_text)
@@ -636,222 +664,3 @@ def execute_inventory_action(
         "fallback_message": "No entendí muy bien la solicitud. Puedo ayudarte a consultar stock, reabastecer o registrar productos."
     }
     return generate_natural_response(context_info, act_res, raw_text)
-
-    # 2. Caso: Datos incompletos (reabastecer sin cantidad)
-    if action == "datos_incompletos":
-        if product_name:
-            return f"⚠️ Entendí que quieres reabastecer *{product_name}*, pero no escuché la cantidad. ¿Cuántas unidades llegaron?"
-        return "⚠️ Entendí que quieres reabastecer mercancía, pero no escuché el nombre del producto ni la cantidad. ¿Podrías repetirlo?"
-
-    # Load active products for this empresa (multi-tenant)
-    productos = (
-        db.query(models.Producto)
-        .filter(
-            models.Producto.empresa_id == empresa_id,
-            models.Producto.is_active.is_(True),
-        )
-        .all()
-    )
-
-    # -----------------------------------------------------------------------
-    # Action: crear_producto (Registrar producto nuevo desde WhatsApp)
-    # -----------------------------------------------------------------------
-    if action == "crear_producto":
-        if not product_name:
-            return (
-                "📝 *Para registrar un nuevo producto necesito los datos obligatorios:*\n\n"
-                "Envíame una nota de voz o mensaje con la siguiente estructura:\n"
-                "1. 📦 *Nombre del producto* (ej: 'Pan Bimbo Blanco')\n"
-                "2. 💵 *Precio Costo* (a cómo lo compraste, ej: 'costó 4500')\n"
-                "3. 💰 *Precio Venta* (a cómo lo vendes, ej: 'lo vendo a 6500')\n"
-                "4. 📊 *Stock Inicial* (ej: 'tengo 12 unidades')\n\n"
-                "💡 *Ejemplo completo:* \"Registrar Pan Bimbo costó 4500 lo vendo a 6500 con 12 unidades\""
-            )
-
-        # Validar si el producto ya existe en la tienda
-        prod_existente, score = find_best_product_match(product_name, productos)
-        if prod_existente and score >= 0.85:
-            return (
-                f"⚠️ *El producto \"{prod_existente.nombre}\" ya existe en tu inventario*\n\n"
-                f"📊 Stock actual: {float(prod_existente.cantidad_actual)} {prod_existente.unidad_medida.value if prod_existente.unidad_medida else 'unidad'}(s)\n"
-                f"💰 Precio venta: ${float(prod_existente.precio_venta):,.0f}\n\n"
-                f"💡 Si lo que quieres es reabastecer más mercancía, dime:\n"
-                f"👉 *\"Reabastecer 10 unidades de {prod_existente.nombre}\"*"
-            )
-
-        precio_venta = intent.get("precio_venta")
-        precio_costo = intent.get("precio_costo")
-
-        # Guiar si faltan precios
-        if not precio_venta or float(precio_venta) <= 0:
-            return (
-                f"📝 *Para registrar \"{product_name}\" en tu tienda faltan los precios:*\n\n"
-                f"Envíame una nota de voz aclarando a cómo lo compraste y a cómo lo vendes.\n\n"
-                f"💡 *Ejemplo:* \"Registrar {product_name} costó 4500 lo vendo a 6500 con 10 unidades\""
-            )
-
-        if not precio_costo or float(precio_costo) <= 0:
-            # Si el tendero solo dijo 1 precio, asumimos que dijo el precio de venta y le sugerimos/pedimos el costo
-            precio_costo = float(precio_venta) * 0.7  # Estimado por defecto 70% del precio de venta
-
-        quantity = intent.get("quantity") or 0
-        unit_str = intent.get("unit", "unidad").lower().strip()
-
-        # Mapear unidad
-        unidad_enum = models.UnidadMedida.UNIDAD
-        for u in models.UnidadMedida:
-            if u.value == unit_str:
-                unidad_enum = u
-                break
-
-        # Mapear categoría si la mencionó
-        cat_str = intent.get("categoria")
-        categoria_enum = None
-        if cat_str:
-            for c in models.CategoriaProducto:
-                if c.value.lower() == cat_str.lower():
-                    categoria_enum = c
-                    break
-
-        # Mapear fecha de vencimiento si la mencionó
-        fecha_venc = None
-        if intent.get("fecha_vencimiento"):
-            try:
-                from datetime import datetime
-                fecha_venc = datetime.strptime(intent["fecha_vencimiento"], "%Y-%m-%d").date()
-            except Exception:
-                fecha_venc = None
-
-        try:
-            import uuid
-            codigo_barras = f"WA-{uuid.uuid4().hex[:8].upper()}"
-
-            nuevo_prod = models.Producto(
-                empresa_id=empresa_id,
-                nombre=product_name.strip(),
-                codigo_barras=codigo_barras,
-                precio_costo=Decimal(str(precio_costo)),
-                precio_venta=Decimal(str(precio_venta)),
-                cantidad_actual=Decimal(str(quantity)),
-                unidad_medida=unidad_enum,
-                categoria=categoria_enum,
-                fecha_vencimiento=fecha_venc,
-            )
-            db.add(nuevo_prod)
-            db.commit()
-            db.refresh(nuevo_prod)
-
-            info_cat = f"\n🏷️ *Categoría:* {nuevo_prod.categoria.value}" if nuevo_prod.categoria else ""
-            info_venc = f"\n📅 *Vencimiento:* {nuevo_prod.fecha_vencimiento}" if nuevo_prod.fecha_vencimiento else ""
-
-            return (
-                f"🎉 *¡Producto nuevo registrado exitosamente!*\n\n"
-                f"📦 *Producto:* {nuevo_prod.nombre}\n"
-                f"💵 *Precio Costo:* ${float(nuevo_prod.precio_costo):,.0f} COP\n"
-                f"💰 *Precio Venta:* ${float(nuevo_prod.precio_venta):,.0f} COP\n"
-                f"📊 *Stock Inicial:* {float(nuevo_prod.cantidad_actual)} {nuevo_prod.unidad_medida.value}(s)"
-                f"{info_cat}{info_venc}\n"
-                f"🏷️ *Código Barcode:* {nuevo_prod.codigo_barras}\n\n"
-                f"💡 *Ya está listo en tu Punto de Venta (POS) y lo puedes consultar o vender de inmediato.*"
-            )
-
-        except Exception as exc:
-            db.rollback()
-            logger.error("Error al crear producto %s por WhatsApp: %s", product_name, exc)
-            return "❌ Error al crear el producto en la base de datos. Intenta de nuevo."
-
-    if not productos:
-        return (
-            "📦 *No tienes productos en tu tienda*\n\n"
-            "Para registrar tu primer producto por WhatsApp, envíame un mensaje como:\n"
-            "👉 *\"Registrar Pan Bimbo a 6500 pesos y 12 unidades\"*"
-        )
-
-    if not product_name:
-        return "⚠️ No pude identificar el producto en tu mensaje. ¿Podrías decirme el nombre exacto del producto?"
-
-    # Fuzzy match the product
-    producto, score = find_best_product_match(product_name, productos)
-
-    # 4. Caso: Producto no registrado en el inventario de esta tienda
-    if not producto or score < _MIN_MATCH_SCORE:
-        lista_existentes = "\n".join(f"• *{p.nombre}* (Stock: {p.cantidad_actual})" for p in productos[:5])
-        return (
-            f"❌ *Producto no encontrado*\n\n"
-            f"No encontré el producto *\"{product_name}\"* en el inventario de tu tienda.\n\n"
-            f"📋 *Algunos productos registrados actualmente:*\n{lista_existentes}\n\n"
-            f"💡 *¿Quieres registrar \"{product_name}\" como un producto nuevo?*\n"
-            f"Envíame un mensaje o audio diciendo:\n"
-            f"👉 *\"Registrar {product_name} a [precio] pesos con [cantidad] unidades\"*"
-        )
-
-    # -----------------------------------------------------------------------
-    # Action: reabastecer
-    # -----------------------------------------------------------------------
-    if action == "reabastecer":
-        quantity = intent.get("quantity")
-        if not quantity or quantity <= 0:
-            return f"⚠️ No entendí la cantidad para *{producto.nombre}*. ¿Cuántas unidades recibiste?"
-
-        try:
-            producto_locked = (
-                db.query(models.Producto)
-                .filter(
-                    models.Producto.id == producto.id,
-                    models.Producto.empresa_id == empresa_id,
-                )
-                .with_for_update()
-                .first()
-            )
-
-            if producto_locked is None:
-                db.rollback()
-                return "❌ El producto no pertenece a tu tienda."
-
-            stock_anterior = float(producto_locked.cantidad_actual)
-            producto_locked.cantidad_actual += Decimal(str(quantity))
-            db.commit()
-            db.refresh(producto_locked)
-
-            unit = intent.get("unit", "unidad")
-            match_info = f" (coincidencia: {score:.0%})" if score < 0.95 else ""
-
-            return (
-                f"✅ *Reabastecimiento registrado*{match_info}\n"
-                f"📦 Producto: {producto_locked.nombre}\n"
-                f"➕ Cantidad agregada: {quantity} {unit}(s)\n"
-                f"📊 Stock anterior: {stock_anterior}\n"
-                f"📊 Stock actual: {float(producto_locked.cantidad_actual)}"
-            )
-
-        except Exception as exc:
-            db.rollback()
-            logger.error("Error al reabastecer %s: %s", producto.nombre, exc)
-            return "❌ Error al actualizar el inventario. Intenta de nuevo."
-
-    # -----------------------------------------------------------------------
-    # Action: consultar_stock
-    # -----------------------------------------------------------------------
-    if action == "consultar_stock":
-        match_info = f" (coincidencia: {score:.0%})" if score < 0.95 else ""
-        stock = float(producto.cantidad_actual)
-        unidad = producto.unidad_medida.value if producto.unidad_medida else "unidad"
-
-        if stock <= 0:
-            nivel = "🔴 SIN STOCK"
-        elif stock <= 5:
-            nivel = "🟡 Stock bajo"
-        else:
-            nivel = "🟢 Stock OK"
-
-        return (
-            f"📋 *Consulta de stock*{match_info}\n"
-            f"📦 Producto: {producto.nombre}\n"
-            f"📊 Cantidad: {stock} {unidad}(s)\n"
-            f"💰 Precio venta: ${float(producto.precio_venta):,.0f}\n"
-            f"📍 Estado: {nivel}"
-        )
-
-    return (
-        "🤔 No reconocí esa acción. Puedes pedirme reabastecer stock, registrar un nuevo producto o consultar el inventario de tu tienda."
-    )
