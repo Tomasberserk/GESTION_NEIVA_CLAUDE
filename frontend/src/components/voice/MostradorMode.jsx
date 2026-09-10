@@ -21,6 +21,7 @@ export default function MostradorMode({
     errorMessage,
     activarModoVoz,
     desactivarModoVoz,
+    detenerYEnviar,
     confirmarOperacion,
     cancelarOperacion,
     seleccionarOpcion,
@@ -30,6 +31,14 @@ export default function MostradorMode({
   const preview = lastResponse?.preview
   const clarification = lastResponse?.clarification
   const isConfirming = voiceState === VoiceTurnState.CONFIRMING || lastResponse?.estado === 'READY_TO_CONFIRM'
+
+  const handleOrbClick = () => {
+    if (voiceState === VoiceTurnState.LISTENING || voiceState === VoiceTurnState.SPEECH_DETECTED) {
+      detenerYEnviar()
+    } else if (voiceState === VoiceTurnState.READY) {
+      activarModoVoz(false)
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col justify-between p-4 md:p-6 text-white select-none animate-in fade-in duration-200">
@@ -56,8 +65,14 @@ export default function MostradorMode({
 
       {/* Zona Central: Orbe y transcripciones legibles a 1 metro */}
       <div className="flex-1 flex flex-col items-center justify-center max-w-lg mx-auto w-full my-auto text-center px-2">
-        {/* Orbe Visual */}
-        <VoiceOrb state={voiceState} size="large" />
+        {/* Orbe Visual Interactivo (Tap-to-send) */}
+        <VoiceOrb state={voiceState} size="large" onClick={handleOrbClick} />
+
+        {(voiceState === VoiceTurnState.LISTENING || voiceState === VoiceTurnState.SPEECH_DETECTED) && (
+          <span className="text-xs text-slate-500 -mt-2 mb-2 animate-in fade-in">
+            Habla a tu ritmo natural • Toca el orbe para enviar ya
+          </span>
+        )}
 
         {/* Transcripción en vivo de lo que dice el tendero */}
         {transcript && (
@@ -79,18 +94,21 @@ export default function MostradorMode({
             <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">
               Elige o di el producto:
             </span>
-            {clarification.options.map((opt, idx) => (
-              <button
-                key={opt.id || idx}
-                onClick={() => seleccionarOpcion(opt.label || String(idx + 1))}
-                className="px-4 py-2.5 rounded-xl bg-slate-900 border border-cyan-500/40 hover:border-cyan-400 text-left text-sm font-medium text-cyan-200 active:scale-98 transition-all flex items-center justify-between"
-              >
-                <span>{opt.label}</span>
-                <span className="text-xs px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800">
-                  Opción {idx + 1}
-                </span>
-              </button>
-            ))}
+            {clarification.options.map((opt, idx) => {
+              const nombreLimpio = (opt.label || '').split('(')[0].trim()
+              return (
+                <button
+                  key={opt.id || idx}
+                  onClick={() => seleccionarOpcion(nombreLimpio || String(idx + 1))}
+                  className="px-4 py-2.5 rounded-xl bg-slate-900 border border-cyan-500/40 hover:border-cyan-400 text-left text-sm font-medium text-cyan-200 active:scale-98 transition-all flex items-center justify-between"
+                >
+                  <span>{opt.label}</span>
+                  <span className="text-xs px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800">
+                    Opción {idx + 1}
+                  </span>
+                </button>
+              )
+            })}
           </div>
         )}
 

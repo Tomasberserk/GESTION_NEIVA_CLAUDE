@@ -33,13 +33,23 @@ export class VoiceTurnManager {
     this.state = VoiceTurnState.IDLE
     this.lastTranscript = ''
     this.interimTranscript = ''
-    this.activeProviderType = 'webspeech'
+    this.sessionGeneration = 0
 
     // Proveedores
     this.webSpeechProvider = new WebSpeechProvider()
     this.backendSTTProvider = new BackendSTTProvider()
-    this.currentSTT = this.webSpeechProvider
     this.tts = new SpeechSynthesisProvider()
+
+    // Política Android-First / Mobile-First:
+    const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '')
+    if (isMobile) {
+      console.info('[VOICE-DEBUG][VoiceTurnManager] Móvil detectado: asignando BackendSTTProvider como primario')
+      this.activeProviderType = 'backend'
+      this.currentSTT = this.backendSTTProvider
+    } else {
+      this.activeProviderType = 'webspeech'
+      this.currentSTT = this.webSpeechProvider
+    }
 
     // Timers
     this.speechEndTimer = null
@@ -48,7 +58,7 @@ export class VoiceTurnManager {
     this.watchdogTimer = null
 
     this._bindProviders()
-    console.log('[VOICE-DEBUG][VoiceTurnManager] Instanciación completa. Estado inicial:', this.state)
+    console.log('[VOICE-DEBUG][VoiceTurnManager] Instanciación completa. Estado inicial:', this.state, 'Proveedor activo:', this.activeProviderType)
   }
 
   _setState(newState, data = {}) {
@@ -68,6 +78,8 @@ export class VoiceTurnManager {
     console.log('[VOICE-DEBUG][VoiceTurnManager] _bindProviders() configurando callbacks de STT y TTS...')
     const setupSTT = (provider, name) => {
       provider.onSpeechStart = () => {
+        // Anti-carrera: ignorar eventos si el proveedor ya no es el activo
+        if (provider !== this.currentSTT) return
         console.log(`[VOICE-DEBUG][VoiceTurnManager][${name}] onSpeechStart disparado. Estado actual: ${this.state}`)
         if (this.state === VoiceTurnState.LISTENING) {
           this._setState(VoiceTurnState.SPEECH_DETECTED)
@@ -78,6 +90,8 @@ export class VoiceTurnManager {
       }
 
       provider.onTranscript = (transcript, isFinal) => {
+        // Anti-carrera: ignorar eventos si el proveedor ya no es el activo
+        if (provider !== this.currentSTT) return
         console.log(`[VOICE-DEBUG][VoiceTurnManager][${name}] onTranscript: "${transcript}", isFinal: ${isFinal}, estado: ${this.state}`)
         this.interimTranscript = transcript
         if (this.onTranscriptUpdate) {
@@ -93,11 +107,18 @@ export class VoiceTurnManager {
       }
 
       provider.onError = (err) => {
+        // Anti-carrera: ignorar errores huérfanos de proveedores inactivos
+        if (provider !== this.currentSTT) return
         console.error(`[VOICE-DEBUG][VoiceTurnManager][${name}] onError recibido:`, err)
         this._handleSTTError(err)
       }
 
       provider.onEnd = () => {
+        // Anti-carrera: si llega un onEnd tardío de un proveedor anterior, descartarlo
+        if (provider !== this.currentSTT) {
+          console.warn(`[VOICE-DEBUG][VoiceTurnManager][${name}] onEnd tardío descartado (proveedor actual es diferente)`)
+          return
+        }
         console.log(`[VOICE-DEBUG][VoiceTurnManager][${name}] onEnd recibido. Estado actual: ${this.state}, interim: "${this.interimTranscript}"`)
         if (this.state === VoiceTurnState.LISTENING || this.state === VoiceTurnState.SPEECH_DETECTED) {
           if (this.interimTranscript.trim()) {
@@ -149,13 +170,18 @@ export class VoiceTurnManager {
     console.warn('[VOICE-DEBUG][VoiceTurnManager] _handleSTTError procesando:', err)
     voiceTelemetry.recordSTTFailure(err.code)
 
-    if (err.code === 'network' && this.activeProviderType === 'webspeech') {
-      console.info('[VOICE-DEBUG][VoiceTurnManager] Conmutando a BackendSTTProvider por error de red')
-      this.activeProviderType = 'backend'
-      this.currentSTT = this.backendSTTProvider
-      voiceTelemetry.recordFallbackUsed()
-      this.iniciarEscucha()
-      return
+    // Fallback inmediato ante fallo de WebSpeech en cualquier plataforma
+    if (this.activeProviderType === 'webspeech') {
+      if (err.code === 'aborted' || err.code === 'audio-capture' || err.code === 'network' || err.code === 'start-error') {
+        console.info(`[VOICE-DEBUG][VoiceTurnManager] Error en WebSpeech (${err.code}). Conmutando inmediatamente a BackendSTTProvider`)
+        this.webSpeechProvider.cancel()
+        this.activeProviderType = 'backend'
+        this.currentSTT = this.backendSTTProvider
+        this.sessionGeneration++
+        voiceTelemetry.recordFallbackUsed()
+        this.iniciarEscucha()
+        return
+      }
     }
 
     if (err.code === 'not-allowed') {
@@ -170,23 +196,29 @@ export class VoiceTurnManager {
       return
     }
 
-    if (err.code === 'aborted') {
-      console.log('[VOICE-DEBUG][VoiceTurnManager] aborted detectado -> ignorando o retornando a READY según estado')
-      return
-    }
-
     this._setState(VoiceTurnState.READY)
   }
 
   /**
-   * Inicia la sesión de voz tras el toque del usuario.
+   * Inicia la sesión de voz tras el toque del usuario con saludo de bienvenida opcional.
    */
-  async activarSesion() {
+  async activarSesion(saludar = true) {
     console.log('[VOICE-DEBUG][VoiceTurnManager] activarSesion() llamado. Estado antes:', this.state)
     this._limpiarTimers()
+    this.sessionGeneration++
     this.tts.cancel()
     this.currentSTT.cancel()
     voiceTelemetry.recordSessionStart()
+
+    // Desbloquear audio del sintetizador (User Interaction Gesture Unlock)
+    this.tts.resume()
+
+    if (saludar) {
+      console.log('[VOICE-DEBUG][VoiceTurnManager] Reproduciendo saludo inicial con voz...')
+      this.reproducirRespuesta('¡Listo, te escucho! ¿Qué vendiste hoy?', VoiceTurnState.READY)
+      return
+    }
+
     this._setState(VoiceTurnState.READY)
     console.log('[VOICE-DEBUG][VoiceTurnManager] activarSesion() llamando a iniciarEscucha()...')
     return this.iniciarEscucha()
@@ -311,6 +343,16 @@ export class VoiceTurnManager {
     this.tts.cancel()
     this.currentSTT.cancel()
     this._setState(VoiceTurnState.IDLE)
+  }
+
+  /**
+   * Detiene inmediatamente la escucha actual y envía el audio/transcripción acumulada (Tap-to-send).
+   */
+  detenerYEnviar() {
+    console.log(`[VOICE-DEBUG][VoiceTurnManager] detenerYEnviar() manual invocado en estado: ${this.state}`)
+    if (this.state === VoiceTurnState.LISTENING || this.state === VoiceTurnState.SPEECH_DETECTED) {
+      this.currentSTT.stop()
+    }
   }
 
   _iniciarWatchdogSTT() {

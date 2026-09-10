@@ -53,6 +53,16 @@ export class SpeechSynthesisProvider {
     this.selectedVoice = this.voices[0] || null
   }
 
+  resume() {
+    if (this.synth) {
+      try {
+        if (this.synth.paused) {
+          this.synth.resume()
+        }
+      } catch {}
+    }
+  }
+
   speak(text) {
     if (!this.synth) {
       if (this.onEnd) this.onEnd()
@@ -62,8 +72,9 @@ export class SpeechSynthesisProvider {
     // Cancelar cualquier audio en reproducción previa
     this.cancel()
 
-    // Limpiar texto para lectura natural (remover asteriscos markdown, corchetes, etc.)
+    // Normalizar precios colombianos y limpiar formato para lectura natural
     const cleanText = text
+      .replace(/\$\s?([0-9]+(?:\.[0-9]+)*)/g, (_, num) => `${num.replace(/\./g, '')} pesos`)
       .replace(/[*_#`~]/g, '')
       .replace(/\[\d+\]/g, '')
       .replace(/\s+/g, ' ')

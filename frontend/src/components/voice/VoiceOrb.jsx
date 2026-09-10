@@ -6,7 +6,7 @@ import { VoiceTurnState } from '../../services/voice/VoiceTurnManager'
  * Construido 100% en CSS3 acelerado por GPU (transform, opacity, radial-gradient).
  * Garantiza >=50 FPS sin long tasks ni recalentamiento en teléfonos Android de 2019.
  */
-export default function VoiceOrb({ state = VoiceTurnState.IDLE, size = 'large' }) {
+export default function VoiceOrb({ state = VoiceTurnState.IDLE, size = 'large', onClick = null }) {
   const isLarge = size === 'large'
   const orbSize = isLarge ? 'w-44 h-44 md:w-56 md:h-56' : 'w-24 h-24'
 
@@ -99,7 +99,11 @@ export default function VoiceOrb({ state = VoiceTurnState.IDLE, size = 'large' }
   return (
     <div className="flex flex-col items-center justify-center select-none py-4">
       {/* Contenedor relativo para capas concéntricas aceleradas por GPU */}
-      <div className={`relative flex items-center justify-center ${orbSize}`}>
+      <div
+        onClick={onClick}
+        className={`relative flex items-center justify-center ${orbSize} ${onClick ? 'cursor-pointer active:scale-95 transition-transform' : ''}`}
+        role={onClick ? 'button' : undefined}
+      >
         {/* Anillo exterior reactivo */}
         <div
           className={`absolute inset-0 rounded-full border-2 ${config.ringColor} transition-all duration-500 will-change-transform ${

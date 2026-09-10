@@ -48,12 +48,12 @@ export function useVoiceAgent() {
     }
   }, [])
 
-  const activarModoVoz = useCallback(async () => {
-    console.log('[VOICE-DEBUG][useVoiceAgent] activarModoVoz disparado por usuario')
+  const activarModoVoz = useCallback(async (saludar = true) => {
+    console.log('[VOICE-DEBUG][useVoiceAgent] activarModoVoz disparado por usuario, saludar:', saludar)
     setTranscript('')
     setErrorMessage(null)
     if (managerRef.current) {
-      await managerRef.current.activarSesion()
+      await managerRef.current.activarSesion(saludar)
     } else {
       console.error('[VOICE-DEBUG][useVoiceAgent] managerRef.current es null al activar')
     }
@@ -65,6 +65,13 @@ export function useVoiceAgent() {
       managerRef.current.detenerSesion()
     }
     setTranscript('')
+  }, [])
+
+  const detenerYEnviar = useCallback(() => {
+    console.log('[VOICE-DEBUG][useVoiceAgent] detenerYEnviar disparado')
+    if (managerRef.current) {
+      managerRef.current.detenerYEnviar()
+    }
   }, [])
 
   const confirmarOperacion = useCallback(async () => {
@@ -95,6 +102,7 @@ export function useVoiceAgent() {
     errorMessage,
     activarModoVoz,
     desactivarModoVoz,
+    detenerYEnviar,
     confirmarOperacion,
     cancelarOperacion,
     seleccionarOpcion,

@@ -15,6 +15,14 @@ export class BackendSTTProvider extends SpeechInputProvider {
     this.audioChunks = []
     this.isRecording = false
     this.mimeType = getSupportedAudioMime() || 'audio/webm'
+
+    // VAD y Temporizadores
+    this.audioContext = null
+    this.analyser = null
+    this.vadInterval = null
+    this.silenceTimer = null
+    this.maxTimer = null
+    this.speechStarted = false
   }
 
   async start() {
@@ -22,7 +30,10 @@ export class BackendSTTProvider extends SpeechInputProvider {
       throw new Error('La grabación de audio no está disponible en este dispositivo.')
     }
 
+    this._limpiarRecursos()
     this.audioChunks = []
+    this.speechStarted = false
+
     try {
       this.audioStream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -43,14 +54,12 @@ export class BackendSTTProvider extends SpeechInputProvider {
 
       this.mediaRecorder.onstart = () => {
         this.isRecording = true
-        if (this.onSpeechStart) {
-          this.onSpeechStart()
-        }
+        this._iniciarVAD()
       }
 
       this.mediaRecorder.onstop = async () => {
         this.isRecording = false
-        this._liberarMicrofono()
+        this._limpiarRecursos()
 
         if (this.audioChunks.length === 0) {
           if (this.onEnd) this.onEnd()
@@ -66,6 +75,7 @@ export class BackendSTTProvider extends SpeechInputProvider {
             this.onTranscript(transcript, true)
           }
         } catch (err) {
+          console.error('[BackendSTTProvider] Error en transcripción:', err)
           if (this.onError) {
             this.onError({
               code: 'backend-stt-error',
@@ -77,9 +87,17 @@ export class BackendSTTProvider extends SpeechInputProvider {
         }
       }
 
-      this.mediaRecorder.start()
+      // Iniciar captura con chunks cada 250ms
+      this.mediaRecorder.start(250)
+
+      // Hard cap de seguridad: 8 segundos máximo para no colgarse nunca
+      this.maxTimer = setTimeout(() => {
+        console.info('[BackendSTTProvider] Límite máximo de turno (8s) alcanzado. Deteniendo...')
+        this.stop()
+      }, 8000)
+
     } catch (err) {
-      this._liberarMicrofono()
+      this._limpiarRecursos()
       if (this.onError) {
         this.onError({
           code: err.name === 'NotAllowedError' ? 'not-allowed' : 'mic-init-error',
@@ -89,8 +107,66 @@ export class BackendSTTProvider extends SpeechInputProvider {
     }
   }
 
+  _iniciarVAD() {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext
+      if (!AudioCtx || !this.audioStream) return
+
+      this.audioContext = new AudioCtx()
+      if (this.audioContext.state === 'suspended') {
+        this.audioContext.resume().catch(() => {})
+      }
+
+      const source = this.audioContext.createMediaStreamSource(this.audioStream)
+      this.analyser = this.audioContext.createAnalyser()
+      this.analyser.fftSize = 512
+      source.connect(this.analyser)
+
+      const buffer = new Float32Array(this.analyser.fftSize)
+      const UMBRAL_VOZ = 0.02
+      const TIEMPO_SILENCIO_MS = 1600
+
+      this.vadInterval = setInterval(() => {
+        if (!this.isRecording || !this.analyser) return
+
+        this.analyser.getFloatTimeDomainData(buffer)
+        let sum = 0
+        for (let i = 0; i < buffer.length; i++) {
+          sum += buffer[i] * buffer[i]
+        }
+        const rms = Math.sqrt(sum / buffer.length)
+
+        if (rms > UMBRAL_VOZ) {
+          // Voz detectada
+          if (!this.speechStarted) {
+            this.speechStarted = true
+            console.log('[BackendSTTProvider] VAD: Habla detectada (RMS:', rms.toFixed(4), ')')
+            if (this.onSpeechStart) {
+              this.onSpeechStart()
+            }
+          }
+          // Reiniciar timer de silencio si el tendero continúa hablando
+          if (this.silenceTimer) {
+            clearTimeout(this.silenceTimer)
+            this.silenceTimer = null
+          }
+        } else if (this.speechStarted && !this.silenceTimer) {
+          // El tendero terminó de hablar y se mantiene silencio
+          this.silenceTimer = setTimeout(() => {
+            console.log('[BackendSTTProvider] VAD: Silencio cómodo detectado (1.6s). Deteniendo...')
+            this.stop()
+          }, TIEMPO_SILENCIO_MS)
+        }
+      }, 100)
+
+    } catch (e) {
+      console.warn('[BackendSTTProvider] No se pudo inicializar AnalyserNode VAD, usando timers pasivos:', e)
+    }
+  }
+
   stop() {
-    if (this.mediaRecorder && this.isRecording) {
+    this._limpiarTimers()
+    if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
       try {
         this.mediaRecorder.stop()
       } catch {
@@ -100,20 +176,48 @@ export class BackendSTTProvider extends SpeechInputProvider {
   }
 
   cancel() {
+    this._limpiarTimers()
     this.audioChunks = []
-    if (this.mediaRecorder && this.isRecording) {
+    if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
       try {
         this.mediaRecorder.stop()
       } catch {
         // Ignorar
       }
     }
-    this._liberarMicrofono()
+    this._limpiarRecursos()
   }
 
-  _liberarMicrofono() {
+  _limpiarTimers() {
+    if (this.vadInterval) {
+      clearInterval(this.vadInterval)
+      this.vadInterval = null
+    }
+    if (this.silenceTimer) {
+      clearTimeout(this.silenceTimer)
+      this.silenceTimer = null
+    }
+    if (this.maxTimer) {
+      clearTimeout(this.maxTimer)
+      this.maxTimer = null
+    }
+  }
+
+  _limpiarRecursos() {
+    this._limpiarTimers()
+
+    if (this.audioContext) {
+      try {
+        this.audioContext.close().catch(() => {})
+      } catch {}
+      this.audioContext = null
+      this.analyser = null
+    }
+
     if (this.audioStream) {
-      this.audioStream.getTracks().forEach((track) => track.stop())
+      this.audioStream.getTracks().forEach((track) => {
+        try { track.stop() } catch {}
+      })
       this.audioStream = null
     }
   }
