@@ -3,8 +3,8 @@
  * Diseñado para ser 100% tolerante a fallos en dispositivos Android económicos.
  */
 
-// Cadena de fallback de idiomas para español
-export const SPANISH_LANG_CHAIN = ['es-CO', 'es-419', 'es-ES']
+// Cadena de fallback de idiomas para español (es-ES es el más universal en servidores Google)
+export const SPANISH_LANG_CHAIN = ['es-ES', 'es-419', 'es-CO']
 
 /**
  * Detecta el mejor formato MIME de audio soportado para grabación.

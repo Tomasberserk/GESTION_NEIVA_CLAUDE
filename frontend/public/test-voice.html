@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Mínimo Web Speech API — Gestión Neiva</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 20px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    h1 { font-size: 1.25rem; color: #38bdf8; }
+    p { font-size: 0.875rem; color: #94a3b8; }
+    .btn-group { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    button {
+      padding: 10px 16px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      border-radius: 8px;
+      border: 1px solid #334155;
+      background: #1e293b;
+      color: #f8fafc;
+      cursor: pointer;
+    }
+    button.primary { background: #0284c7; border-color: #38bdf8; }
+    button.danger { background: #be123c; border-color: #f43f5e; }
+    button:active { transform: scale(0.97); }
+    #log {
+      background: #020617;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 12px;
+      height: 350px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 0.75rem;
+      line-height: 1.5;
+    }
+    .entry { margin-bottom: 4px; border-bottom: 1px solid #0f172a; }
+    .highlight { color: #4ade80; font-weight: bold; }
+    .error { color: #f87171; font-weight: bold; }
+    .warn { color: #fbbf24; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Test Diagnóstico Aislado — Web Speech API</h1>
+  <p>Página de 0 dependencias para probar directamente el motor del navegador sin React ni backend.</p>
+
+  <div class="btn-group">
+    <button class="primary" onclick="testLang('es-ES')">🎙️ Probar es-ES (España / Global)</button>
+    <button onclick="testLang('es-419')">🎙️ Probar es-419 (Latinoamérica)</button>
+    <button onclick="testLang('es-CO')">🎙️ Probar es-CO (Colombia)</button>
+    <button class="danger" onclick="stopTest()">⏹️ Detener</button>
+    <button onclick="clearLog()">🗑️ Limpiar</button>
+  </div>
+
+  <div id="log"></div>
+
+  <script>
+    let recognition = null;
+    const logEl = document.getElementById('log');
+
+    function log(msg, cls = '') {
+      const d = new Date();
+      const time = d.toTimeString().split(' ')[0] + '.' + String(d.getMilliseconds()).padStart(3, '0');
+      const div = document.createElement('div');
+      div.className = 'entry ' + cls;
+      div.textContent = `[${time}] ${msg}`;
+      logEl.appendChild(div);
+      logEl.scrollTop = logEl.scrollHeight;
+      console.log(`[TEST-VOICE] ${msg}`);
+    }
+
+    function clearLog() {
+      logEl.innerHTML = '';
+    }
+
+    function testLang(langCode) {
+      if (recognition) {
+        try { recognition.abort(); } catch (e) {}
+      }
+
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRec) {
+        log('❌ Error: Este navegador no soporta SpeechRecognition ni webkitSpeechRecognition.', 'error');
+        return;
+      }
+
+      log(`--- INICIANDO TEST CON lang = "${langCode}" ---`, 'warn');
+      recognition = new SpeechRec();
+      recognition.lang = langCode;
+      recognition.continuous = false;
+      recognition.interimResults = true;
+
+      recognition.onstart = () => log('EVENTO: onstart (micrófono abierto y escuchando)');
+      recognition.onaudiostart = () => log('EVENTO: onaudiostart (hardware capturando audio)');
+      recognition.onsoundstart = () => log('EVENTO: onsoundstart (sonido detectado)');
+      recognition.onspeechstart = () => log('EVENTO: onspeechstart (habla detectada)', 'highlight');
+      recognition.onspeechend = () => log('EVENTO: onspeechend (fin de habla detectado)');
+      recognition.onsoundend = () => log('EVENTO: onsoundend (fin de sonido)');
+      recognition.onaudioend = () => log('EVENTO: onaudioend (captura de audio finalizada)');
+
+      recognition.onresult = (e) => {
+        const last = e.results[e.results.length - 1];
+        const text = last[0]?.transcript || '';
+        const isFinal = last.isFinal;
+        log(`🎉 EVENTO: onresult -> "${text}" [isFinal=${isFinal}]`, 'highlight');
+      };
+
+      recognition.onerror = (e) => {
+        log(`❌ EVENTO: onerror -> code: ${e.error}, message: ${e.message}`, 'error');
+      };
+
+      recognition.onend = () => {
+        log('EVENTO: onend (servicio desconectado / sesión finalizada)');
+      };
+
+      try {
+        recognition.start();
+        log(`recognition.start() ejecutado con éxito. Habla ahora al micrófono...`);
+      } catch (err) {
+        log(`Excepción al llamar start(): ${err.name} - ${err.message}`, 'error');
+      }
+    }
+
+    function stopTest() {
+      if (recognition) {
+        recognition.stop();
+        log('recognition.stop() llamado por el usuario.');
+      }
+    }
+  </script>
+</body>
+</html>

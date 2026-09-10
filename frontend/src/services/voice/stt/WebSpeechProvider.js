@@ -6,7 +6,7 @@ import { SPANISH_LANG_CHAIN } from '../voiceCapabilities'
  * Instrumentado con logs de diagnóstico para rastreo de eventos.
  */
 export class WebSpeechProvider extends SpeechInputProvider {
-  constructor(preferredLang = 'es-CO') {
+  constructor(preferredLang = 'es-ES') {
     super()
     this.preferredLang = preferredLang
     this.recognition = null
@@ -33,7 +33,7 @@ export class WebSpeechProvider extends SpeechInputProvider {
     this.recognition.interimResults = true
     this.recognition.maxAlternatives = 1
 
-    // Seleccionar idioma con fallback de la cadena
+    // Seleccionar idioma con fallback de la cadena (iniciando en es-ES)
     this.recognition.lang = SPANISH_LANG_CHAIN[this.langIndex] || this.preferredLang
     console.log('[VOICE-DEBUG][WebSpeechProvider] recognition configurado con lang:', this.recognition.lang)
 
@@ -67,9 +67,6 @@ export class WebSpeechProvider extends SpeechInputProvider {
     this.recognition.onstart = () => {
       console.log('[VOICE-DEBUG][WebSpeechProvider] EVENTO: onstart (reconocedor activado y escuchando)')
       this.isListening = true
-      if (this.onSpeechStart) {
-        this.onSpeechStart()
-      }
     }
 
     this.recognition.onresult = (event) => {

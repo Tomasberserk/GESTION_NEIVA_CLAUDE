@@ -45,6 +45,7 @@ export class VoiceTurnManager {
     this.speechEndTimer = null
     this.settlingTimer = null
     this.operationalTimer = null
+    this.watchdogTimer = null
 
     this._bindProviders()
     console.log('[VOICE-DEBUG][VoiceTurnManager] Instanciación completa. Estado inicial:', this.state)
@@ -204,6 +205,7 @@ export class VoiceTurnManager {
     this._limpiarTimers()
     this.interimTranscript = ''
     this._setState(VoiceTurnState.LISTENING)
+    this._iniciarWatchdogSTT()
 
     try {
       console.log('[VOICE-DEBUG][VoiceTurnManager] Invocando this.currentSTT.start()...')
@@ -311,6 +313,26 @@ export class VoiceTurnManager {
     this._setState(VoiceTurnState.IDLE)
   }
 
+  _iniciarWatchdogSTT() {
+    if (this.watchdogTimer) {
+      clearTimeout(this.watchdogTimer)
+    }
+    console.log('[VOICE-DEBUG][VoiceTurnManager] Programando watchdog STT de seguridad (9s)...')
+    this.watchdogTimer = setTimeout(() => {
+      if (this.state === VoiceTurnState.LISTENING || this.state === VoiceTurnState.SPEECH_DETECTED) {
+        console.warn(`[VOICE-DEBUG][VoiceTurnManager] Watchdog STT expiró (9s sin respuesta). Estado actual: ${this.state}`)
+        this.currentSTT.stop()
+        if (this.interimTranscript && this.interimTranscript.trim()) {
+          console.log('[VOICE-DEBUG][VoiceTurnManager] Watchdog finalizando con interimTranscript existente:', this.interimTranscript)
+          this._finalizarTurnoVocal(this.interimTranscript)
+        } else {
+          console.warn('[VOICE-DEBUG][VoiceTurnManager] Watchdog reiniciando estado a READY')
+          this._setState(VoiceTurnState.READY)
+        }
+      }
+    }, 9000)
+  }
+
   _limpiarTimers() {
     if (this.speechEndTimer) {
       clearTimeout(this.speechEndTimer)
@@ -323,6 +345,10 @@ export class VoiceTurnManager {
     if (this.operationalTimer) {
       clearTimeout(this.operationalTimer)
       this.operationalTimer = null
+    }
+    if (this.watchdogTimer) {
+      clearTimeout(this.watchdogTimer)
+      this.watchdogTimer = null
     }
   }
 }
