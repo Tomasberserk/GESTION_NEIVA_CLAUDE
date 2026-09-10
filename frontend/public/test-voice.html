@@ -54,6 +54,7 @@
     <button class="primary" onclick="testLang('es-ES')">🎙️ Probar es-ES (España / Global)</button>
     <button onclick="testLang('es-419')">🎙️ Probar es-419 (Latinoamérica)</button>
     <button onclick="testLang('es-CO')">🎙️ Probar es-CO (Colombia)</button>
+    <button class="primary" style="background: #059669; border-color: #10b981;" onclick="testMediaRecorder()">🎙️ Probar MediaRecorder (Hardware Directo)</button>
     <button class="danger" onclick="stopTest()">⏹️ Detener</button>
     <button onclick="clearLog()">🗑️ Limpiar</button>
   </div>
@@ -129,8 +130,83 @@
 
     function stopTest() {
       if (recognition) {
-        recognition.stop();
+        try { recognition.stop(); } catch(e) {}
         log('recognition.stop() llamado por el usuario.');
+      }
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        try { mediaRecorder.stop(); } catch(e) {}
+        log('mediaRecorder.stop() llamado.');
+      }
+    }
+
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let audioStream = null;
+
+    async function testMediaRecorder() {
+      stopTest();
+      log('--- INICIANDO TEST DE HARDWARE DIRECTO (MediaRecorder) ---', 'warn');
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        log('❌ Error: navigator.mediaDevices.getUserMedia no soportado en este navegador.', 'error');
+        return;
+      }
+
+      try {
+        log('Solicitando acceso físico al micrófono (getUserMedia)...');
+        audioStream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true }
+        });
+        log('🎤 Micrófono físico capturado exitosamente por el hardware.', 'highlight');
+
+        const mimeTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'];
+        let supportedMime = mimeTypes.find(m => MediaRecorder.isTypeSupported(m)) || '';
+        log(`MIME soportado detectado: "${supportedMime || 'default'}"`);
+
+        recordedChunks = [];
+        mediaRecorder = new MediaRecorder(audioStream, supportedMime ? { mimeType: supportedMime } : {});
+
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) {
+            recordedChunks.push(e.data);
+            log(`📦 Chunk recibido: ${e.data.size} bytes`, 'highlight');
+          }
+        };
+
+        mediaRecorder.onstart = () => {
+          log('🔴 MediaRecorder INICIADO: Habla al micrófono durante 3 segundos...', 'highlight');
+        };
+
+        mediaRecorder.onstop = () => {
+          log('⏹️ MediaRecorder DETENIDO. Procesando audio capturado...');
+          if (audioStream) {
+            audioStream.getTracks().forEach(t => t.stop());
+          }
+          const blob = new Blob(recordedChunks, { type: supportedMime || 'audio/webm' });
+          log(`✅ ÉXITO TOTAL: Audio capturado en hardware: ${blob.size} bytes (${blob.type})`, 'highlight');
+          
+          // Reproducir para confirmar que se escucha perfecto
+          const audioUrl = URL.createObjectURL(blob);
+          const audio = new Audio(audioUrl);
+          audio.play().then(() => {
+            log('🔊 Reproduciendo tu voz grabada en el altavoz...', 'highlight');
+          }).catch(err => {
+            log('Audio listo pero autoplay bloqueado: haz clic para reproducir.');
+          });
+        };
+
+        mediaRecorder.start(500); // chunks cada 500ms
+
+        // Detener automáticamente a los 3.5 segundos
+        setTimeout(() => {
+          if (mediaRecorder && mediaRecorder.state === 'recording') {
+            log('Tiempo cumplido (3.5s). Deteniendo grabación...');
+            mediaRecorder.stop();
+          }
+        }, 3500);
+
+      } catch (err) {
+        log(`❌ Error al acceder al micrófono físico: ${err.name} - ${err.message}`, 'error');
       }
     }
   </script>
