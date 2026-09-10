@@ -1,5 +1,6 @@
 import os
 import uuid as uuid_lib
+from decimal import Decimal
 from uuid import UUID
 
 from fastapi import HTTPException, UploadFile, status
@@ -54,7 +55,7 @@ def _validar_codigo_barras_unico(
 # CRUD
 # ---------------------------------------------------------------------------
 
-def crear_producto(data: ProductoCrear, db: Session) -> models.Producto:
+def crear_producto(data: ProductoCrear, db: Session, commit: bool = True) -> models.Producto:
     # pre-check: empresa existe
     if not db.query(models.Empresa).filter(
         models.Empresa.id == data.empresa_id,
@@ -81,8 +82,45 @@ def crear_producto(data: ProductoCrear, db: Session) -> models.Producto:
         is_active=True,
     )
     db.add(producto)
-    db.commit()
-    db.refresh(producto)
+    if commit:
+        db.commit()
+        db.refresh(producto)
+    else:
+        db.flush()
+    return producto
+
+
+def reabastecer_producto(
+    producto_id: UUID,
+    empresa_id: UUID,
+    cantidad: float | Decimal,
+    db: Session,
+    commit: bool = True,
+) -> models.Producto:
+    """Incrementa el stock de un producto existente con lock pesimista."""
+    from decimal import Decimal
+    producto = (
+        db.query(models.Producto)
+        .filter(
+            models.Producto.id == producto_id,
+            models.Producto.empresa_id == empresa_id,
+            models.Producto.is_active.is_(True),
+        )
+        .with_for_update()
+        .first()
+    )
+    if not producto:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Producto no encontrado en esta empresa",
+        )
+
+    producto.cantidad_actual += Decimal(str(cantidad))
+    if commit:
+        db.commit()
+        db.refresh(producto)
+    else:
+        db.flush()
     return producto
 
 

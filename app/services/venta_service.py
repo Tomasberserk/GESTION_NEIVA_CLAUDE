@@ -15,6 +15,7 @@ def registrar_venta(
     data: VentaCrear,
     current_user: models.Usuario,
     db: Session,
+    commit: bool = True,
 ) -> VentaResumen:
     """
     Registra una venta completa en una transacción ACID.
@@ -30,7 +31,7 @@ def registrar_venta(
         )
 
     # 2. Crear el documento maestro de venta con total provisional = 0
-    nueva_venta = models.Venta(empresa_id=empresa_id, total=Decimal("0.00"))
+    nueva_venta = models.Venta(empresa_id=empresa_id, total=Decimal("0.00"), is_active=True)
     db.add(nueva_venta)
     # flush: escribe en la transacción activa sin hacer commit,
     # para obtener el UUID asignado por PostgreSQL
@@ -98,8 +99,11 @@ def registrar_venta(
         # 4. Actualizar el total en el documento maestro
         nueva_venta.total = total_venta
 
-        # 5. COMMIT: persiste todos los cambios (venta + detalles + stocks)
-        db.commit()
+        # 5. COMMIT o FLUSH según si el llamador controla la transacción externa
+        if commit:
+            db.commit()
+        else:
+            db.flush()
 
     except HTTPException:
         # Rollback explícito: deshace el flush y todos los cambios en la sesión

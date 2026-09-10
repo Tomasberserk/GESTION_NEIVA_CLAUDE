@@ -102,7 +102,7 @@ class AuditMixin:
         onupdate=func.now(),
         nullable=False,
     )
-    is_active = Column(Boolean, server_default="true", nullable=False)
+    is_active = Column(Boolean, default=True, server_default="true", nullable=False)
 
 
 # ---------------------------------------------------------------------------
@@ -129,6 +129,7 @@ class Empresa(AuditMixin, Base):
     proveedores       = relationship("Proveedor",      back_populates="empresa", cascade="all, delete-orphan")
     compras           = relationship("Compra",         back_populates="empresa", cascade="all, delete-orphan")
     cuentas_por_pagar = relationship("CuentaPorPagar", back_populates="empresa", cascade="all, delete-orphan")
+    agent_commands    = relationship("AgentCommand",    back_populates="empresa", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Empresa {self.nombre_comercial!r}>"
@@ -473,3 +474,30 @@ class AbonoCuentaPorPagar(AuditMixin, Base):
 
     def __repr__(self) -> str:
         return f"<Abono id={self.id} monto={self.monto}>"
+
+
+class AgentCommand(AuditMixin, Base):
+    __tablename__ = "agent_commands"
+
+    id              = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    empresa_id      = Column(UUID(as_uuid=True), ForeignKey("empresas.id", ondelete="CASCADE"), nullable=False)
+    conversation_id = Column(String(100), nullable=False)
+    command_id      = Column(String(100), nullable=False)
+    action          = Column(String(50), nullable=False)
+    payload         = Column(Text, nullable=True)  # JSON string
+    status          = Column(String(30), nullable=False, default="PENDIENTE")  # PENDIENTE, EJECUTADO, RECHAZADO, INVALIDADO
+    result          = Column(Text, nullable=True)   # JSON string
+    executed_at     = Column(DateTime(timezone=True), nullable=True)
+
+    empresa = relationship("Empresa", back_populates="agent_commands")
+
+    __table_args__ = (
+        UniqueConstraint("empresa_id", "command_id", name="uq_empresa_command_id"),
+        Index("idx_agent_commands_empresa", "empresa_id"),
+        Index("idx_agent_commands_command", "command_id"),
+        Index("idx_agent_commands_conversation", "conversation_id"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<AgentCommand {self.command_id} [{self.status}]>"
+

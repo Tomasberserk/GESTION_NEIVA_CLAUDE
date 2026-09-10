@@ -35,3 +35,12 @@ htmlcov/
 *.egg-info/
 build/
 *.whl
+
+# Binaries & Media
+*.exe
+*.mp4
+*.zip
+*.db
+graphify-out/
+scratch/
+frontend/dist/

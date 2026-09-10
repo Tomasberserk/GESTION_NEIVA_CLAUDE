@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Header from './Header'
 import CartSidebar from '../CartSidebar'
+import AgentWidget from '../AgentWidget'
 
 export default function Layout() {
   const [menuAbierto, setMenuAbierto] = useState(false)
@@ -22,6 +23,7 @@ export default function Layout() {
       </div>
 
       <CartSidebar />
+      <AgentWidget />
     </div>
   )
 }

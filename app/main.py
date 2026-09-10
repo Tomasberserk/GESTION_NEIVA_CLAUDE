@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.routers import auth, dashboard, empresas, productos, reportes, ventas, superadmin, soporte, proveedores, compras, cuentas_por_pagar, whatsapp_webhook
+from app.routers import auth, dashboard, empresas, productos, reportes, ventas, superadmin, soporte, proveedores, compras, cuentas_por_pagar, whatsapp_webhook, agente
 from app.routers.cuentas_por_pagar import abonos_router
 from app.core.security_middleware import SecurityHeadersMiddleware
 
@@ -76,6 +76,8 @@ app.include_router(compras.router)
 app.include_router(cuentas_por_pagar.router)
 app.include_router(abonos_router)
 app.include_router(whatsapp_webhook.router)
+app.include_router(agente.router)
+app.include_router(agente.router, prefix="/api")
 
 # ---------------------------------------------------------------------------
 # Exception handlers globales

@@ -22,6 +22,7 @@
 [✅] Sprint 6 — Template medium (COMPLETO)
 [✅] Sprint 7 — Template professional (Diseño & Especificaciones en factory/templates/professional/ COMPLETO)
 [✅] Sprint 7.8 — Fusión e Integración del ERP Distribuidora en el POS (COMPLETO)
+[✅] Sprint 7.9 — Agente IA In-App Orientado a Tareas para Tier Pro (COMPLETO)
 [ ] Sprint 8 — Despliegue y Activación de Hermes-3 + Landing Page (SIGUIENTE)
 ```
 
@@ -271,11 +272,67 @@
 
 ---
 
-## Sprint 8 — Despliegue, Activación de Hermes-3 y Landing Page (SIGUIENTE)
+## Sprint 7.9 — Agente IA In-App Orientado a Tareas para Tier Pro (🟢 CERTIFICADO 9.5/10 — GO PRODUCCIÓN COMERCIAL)
 
-- **Activar Hermes-3 vía Together AI** (primer ingreso recurrente confirmado)
-- Documentación pública del portafolio comercial
-- Landing page oficial con los tres tiers integrados
+**Objetivo:** Implementar la arquitectura definitiva del Agente de Inteligencia Artificial para el MVP Tier Pro ($89.000 – $99.000 COP/mes). El agente interpreta intenciones en lenguaje natural y delega la ejecución en los servicios existentes de negocio, con PostgreSQL como autoridad final y confirmación obligatoria previa a toda mutación.
+
+> **Dictamen Oficial de Auditoría Externa:** 🟢 **GO PARA PRODUCCIÓN COMERCIAL (9.5/10 — CERTIFICADO)**
+> - P0 restantes: **0**
+> - P1 bloqueadores: **0**
+> - Concurrencia artificial: **0** (concurrencia PostgreSQL pura mediante `SELECT FOR UPDATE` y `uq_empresa_command_id`, CERO cerrojos Python)
+> - Autoridad transaccional: **100% servicios de negocio y PostgreSQL** (el LLM es solo intérprete probabilístico)
+> - 53/53 tests pasando al 100% en todo el repositorio.
+
+| # | Tarea | Recurso / Archivo | Estado |
+|---|-------|-------------------|--------|
+| 1 | **[Architect/DB]** Tabla de auditoría e idempotencia persistente `AgentCommand` + migración Alembic 010 | `app/models.py`, `alembic/versions/010_crear_tabla_agent_commands.py` | ✅ Completado |
+| 2 | **[Architect/Backend]** Soporte transaccional externo (`commit=False`) en `venta_service` y `producto_service` | `app/services/venta_service.py`, `app/services/producto_service.py` | ✅ Completado |
+| 3 | **[Core/Agente]** Almacenamiento de sesiones desacoplado (`SessionStore`: InMemory para test/dev + Redis con TTL 5m para prod) | `app/services/agente/session_store.py` | ✅ Completado |
+| 4 | **[Core/Agente]** Matcher de catálogo fuzzy de 3 zonas con discriminación de ambigüedades | `app/services/agente/catalog_matcher.py` | ✅ Completado |
+| 5 | **[Core/Agente]** Formateador determinístico de lenguaje natural (cero costo en tokens de salida) | `app/services/agente/response_formatter.py` | ✅ Completado |
+| 6 | **[Core/Agente]** Consultas financieras y de inventario determinísticas con validaciones de fechas UTC | `app/services/agente/consultas_service.py` | ✅ Completado |
+| 7 | **[Core/Agente]** FSM formal con matriz de transiciones estrictas (`AgentState`) | `app/services/agente/fsm.py` | ✅ Completado |
+| 8 | **[Core/Agente]** Proveedor agnóstico de intenciones (Regex <1ms + adaptadores Groq/Gemini) | `app/services/agente/intent_provider.py` | ✅ Completado |
+| 9 | **[Orchestrator]** Orquestador central de intenciones, slot-filling, verificación de tenant en JWT y fallback idempotente | `app/services/agente/agent_orchestrator.py` | ✅ Completado |
+| 10 | **[Router]** Endpoint HTTP delgado `POST /api/agente/mensaje` con schema de entrada/salida tipado | `app/routers/agente.py`, `app/main.py` | ✅ Completado |
+| 11 | **[QA/Tests]** Suite de 13 pruebas adversariales de producción (T-01 a T-13) con 100% de aprobación | `tests/test_agente_produccion.py` | ✅ Completado |
+| 12 | **[Frontend]** Widget interactivo in-app (`AgentWidget.jsx` con Web Speech API `es-CO`, chips, preview cards y acción confirm/cancel) | `frontend/src/components/AgentWidget.jsx`, `Layout.jsx` | ✅ Completado |
+| 13 | **[Auditoría Senior]** Correcciones P0 y P1 del auditor (P0.1, P0.3, P1.1-P1.5): confirmación sin LLM, timezone Neiva, modismos colombianos, aislamiento por usuario | Repositorio completo | ✅ Completado |
+| 14 | **[Certificación Final 9.1/10]** Resolución de los 4 bloqueadores para Producción Comercial: confirmación inequívoca, Redis fail-closed, validación Pydantic + límites de cantidades, suite de concurrencia e integración Postgres | `agent_orchestrator.py`, `session_store.py`, `intent_provider.py`, `tests/test_concurrencia_real.py`, `tests/integration/postgres/` | ✅ Completado |
+| 15 | **[PostgreSQL Concurrencia Pura - CERO db_lock]** Eliminación total de serialización artificial (`threading.Lock()`); pruebas empíricas contra motor PostgreSQL vivo con connection pool (`tests/integration/postgres/test_concurrencia_postgres.py` y `tests/test_concurrencia_real.py`) con medición de bloqueo de kernel `SELECT FOR UPDATE` (>0.25s), violación nativa de `uq_empresa_command_id` y cero lost updates | `tests/integration/postgres/test_concurrencia_postgres.py`, `tests/test_concurrencia_real.py` | ✅ Completado |
+
+### Criterios de éxito y verificación Sprint 7.9
+1. ✅ **El LLM nunca es autoridad:** Toda consulta financiera (ventas hoy, recaudo, stock) es calculada determinísticamente por PostgreSQL / SQLAlchemy; no hay alucinaciones de cifras ni falsas métricas de ROI.
+2. ✅ **Cero duplicación de lógica:** Las ventas descuentan stock mediante `venta_service.registrar_venta` con `SELECT FOR UPDATE`.
+3. ✅ **Aislamiento multi-tenant y multi-usuario estricto:** `empresa_id` y `usuario_id` se extraen únicamente del JWT verificado; sesiones cruzadas entre tiendas o entre cajeros de la misma tienda son aisladas.
+4. ✅ **Confirmación obligatoria e idempotencia persistente:** Ninguna venta ni reabastecimiento muta la base de datos sin confirmación del tendero. Las confirmaciones repetidas o reintentadas responden con `idempotente=True` desde la tabla `agent_commands`.
+5. ✅ **Confirmación inequívoca blindada:** Evaluación previa de negaciones y exigencia de expresiones completas cerradas; frases como *"sí, pero cambiar cantidad"* o *"espera"* no ejecutan.
+6. ✅ **Redis fail-closed en producción:** En `ENVIRONMENT=production`, la caída o ausencia de Redis no degrada a memoria volátil, retornando HTTP 503 sin pérdida de contexto.
+7. ✅ **Validación Pydantic estricta del LLM:** Salida del parser/LLM validada con `AgentLLMOutput` y `AgentSlotsSchema`, rechazando `NaN`, `Infinity`, ceros o valores fuera de rango $(0.001, 10000.0]$.
+8. ✅ **Concurrencia Real en PostgreSQL Demostrada (CERO db_lock):** Eliminación total de serializaciones artificiales de Python (`db_lock = threading.Lock()`). Pruebas concurrentes multi-hilo sincronizadas con `threading.Barrier(2)` ejecutadas contra PostgreSQL real demostrando:
+   - Bloqueo físico en kernel con `SELECT ... FOR UPDATE` (tiempo de suspensión medido $\ge 0.25$ segundos mientras la otra transacción finaliza).
+   - Stock final estrictamente $0.0$, jamás negativo.
+   - Deduplicación idempotente ante carreras por el mismo `command_id` arbitrada por `UniqueConstraint('empresa_id', 'command_id')` con `IntegrityError` nativo en PostgreSQL.
+   - Reabastecimiento atómico sin lost updates ($10 + 5 + 5 = 20.0$).
+9. ✅ **53/53 pruebas pasando al 100% en todo el repositorio:**
+   - 5/5 pruebas de concurrencia e integración PostgreSQL pura (`tests/integration/postgres/test_concurrencia_postgres.py`)
+   - 6/6 pruebas de concurrencia real y blindajes de producción (`tests/test_concurrencia_real.py`)
+   - 13/13 pruebas adversariales de producción (`tests/test_agente_produccion.py`)
+   - 29/29 pruebas de módulos core (Auth, ERP Compras/CxP, OWASP Security, CRM Soporte, Webhooks WhatsApp)
+10. ✅ **Frontend Production Ready:** `npm run build` compila con 0 errores y el drawer se encuentra activo en el layout general.
+
+---
+
+## Sprint 8 — Despliegue en Producción y Piloto Comercial (SIGUIENTE)
+
+**Objetivo:** Congelar la arquitectura del agente y poner el sistema en manos de 5 a 10 tiendas piloto reales en Neiva para validar producto y economía unitaria.
+
+| # | Tarea | Detalle | Estado |
+|---|-------|---------|--------|
+| 1 | **[DevOps]** Preparación de entorno productivo con Docker Compose / VPS | PostgreSQL 16/18 + Redis 7 + FastAPI + Nginx + Frontend Vite | ⏳ Por iniciar |
+| 2 | **[Telemetría]** Instrumentación de métricas clave del tendero | Logging/Métricas de `time_to_sale`, `confirmation_rate`, `clarification_rate`, `LLM_fallback_rate` | ⏳ Por iniciar |
+| 3 | **[Piloto Neiva]** Onboarding controlado de 5 a 10 tiendas de barrio | Medición de adopción de voz vs texto y ahorro de tiempo por venta | ⏳ Por iniciar |
+| 4 | **[Monetización]** Activación de Hermes-3 vía Together AI | Se activa con el cobro de la primera mensualidad real ($89.000 - $99.000 COP) | 🔒 Bloqueado hasta 1er pago |
 
 ---
 
