@@ -470,3 +470,82 @@ def test_t13_aislamiento_entre_usuarios(client):
     # Debe rechazar el secuestro de sesión y no ejecutar
     assert r2.json()["estado"] == "IDLE"
     assert "no tienes ninguna operación pendiente" in r2.json()["respuesta"].lower()
+
+
+# ---------------------------------------------------------------------------
+# T-14: Resolución inmediata de ambigüedad/clarificación (sin loop infinito)
+# ---------------------------------------------------------------------------
+
+def test_t14_resolucion_bucle_clarificacion(client):
+    headers, empresa_id = _registrar_tienda(client, "t14")
+    # Creamos dos productos que puedan disparar ambigüedad al buscar "aceite"
+    p1 = _crear_producto(client, headers, empresa_id, "Aceite Gourmet 1L", 10000, 14000, 20, "BAR-ACEITE-G14")
+    p2 = _crear_producto(client, headers, empresa_id, "Arroz Diana 500g", 3000, 4500, 30, "BAR-ARROZ-D14")
+
+    # 1. Mensaje inicial ambiguo: "ey bro, hoy vendi dos aceites"
+    r1 = client.post(
+        "/api/agente/mensaje",
+        headers=headers,
+        json={"mensaje": "ey bro, hoy vendi dos aceites"},
+    )
+    assert r1.status_code == 200
+    d1 = r1.json()
+    assert d1["estado"] == "NEEDS_CLARIFICATION"
+    assert "clarification" in d1
+    conv_id = d1["conversation_id"]
+    options = d1["clarification"]["options"]
+    assert len(options) >= 2
+
+    # 2. El usuario responde seleccionando la opción 1: "1" o "[1]" o el nombre
+    r2 = client.post(
+        "/api/agente/mensaje",
+        headers=headers,
+        json={"mensaje": "1", "conversation_id": conv_id},
+    )
+    assert r2.status_code == 200
+    d2 = r2.json()
+
+    # Ya NO debe quedarse en NEEDS_CLARIFICATION; debe pasar a READY_TO_CONFIRM
+    assert d2["estado"] == "READY_TO_CONFIRM", f"Estado inesperado: {d2['estado']}, respuesta: {d2.get('respuesta')}"
+    assert "aceite gourmet" in d2["respuesta"].lower()
+    assert "14.000" in d2["respuesta"] or "28.000" in d2["respuesta"]
+    assert d2.get("command_id") is not None
+
+    # 3. El usuario confirma
+    r3 = client.post(
+        "/api/agente/mensaje",
+        headers=headers,
+        json={"mensaje": "sí, dale", "conversation_id": conv_id},
+    )
+    assert r3.status_code == 200
+    assert r3.json()["estado"] == "EXECUTED"
+
+
+def test_t14_resolucion_bucle_clarificacion_por_texto_boton(client):
+    headers, empresa_id = _registrar_tienda(client, "t14b")
+    p1 = _crear_producto(client, headers, empresa_id, "Aceite Gourmet 1L", 10000, 14000, 20, "BAR-ACEITE-GB14")
+    p2 = _crear_producto(client, headers, empresa_id, "Arroz Diana 500g", 3000, 4500, 30, "BAR-ARROZ-DB14")
+
+    # 1. Pide clarificación
+    r1 = client.post(
+        "/api/agente/mensaje",
+        headers=headers,
+        json={"mensaje": "hoy vendí 2 aceites"},
+    )
+    assert r1.status_code == 200
+    d1 = r1.json()
+    assert d1["estado"] == "NEEDS_CLARIFICATION"
+    conv_id = d1["conversation_id"]
+
+    # 2. El usuario hace click en el botón, enviando el texto del botón: "Aceite Gourmet 1L ($14.000)"
+    label = d1["clarification"]["options"][0]["label"]
+    r2 = client.post(
+        "/api/agente/mensaje",
+        headers=headers,
+        json={"mensaje": label, "conversation_id": conv_id},
+    )
+    assert r2.status_code == 200
+    d2 = r2.json()
+    assert d2["estado"] == "READY_TO_CONFIRM"
+    assert "aceite gourmet" in d2["respuesta"].lower()
+    assert d2.get("command_id") is not None

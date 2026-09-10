@@ -234,8 +234,19 @@ def quick_parse_intent(text: str) -> AgentInterpretation | None:
         if prod_q:
             return AgentInterpretation(intent="consultar_stock", slots={"product_query": prod_q}, confidence=0.90, raw_text=text)
 
-    # 7. Venta explícita sencilla (ej: "vendí 2 coca colas")
-    m_venta = re.search(r"(?:vendi|vendí|venta de)\s+(\d+(?:\.\d+)?)\s+(?:de\s+)?([\w\s\.\-_]+)", t)
+    # Normalización de números escritos en palabras comunes (ej: "dos" -> "2")
+    NUMEROS_TEXTO = {
+        "un": "1", "uno": "1", "una": "1",
+        "dos": "2", "tres": "3", "cuatro": "4", "cinco": "5",
+        "seis": "6", "siete": "7", "ocho": "8", "nueve": "9", "diez": "10",
+        "once": "11", "doce": "12", "quince": "15", "veinte": "20",
+    }
+    t_num = t
+    for word_num, digit_val in NUMEROS_TEXTO.items():
+        t_num = re.sub(rf"\b{word_num}\b", digit_val, t_num)
+
+    # 7. Venta explícita sencilla (ej: "vendí 2 coca colas", "hoy vendi dos aceites")
+    m_venta = re.search(r"(?:vendi|vendí|venta de|facturé|facture)\s+(\d+(?:\.\d+)?)\s+(?:de\s+)?([\w\s\.\-_]+)", t_num)
     if m_venta:
         qty = float(m_venta.group(1))
         prod_q = m_venta.group(2).strip()
@@ -247,7 +258,7 @@ def quick_parse_intent(text: str) -> AgentInterpretation | None:
         )
 
     # 8. Reabastecimiento explícito sencillo (ej: "llegaron 5 aceites diana", "compré 10 cervezas")
-    m_reab = re.search(r"(?:llegaron|llegó|llego|compre|compré|recibí|recibi|entran|entraron)\s+(\d+(?:\.\d+)?)\s+(?:de\s+)?([\w\s\.\-_]+)", t)
+    m_reab = re.search(r"(?:llegaron|llegó|llego|compre|compré|recibí|recibi|entran|entraron)\s+(\d+(?:\.\d+)?)\s+(?:de\s+)?([\w\s\.\-_]+)", t_num)
     if m_reab:
         qty = float(m_reab.group(1))
         prod_q = m_reab.group(2).strip()

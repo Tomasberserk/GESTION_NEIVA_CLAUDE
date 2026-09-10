@@ -196,7 +196,8 @@ class AgentOrchestrator:
 
         # 3.7. Operaciones de escritura (registrar_venta, reabastecer, crear_producto)
         if interp.intent in ["registrar_venta", "reabastecer", "crear_producto"] or estado_actual == AgentState.NEEDS_CLARIFICATION.value:
-            return await self._procesar_escritura(interp, session, conv_id, current_user, db)
+            return await self._procesar_escritura(interp, session, conv_id, current_user, db, mensaje=mensaje)
+
 
         # 3.8. Desconocido / No entendido
         return {
@@ -302,6 +303,7 @@ class AgentOrchestrator:
         conv_id: str,
         current_user: models.Usuario,
         db: Session,
+        mensaje: str = "",
     ) -> dict[str, Any]:
         empresa_id = current_user.empresa_id
         action = interp.intent if interp.intent in ["registrar_venta", "reabastecer", "crear_producto"] else (session.get("action") if session else "registrar_venta")
@@ -391,17 +393,69 @@ class AgentOrchestrator:
         query = slots.get("product_query")
         producto_id = slots.get("producto_id")
 
-        # Resolver producto si no está resuelto
+        # Resolver producto si ya está resuelto en slots
         producto_seleccionado = None
         if producto_id:
             producto_seleccionado = db.query(models.Producto).filter(
-                models.Producto.id == UUID(producto_id),
+                models.Producto.id == UUID(str(producto_id)),
                 models.Producto.empresa_id == empresa_id,
                 models.Producto.is_active.is_(True),
             ).first()
 
+        # Si la sesión anterior estaba en NEEDS_CLARIFICATION y el usuario responde a la aclaración:
+        clar_opts = session.get("clarification_options", {}) if session else {}
+        if not producto_seleccionado and clar_opts and mensaje:
+            msg_clean = re.sub(r"[\[\]]", " ", mensaje.strip().lower())
+
+            # A. ¿Envió número de opción? (ej: "1", "[1]", "opción 1", "primera")
+            m_num = re.search(r"\b([1-9]\d?)\b", msg_clean)
+            if m_num:
+                idx = int(m_num.group(1))
+                keys = list(clar_opts.keys())
+                if 1 <= idx <= len(keys):
+                    producto_id = keys[idx - 1]
+
+            # B. ¿Envió UUID exacto?
+            if not producto_id:
+                for k in clar_opts.keys():
+                    if msg_clean == str(k).lower():
+                        producto_id = k
+                        break
+
+            # C. ¿El mensaje coincide con alguna de las opciones presentadas?
+            if not producto_id:
+                for k, label in clar_opts.items():
+                    label_clean = label.lower().split("(")[0].strip()
+                    if msg_clean in label.lower() or label_clean in msg_clean:
+                        producto_id = k
+                        break
+
+            if producto_id:
+                producto_seleccionado = db.query(models.Producto).filter(
+                    models.Producto.id == UUID(str(producto_id)),
+                    models.Producto.empresa_id == empresa_id,
+                    models.Producto.is_active.is_(True),
+                ).first()
+                if producto_seleccionado:
+                    slots["producto_id"] = str(producto_seleccionado.id)
+                    slots["product_query"] = producto_seleccionado.nombre
+
+        # Si aún no está seleccionado y el usuario envió un mensaje durante aclaración,
+        # verificar si el mensaje coincide directamente con un producto del catálogo
+        if not producto_seleccionado and mensaje and session and session.get("estado") == AgentState.NEEDS_CLARIFICATION.value:
+            prods_tienda = db.query(models.Producto).filter(
+                models.Producto.empresa_id == empresa_id,
+                models.Producto.is_active.is_(True),
+            ).all()
+            m_stat, m_prod = match_producto(mensaje, prods_tienda)
+            if m_stat == MATCH_AUTO_RESOLVED:
+                producto_seleccionado = m_prod
+                slots["producto_id"] = str(producto_seleccionado.id)
+                slots["product_query"] = producto_seleccionado.nombre
+
         if not producto_seleccionado:
-            if not query:
+            q_buscar = slots.get("product_query") or mensaje
+            if not q_buscar:
                 validate_transition(session.get("estado", AgentState.IDLE.value) if session else AgentState.IDLE.value, AgentState.NEEDS_CLARIFICATION)
                 await self.session_store.save(conv_id, {
                     "conversation_id": conv_id,
@@ -423,13 +477,13 @@ class AgentOrchestrator:
                 models.Producto.is_active.is_(True),
             ).all()
 
-            match_status, match_data = match_producto(query, productos)
+            match_status, match_data = match_producto(q_buscar, productos)
 
             if match_status == MATCH_NOT_FOUND:
                 return {
                     "conversation_id": conv_id,
                     "estado": AgentState.IDLE.value,
-                    "respuesta": f"No encontré el producto '{query}' en tu catálogo.",
+                    "respuesta": f"No encontré el producto '{q_buscar}' en tu catálogo.",
                 }
             elif match_status == MATCH_NEEDS_CLARIFICATION:
                 clar_id = f"clar_{uuid.uuid4().hex[:6]}"
@@ -453,12 +507,13 @@ class AgentOrchestrator:
                 return {
                     "conversation_id": conv_id,
                     "estado": AgentState.NEEDS_CLARIFICATION.value,
-                    "respuesta": f"Encontré varias opciones para '{query}': {labels}. ¿Cuál deseas?",
+                    "respuesta": f"Encontré varias opciones para '{q_buscar}': {labels}. ¿Cuál deseas?",
                     "clarification": {"clarification_id": clar_id, "options": options},
                 }
             else:
                 producto_seleccionado = match_data
                 slots["producto_id"] = str(producto_seleccionado.id)
+                slots["product_query"] = producto_seleccionado.nombre
 
         # Validar cantidad con límites de producción (0.001 <= cantidad <= 10000.0)
         cantidad_valida = False
@@ -472,6 +527,20 @@ class AgentOrchestrator:
                     cantidad_valida = True
         except (ValueError, TypeError):
             cantidad_valida = False
+
+        # Si falta cantidad y el usuario acaba de responder con un número
+        if not cantidad_valida and mensaje:
+            m_qty = re.search(r"\b(\d+(?:\.\d+)?)\b", mensaje.strip())
+            if m_qty:
+                try:
+                    val_num = float(m_qty.group(1))
+                    if 0.001 <= val_num <= 10000.0:
+                        cantidad = val_num
+                        cantidad_valida = True
+                        slots["quantity"] = cantidad
+                except (ValueError, TypeError):
+                    pass
+
 
         if not cantidad_valida:
             validate_transition(session.get("estado", AgentState.IDLE.value) if session else AgentState.IDLE.value, AgentState.NEEDS_CLARIFICATION)

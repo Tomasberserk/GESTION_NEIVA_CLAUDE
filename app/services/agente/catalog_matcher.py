@@ -53,9 +53,25 @@ ALIAS_TIENDA_COLOMBIA: dict[str, str] = {
     "papas": "margarita lays papas fritas",
     "papitas": "margarita lays papas fritas",
     "leche": "alqueria colanta parmalat proleche",
+    "leches": "alqueria colanta parmalat proleche",
     "arroz": "diana roa florhuila",
+    "arroces": "diana roa florhuila",
     "aceite": "premier diana girasol oleocali gourmet",
+    "aceites": "premier diana girasol oleocali gourmet",
 }
+
+
+def _match_token_or_stem(q_tok: str, target_tokens: set[str]) -> bool:
+    """Verifica si un token o su raíz singular/plural coincide con los tokens del objetivo."""
+    if q_tok in target_tokens:
+        return True
+    if q_tok.endswith("s") and q_tok[:-1] in target_tokens:
+        return True
+    if q_tok.endswith("ces") and (q_tok[:-3] + "z") in target_tokens:
+        return True
+    if q_tok.endswith("es") and len(q_tok) > 4 and q_tok[:-2] in target_tokens:
+        return True
+    return False
 
 
 def calcular_similitud(query: str, target: str) -> float:
@@ -86,10 +102,18 @@ def calcular_similitud(query: str, target: str) -> float:
         if q_tokens.issubset(t_tokens):
             ratio = max(ratio, 0.88)
 
-        # Expansión de modismos populares colombianos (P1.5)
+        # Expansión de modismos populares colombianos (P1.5) y tolerancia a plurales
         for tok in q_tokens:
-            sinonimos = ALIAS_TIENDA_COLOMBIA.get(tok, "").split()
-            if any(s in t_tokens or any(s in t_w for t_w in t_tokens) for s in sinonimos):
+            tok_singular = tok[:-1] if tok.endswith("s") else tok
+            sinonimos = (
+                ALIAS_TIENDA_COLOMBIA.get(tok, "")
+                + " "
+                + ALIAS_TIENDA_COLOMBIA.get(tok_singular, "")
+            ).split()
+            if any(_match_token_or_stem(s, t_tokens) or any(s in t_w for t_w in t_tokens) for s in sinonimos if s):
+                ratio = max(ratio, 0.88)
+
+            if _match_token_or_stem(tok, t_tokens):
                 ratio = max(ratio, 0.88)
 
     return min(ratio, 1.0)
