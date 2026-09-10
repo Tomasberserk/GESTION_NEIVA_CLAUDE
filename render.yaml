@@ -23,5 +23,5 @@ services:
 databases:
   - name: gestion-neiva-db
     databaseName: gestion_neiva
-    user: postgres
+    user: neiva_user
     plan: free
