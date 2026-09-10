@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: gestion-neiva-api
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: gestion-neiva-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: 480
+      - key: CORS_ORIGINS
+        value: https://gestion-neiva-claude.vercel.app,http://localhost:5173
+
+databases:
+  - name: gestion-neiva-db
+    databaseName: gestion_neiva
+    user: postgres
+    plan: free

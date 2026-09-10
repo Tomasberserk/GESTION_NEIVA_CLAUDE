@@ -12,6 +12,11 @@ if not DATABASE_URL:
         "Copia .env.example a .env y completa tus credenciales."
     )
 
+# Render / Railway / Supabase proveen la URL como postgres://; SQLAlchemy 2.0 requiere postgresql://
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+
 # SQLite (usado en tests) no soporta pool_size ni max_overflow.
 # PostgreSQL (producción) sí los necesita para Supabase free tier.
 _is_sqlite = DATABASE_URL.startswith("sqlite")

@@ -24,6 +24,9 @@ if not database_url:
         "DATABASE_URL no está configurada. "
         "Ejecuta: cp .env.example .env y completa las credenciales."
     )
+if database_url.startswith("postgres://"):
+    database_url = database_url.replace("postgres://", "postgresql://", 1)
+
 # % en el URL (e.g. caracteres especiales URL-encoded) rompe ConfigParser.
 # Se escapan para que alembic los lea como literales.
 config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))

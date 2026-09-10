@@ -1,11 +1,14 @@
 # Web framework
 fastapi>=0.115.0
 uvicorn[standard]==0.24.0
+gunicorn>=21.2.0
 
 # Base de datos
 sqlalchemy>=2.0.30
 psycopg2-binary==2.9.10
 alembic==1.13.1
+redis>=5.0.0
+
 
 # Validación y seguridad
 pydantic==2.10.6
