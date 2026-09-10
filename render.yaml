@@ -8,7 +8,8 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.9
       - key: ENVIRONMENT
-        value: production
+        value: pilot
+
       - key: DATABASE_URL
         sync: false
       - key: SECRET_KEY
