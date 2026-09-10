@@ -14,9 +14,13 @@ import {
   Package,
 } from 'lucide-react'
 import agentService from '../services/agentService'
+import MostradorMode from './voice/MostradorMode'
+import { useVoiceAgent } from '../hooks/useVoiceAgent'
 
 export default function AgentWidget() {
   const [abierto, setAbierto] = useState(false)
+  const [modoMostradorAbierto, setModoMostradorAbierto] = useState(false)
+  const voiceAgent = useVoiceAgent()
   const [mensajes, setMensajes] = useState([
     {
       remitente: 'agente',
@@ -194,7 +198,15 @@ export default function AgentWidget() {
               </div>
             </div>
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setModoMostradorAbierto(true)}
+                title="Abrir Modo Mostrador Manos Libres"
+                className="flex items-center gap-1 px-2.5 py-1 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/40 text-cyan-300 rounded-lg text-xs font-semibold active:scale-95 transition-all"
+              >
+                <Mic size={13} className="animate-pulse text-cyan-400" />
+                <span className="hidden sm:inline">Modo</span> Voz
+              </button>
               <button
                 onClick={reiniciarConversacion}
                 title="Reiniciar chat"
@@ -426,18 +438,36 @@ export default function AgentWidget() {
         </section>
       )}
 
-      {/* Botón Flotante Launcher */}
-      <button
-        onClick={() => setAbierto(!abierto)}
-        className="group relative flex items-center gap-2 px-4 py-3 bg-slate-900 hover:bg-indigo-600 text-white rounded-full shadow-xl hover:shadow-indigo-500/25 transition-all duration-200 active:scale-95"
-      >
-        <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-white"></span>
-        </span>
-        <Sparkles size={18} className="text-amber-300 group-hover:rotate-12 transition-transform" />
-        <span className="font-semibold text-sm tracking-tight pr-1">Asistente IA</span>
-      </button>
+      {/* Botones Flotantes Launcher */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setModoMostradorAbierto(true)}
+          className="group flex items-center gap-2 px-3.5 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-full shadow-xl hover:shadow-cyan-500/25 transition-all duration-200 active:scale-95"
+          title="Abrir Modo Mostrador por Voz (Manos Libres)"
+        >
+          <Mic size={18} className="animate-pulse text-cyan-200" />
+          <span className="font-semibold text-sm tracking-tight pr-0.5">Modo Voz</span>
+        </button>
+
+        <button
+          onClick={() => setAbierto(!abierto)}
+          className="group relative flex items-center gap-2 px-4 py-3 bg-slate-900 hover:bg-indigo-600 text-white rounded-full shadow-xl hover:shadow-indigo-500/25 transition-all duration-200 active:scale-95"
+        >
+          <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-white"></span>
+          </span>
+          <Sparkles size={18} className="text-amber-300 group-hover:rotate-12 transition-transform" />
+          <span className="font-semibold text-sm tracking-tight pr-1">Chat IA</span>
+        </button>
+      </div>
+
+      {/* Modal Inmersivo Modo Mostrador */}
+      <MostradorMode
+        isOpen={modoMostradorAbierto}
+        onClose={() => setModoMostradorAbierto(false)}
+        voiceAgent={voiceAgent}
+      />
     </aside>
   )
 }

@@ -4,8 +4,9 @@ Expone el endpoint delgado POST /api/agente/mensaje que delega toda la lógica
 al AgentOrchestrator, validando la identidad del usuario y empresa mediante JWT.
 """
 
+import os
 from typing import Any
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -63,3 +64,50 @@ async def enviar_mensaje(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="El servicio de sesiones del agente está temporalmente no disponible. Intente de nuevo en unos segundos.",
         ) from exc
+
+
+@router.post(
+    "/transcribir-audio",
+    status_code=status.HTTP_200_OK,
+    summary="Transcribir fragmento de audio (fallback para navegadores móviles)",
+)
+async def transcribir_audio(
+    audio: UploadFile = File(...),
+    current_user: models.Usuario = Depends(get_current_user),
+):
+    """Fallback STT: recibe audio en formato Opus/WebM y devuelve el texto transcrito."""
+    audio_bytes = await audio.read()
+    if not audio_bytes or len(audio_bytes) < 100:
+        return {"texto": ""}
+
+    # 1. Intentar con Groq Whisper (ultra-rápido ~150ms)
+    groq_key = os.getenv("GROQ_API_KEY")
+    if groq_key:
+        try:
+            from groq import Groq
+            client = Groq(api_key=groq_key)
+            transcription = client.audio.transcriptions.create(
+                file=(audio.filename or "voz.webm", audio_bytes),
+                model="whisper-large-v3",
+                language="es",
+            )
+            return {"texto": transcription.text.strip()}
+        except Exception as exc:
+            pass
+
+    # 2. Fallback con Google Gemini
+    google_key = os.getenv("GOOGLE_API_KEY")
+    if google_key:
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=google_key)
+            model = genai.GenerativeModel("gemini-1.5-flash")
+            response = model.generate_content([
+                "Transcribe de forma literal y exacta en español este audio de un tendero colombiano. Devuelve ÚNICAMENTE el texto transcrito, sin explicaciones ni comillas.",
+                {"mime_type": audio.content_type or "audio/webm", "data": audio_bytes},
+            ])
+            return {"texto": (response.text or "").strip()}
+        except Exception as exc:
+            pass
+
+    return {"texto": ""}
