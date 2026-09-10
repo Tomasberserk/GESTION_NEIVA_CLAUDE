@@ -20,14 +20,15 @@ export const VoiceTurnState = {
 
 /**
  * VoiceTurnManager: Gestor desacoplado de turnos de audio y anti-eco.
- * NO conoce reglas de negocio (ventas, precios, base de datos).
+ * Instrumentado con logs de diagnóstico paso a paso.
  */
 export class VoiceTurnManager {
   constructor(options = {}) {
+    console.log('[VOICE-DEBUG][VoiceTurnManager] Instanciando VoiceTurnManager...')
     this.onStateChange = options.onStateChange || null
     this.onTranscriptUpdate = options.onTranscriptUpdate || null
     this.onAgentResponse = options.onAgentResponse || null
-    this.onSendMessage = options.onSendMessage || null // (texto) => Promise<{ respuesta: string, estado: string, ... }>
+    this.onSendMessage = options.onSendMessage || null
 
     this.state = VoiceTurnState.IDLE
     this.lastTranscript = ''
@@ -46,10 +47,16 @@ export class VoiceTurnManager {
     this.operationalTimer = null
 
     this._bindProviders()
+    console.log('[VOICE-DEBUG][VoiceTurnManager] Instanciación completa. Estado inicial:', this.state)
   }
 
   _setState(newState, data = {}) {
-    if (this.state === newState) return
+    const oldState = this.state
+    console.log(`[VOICE-DEBUG][VoiceTurnManager] _setState: [${oldState}] -> [${newState}]`, data)
+    if (this.state === newState) {
+      console.log(`[VOICE-DEBUG][VoiceTurnManager] _setState ignorado (ya estaba en ${newState})`)
+      return
+    }
     this.state = newState
     if (this.onStateChange) {
       this.onStateChange(newState, data)
@@ -57,16 +64,20 @@ export class VoiceTurnManager {
   }
 
   _bindProviders() {
-    // Configurar STT WebSpeech
-    const setupSTT = (provider) => {
+    console.log('[VOICE-DEBUG][VoiceTurnManager] _bindProviders() configurando callbacks de STT y TTS...')
+    const setupSTT = (provider, name) => {
       provider.onSpeechStart = () => {
+        console.log(`[VOICE-DEBUG][VoiceTurnManager][${name}] onSpeechStart disparado. Estado actual: ${this.state}`)
         if (this.state === VoiceTurnState.LISTENING) {
           this._setState(VoiceTurnState.SPEECH_DETECTED)
           voiceTelemetry.recordSpeechDetected()
+        } else {
+          console.warn(`[VOICE-DEBUG][VoiceTurnManager][${name}] onSpeechStart ignorado porque estado no es LISTENING (es ${this.state})`)
         }
       }
 
       provider.onTranscript = (transcript, isFinal) => {
+        console.log(`[VOICE-DEBUG][VoiceTurnManager][${name}] onTranscript: "${transcript}", isFinal: ${isFinal}, estado: ${this.state}`)
         this.interimTranscript = transcript
         if (this.onTranscriptUpdate) {
           this.onTranscriptUpdate(transcript, isFinal)
@@ -76,41 +87,45 @@ export class VoiceTurnManager {
           this.lastTranscript = transcript
           this._finalizarTurnoVocal(transcript)
         } else {
-          // Timer de silencio (~1000 ms) como política de turno
           this._reiniciarTimerSilencio(transcript)
         }
       }
 
       provider.onError = (err) => {
+        console.error(`[VOICE-DEBUG][VoiceTurnManager][${name}] onError recibido:`, err)
         this._handleSTTError(err)
       }
 
       provider.onEnd = () => {
+        console.log(`[VOICE-DEBUG][VoiceTurnManager][${name}] onEnd recibido. Estado actual: ${this.state}, interim: "${this.interimTranscript}"`)
         if (this.state === VoiceTurnState.LISTENING || this.state === VoiceTurnState.SPEECH_DETECTED) {
-          // Si el proveedor terminó y teníamos texto pendiente
           if (this.interimTranscript.trim()) {
+            console.log(`[VOICE-DEBUG][VoiceTurnManager][${name}] onEnd con transcripción pendiente -> finalizando turno`)
             this._finalizarTurnoVocal(this.interimTranscript)
           } else {
+            console.warn(`[VOICE-DEBUG][VoiceTurnManager][${name}] onEnd sin transcripción -> regresando a READY`)
             this._setState(VoiceTurnState.READY)
           }
         }
       }
     }
 
-    setupSTT(this.webSpeechProvider)
-    setupSTT(this.backendSTTProvider)
+    setupSTT(this.webSpeechProvider, 'WebSpeech')
+    setupSTT(this.backendSTTProvider, 'BackendSTT')
 
     // Configurar TTS
     this.tts.onStart = () => {
+      console.log('[VOICE-DEBUG][VoiceTurnManager] TTS onStart -> transicionando a SPEAKING')
       this._setState(VoiceTurnState.SPEAKING)
     }
 
     this.tts.onEnd = () => {
+      console.log('[VOICE-DEBUG][VoiceTurnManager] TTS onEnd -> iniciando settling')
       this._iniciarVentanaSettling()
     }
 
     this.tts.onError = (err) => {
-      console.warn('TTS Warning:', err)
+      console.warn('[VOICE-DEBUG][VoiceTurnManager] TTS onError:', err)
       this._iniciarVentanaSettling()
     }
   }
@@ -119,7 +134,9 @@ export class VoiceTurnManager {
     if (this.speechEndTimer) {
       clearTimeout(this.speechEndTimer)
     }
+    console.log('[VOICE-DEBUG][VoiceTurnManager] Programando timer de silencio (1100ms) para:', currentText)
     this.speechEndTimer = setTimeout(() => {
+      console.log(`[VOICE-DEBUG][VoiceTurnManager] Timer de silencio expiró. Estado: ${this.state}, texto: "${currentText}"`)
       if (this.state === VoiceTurnState.SPEECH_DETECTED && currentText.trim()) {
         this.currentSTT.stop()
         this._finalizarTurnoVocal(currentText)
@@ -128,11 +145,11 @@ export class VoiceTurnManager {
   }
 
   _handleSTTError(err) {
+    console.warn('[VOICE-DEBUG][VoiceTurnManager] _handleSTTError procesando:', err)
     voiceTelemetry.recordSTTFailure(err.code)
 
-    // Fallback a Backend STT si falla por red
     if (err.code === 'network' && this.activeProviderType === 'webspeech') {
-      console.info('Cambiando a BackendSTTProvider por error de red en WebSpeech')
+      console.info('[VOICE-DEBUG][VoiceTurnManager] Conmutando a BackendSTTProvider por error de red')
       this.activeProviderType = 'backend'
       this.currentSTT = this.backendSTTProvider
       voiceTelemetry.recordFallbackUsed()
@@ -141,13 +158,19 @@ export class VoiceTurnManager {
     }
 
     if (err.code === 'not-allowed') {
+      console.error('[VOICE-DEBUG][VoiceTurnManager] Error not-allowed (permiso de micrófono denegado)')
       this._setState(VoiceTurnState.ERROR, { message: 'Permiso de micrófono denegado.' })
       return
     }
 
     if (err.code === 'no-speech') {
-      // Silencio normal; retornar a READY sin alertar
+      console.log('[VOICE-DEBUG][VoiceTurnManager] no-speech detectado -> retornando a READY')
       this._setState(VoiceTurnState.READY)
+      return
+    }
+
+    if (err.code === 'aborted') {
+      console.log('[VOICE-DEBUG][VoiceTurnManager] aborted detectado -> ignorando o retornando a READY según estado')
       return
     }
 
@@ -155,14 +178,16 @@ export class VoiceTurnManager {
   }
 
   /**
-   * Inicia la sesión de voz tras el toque del usuario (gesto de activación móvil).
+   * Inicia la sesión de voz tras el toque del usuario.
    */
   async activarSesion() {
+    console.log('[VOICE-DEBUG][VoiceTurnManager] activarSesion() llamado. Estado antes:', this.state)
     this._limpiarTimers()
     this.tts.cancel()
     this.currentSTT.cancel()
     voiceTelemetry.recordSessionStart()
     this._setState(VoiceTurnState.READY)
+    console.log('[VOICE-DEBUG][VoiceTurnManager] activarSesion() llamando a iniciarEscucha()...')
     return this.iniciarEscucha()
   }
 
@@ -170,8 +195,9 @@ export class VoiceTurnManager {
    * Abre el micrófono para un turno discreto.
    */
   async iniciarEscucha() {
-    // Regla anti-eco: jamás escuchar si TTS está hablando o settling
+    console.log('[VOICE-DEBUG][VoiceTurnManager] iniciarEscucha() llamado. Estado actual:', this.state)
     if (this.state === VoiceTurnState.SPEAKING || this.state === VoiceTurnState.SETTLING) {
+      console.warn(`[VOICE-DEBUG][VoiceTurnManager] iniciarEscucha() bloqueado por anti-eco (estado=${this.state})`)
       return
     }
 
@@ -180,8 +206,11 @@ export class VoiceTurnManager {
     this._setState(VoiceTurnState.LISTENING)
 
     try {
+      console.log('[VOICE-DEBUG][VoiceTurnManager] Invocando this.currentSTT.start()...')
       await this.currentSTT.start()
+      console.log('[VOICE-DEBUG][VoiceTurnManager] this.currentSTT.start() completado sin excepción.')
     } catch (err) {
+      console.error('[VOICE-DEBUG][VoiceTurnManager] Excepción en currentSTT.start():', err)
       this._handleSTTError({ code: err.name || 'start-error', message: err.message })
     }
   }
@@ -190,7 +219,9 @@ export class VoiceTurnManager {
    * Procesa la transcripción final y la envía al backend.
    */
   async _finalizarTurnoVocal(texto) {
+    console.log('[VOICE-DEBUG][VoiceTurnManager] _finalizarTurnoVocal() con texto:', texto)
     if (!texto || !texto.trim()) {
+      console.warn('[VOICE-DEBUG][VoiceTurnManager] _finalizarTurnoVocal ignorado por texto vacío')
       this._setState(VoiceTurnState.READY)
       return
     }
@@ -206,8 +237,10 @@ export class VoiceTurnManager {
         throw new Error('No hay callback onSendMessage configurado.')
       }
 
+      console.log('[VOICE-DEBUG][VoiceTurnManager] Enviando texto al backend mediante onSendMessage...')
       const res = await this.onSendMessage(texto.trim())
       const latency = Date.now() - t0
+      console.log(`[VOICE-DEBUG][VoiceTurnManager] Respuesta recibida en ${latency}ms:`, res)
       voiceTelemetry.recordBackendResponse(latency)
 
       if (this.onAgentResponse) {
@@ -226,6 +259,7 @@ export class VoiceTurnManager {
       // Reproducir audio con la respuesta
       this.reproducirRespuesta(respuestaTexto, esConfirmacion ? VoiceTurnState.CONFIRMING : VoiceTurnState.READY)
     } catch (err) {
+      console.error('[VOICE-DEBUG][VoiceTurnManager] Error al procesar mensaje con backend:', err)
       this.reproducirRespuesta(`Hubo un error: ${err.message}`, VoiceTurnState.READY)
     }
   }
@@ -234,6 +268,7 @@ export class VoiceTurnManager {
    * Envía un mensaje manual (por ejemplo, al hacer clic en el botón de confirmación táctil).
    */
   async enviarMensajeManual(texto) {
+    console.log('[VOICE-DEBUG][VoiceTurnManager] enviarMensajeManual llamado con:', texto)
     this.currentSTT.cancel()
     return this._finalizarTurnoVocal(texto)
   }
@@ -242,8 +277,9 @@ export class VoiceTurnManager {
    * Reproduce la respuesta con TTS silenciando el micrófono.
    */
   reproducirRespuesta(texto, siguienteEstado = VoiceTurnState.READY) {
+    console.log(`[VOICE-DEBUG][VoiceTurnManager] reproducirRespuesta(): "${texto}", siguienteEstado=${siguienteEstado}`)
     this._limpiarTimers()
-    this.currentSTT.cancel() // Micrófono muteado estrictamente
+    this.currentSTT.cancel()
     this._nextStateAfterSettling = siguienteEstado
     this._setState(VoiceTurnState.SPEAKING)
     this.tts.speak(texto)
@@ -253,19 +289,22 @@ export class VoiceTurnManager {
    * Ventana de reposo acústico (250 ms) para absorber ecos de altavoces.
    */
   _iniciarVentanaSettling() {
+    console.log('[VOICE-DEBUG][VoiceTurnManager] _iniciarVentanaSettling() iniciada (250ms)')
     this._setState(VoiceTurnState.SETTLING)
     this.settlingTimer = setTimeout(() => {
       const targetState = this._nextStateAfterSettling || VoiceTurnState.READY
+      console.log(`[VOICE-DEBUG][VoiceTurnManager] Ventana de settling finalizada. Transicionando a: ${targetState}`)
       this._setState(targetState)
 
-      // Si el estado siguiente es READY o CONFIRMING, reactivar la escucha del siguiente turno
       if (targetState === VoiceTurnState.READY || targetState === VoiceTurnState.CONFIRMING) {
+        console.log('[VOICE-DEBUG][VoiceTurnManager] Reanudando escucha tras settling...')
         this.iniciarEscucha()
       }
     }, 250)
   }
 
   detenerSesion() {
+    console.log('[VOICE-DEBUG][VoiceTurnManager] detenerSesion() llamado')
     this._limpiarTimers()
     this.tts.cancel()
     this.currentSTT.cancel()

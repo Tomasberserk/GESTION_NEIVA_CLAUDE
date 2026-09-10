@@ -4,7 +4,7 @@ import { agentService } from '../services/agentService'
 
 /**
  * Hook para integrar el VoiceTurnManager en cualquier componente React.
- * Mantiene la sincronización de estado y expone métodos determinísticos.
+ * Instrumentado con logs de diagnóstico.
  */
 export function useVoiceAgent() {
   const [voiceState, setVoiceState] = useState(VoiceTurnState.IDLE)
@@ -15,8 +15,10 @@ export function useVoiceAgent() {
   const managerRef = useRef(null)
 
   useEffect(() => {
+    console.log('[VOICE-DEBUG][useVoiceAgent] useEffect inicializando VoiceTurnManager...')
     const manager = new VoiceTurnManager({
       onStateChange: (newState, data) => {
+        console.log(`[VOICE-DEBUG][useVoiceAgent] onStateChange recibido: ${newState}`, data)
         setVoiceState(newState)
         if (newState === VoiceTurnState.ERROR && data.message) {
           setErrorMessage(data.message)
@@ -24,13 +26,16 @@ export function useVoiceAgent() {
           setErrorMessage(null)
         }
       },
-      onTranscriptUpdate: (text) => {
+      onTranscriptUpdate: (text, isFinal) => {
+        console.log(`[VOICE-DEBUG][useVoiceAgent] onTranscriptUpdate: "${text}", isFinal: ${isFinal}`)
         setTranscript(text)
       },
       onAgentResponse: (res) => {
+        console.log('[VOICE-DEBUG][useVoiceAgent] onAgentResponse recibido:', res)
         setLastResponse(res)
       },
       onSendMessage: async (text) => {
+        console.log(`[VOICE-DEBUG][useVoiceAgent] onSendMessage invocando agentService.enviarMensaje("${text}")...`)
         return await agentService.enviarMensaje(text)
       },
     })
@@ -38,39 +43,46 @@ export function useVoiceAgent() {
     managerRef.current = manager
 
     return () => {
+      console.log('[VOICE-DEBUG][useVoiceAgent] Limpiando sesión en desmontaje...')
       manager.detenerSesion()
     }
   }, [])
 
   const activarModoVoz = useCallback(async () => {
+    console.log('[VOICE-DEBUG][useVoiceAgent] activarModoVoz disparado por usuario')
     setTranscript('')
     setErrorMessage(null)
     if (managerRef.current) {
       await managerRef.current.activarSesion()
+    } else {
+      console.error('[VOICE-DEBUG][useVoiceAgent] managerRef.current es null al activar')
     }
   }, [])
 
   const desactivarModoVoz = useCallback(() => {
+    console.log('[VOICE-DEBUG][useVoiceAgent] desactivarModoVoz disparado')
     if (managerRef.current) {
       managerRef.current.detenerSesion()
     }
     setTranscript('')
   }, [])
 
-  // Confirmación táctil (comparte el mismo camino transaccional)
   const confirmarOperacion = useCallback(async () => {
+    console.log('[VOICE-DEBUG][useVoiceAgent] confirmarOperacion táctil disparado ("sí, dale")')
     if (managerRef.current) {
       await managerRef.current.enviarMensajeManual('sí, dale')
     }
   }, [])
 
   const cancelarOperacion = useCallback(async () => {
+    console.log('[VOICE-DEBUG][useVoiceAgent] cancelarOperacion táctil disparado ("cancelar")')
     if (managerRef.current) {
       await managerRef.current.enviarMensajeManual('cancelar')
     }
   }, [])
 
   const seleccionarOpcion = useCallback(async (opcionTexto) => {
+    console.log(`[VOICE-DEBUG][useVoiceAgent] seleccionarOpcion táctil disparado ("${opcionTexto}")`)
     if (managerRef.current) {
       await managerRef.current.enviarMensajeManual(opcionTexto)
     }
