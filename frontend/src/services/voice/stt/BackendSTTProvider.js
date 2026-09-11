@@ -1,7 +1,7 @@
-import { SpeechInputProvider } from './SpeechInputProvider'
-import { getSupportedAudioMime } from '../voiceCapabilities'
+import { SpeechInputProvider } from './SpeechInputProvider.js'
+import { getSupportedAudioMime } from '../voiceCapabilities.js'
 
-const BASE = import.meta.env.VITE_API_URL || '/api'
+const BASE = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || '/api'
 
 /**
  * Proveedor STT de contingencia que graba audio comprimido (Opus/WebM)
@@ -23,6 +23,7 @@ export class BackendSTTProvider extends SpeechInputProvider {
     this.silenceTimer = null
     this.maxTimer = null
     this.speechStarted = false
+    this.isStarting = false
   }
 
   async start() {
@@ -30,6 +31,12 @@ export class BackendSTTProvider extends SpeechInputProvider {
       throw new Error('La grabación de audio no está disponible en este dispositivo.')
     }
 
+    if (this.isRecording || this.isStarting) {
+      console.warn('[VOICE-LIFECYCLE] BackendSTTProvider.start() ignorado: ya está grabando o iniciando.')
+      return
+    }
+
+    this.isStarting = true
     this._limpiarRecursos()
     this.audioChunks = []
     this.speechStarted = false
@@ -53,6 +60,7 @@ export class BackendSTTProvider extends SpeechInputProvider {
       }
 
       this.mediaRecorder.onstart = () => {
+        this.isStarting = false
         this.isRecording = true
         this._iniciarVAD()
       }
@@ -97,6 +105,7 @@ export class BackendSTTProvider extends SpeechInputProvider {
       }, 8000)
 
     } catch (err) {
+      this.isStarting = false
       this._limpiarRecursos()
       if (this.onError) {
         this.onError({
@@ -164,7 +173,13 @@ export class BackendSTTProvider extends SpeechInputProvider {
     }
   }
 
+  requestStop() {
+    console.log('[VOICE-STT] requestStop() invocado en BackendSTTProvider. isRecording:', this.isRecording)
+    this.stop()
+  }
+
   stop() {
+    this.isStarting = false
     this._limpiarTimers()
     if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
       try {

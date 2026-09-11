@@ -1,5 +1,5 @@
-import { SpeechInputProvider } from './SpeechInputProvider'
-import { SPANISH_LANG_CHAIN } from '../voiceCapabilities'
+import { SpeechInputProvider } from './SpeechInputProvider.js'
+import { SPANISH_LANG_CHAIN } from '../voiceCapabilities.js'
 
 /**
  * Proveedor STT basado en la Web Speech API nativa del navegador.
@@ -11,6 +11,8 @@ export class WebSpeechProvider extends SpeechInputProvider {
     this.preferredLang = preferredLang
     this.recognition = null
     this.isListening = false
+    this.isStarting = false
+    this.isStopping = false
     this.langIndex = 0
     console.log('[VOICE-DEBUG][WebSpeechProvider] constructor llamado con preferredLang:', preferredLang)
     this._initRecognition()
@@ -66,6 +68,7 @@ export class WebSpeechProvider extends SpeechInputProvider {
 
     this.recognition.onstart = () => {
       console.log('[VOICE-DEBUG][WebSpeechProvider] EVENTO: onstart (reconocedor activado y escuchando)')
+      this.isStarting = false
       this.isListening = true
     }
 
@@ -107,7 +110,9 @@ export class WebSpeechProvider extends SpeechInputProvider {
 
     this.recognition.onend = () => {
       console.log('[VOICE-DEBUG][WebSpeechProvider] EVENTO: onend (reconocedor detenido, isListening era:', this.isListening, ')')
+      this.isStarting = false
       this.isListening = false
+      this.isStopping = false
       if (this.onEnd) {
         this.onEnd()
       }
@@ -115,7 +120,7 @@ export class WebSpeechProvider extends SpeechInputProvider {
   }
 
   async start() {
-    console.log('[VOICE-DEBUG][WebSpeechProvider] start() invocado. isListening actual:', this.isListening, 'recognition existe:', !!this.recognition)
+    console.log('[VOICE-DEBUG][WebSpeechProvider] start() invocado. isListening:', this.isListening, 'isStarting:', this.isStarting, 'isStopping:', this.isStopping)
 
     if (!this.recognition) {
       const err = new Error('Web Speech API no está soportada en este navegador.')
@@ -123,34 +128,52 @@ export class WebSpeechProvider extends SpeechInputProvider {
       throw err
     }
 
-    if (this.isListening) {
-      console.warn('[VOICE-DEBUG][WebSpeechProvider] start() ignorado: ya está escuchando.')
+    // Guard de lifecycle estricto contra reentrancia
+    if (this.isListening || this.isStarting) {
+      console.warn('[VOICE-LIFECYCLE] WebSpeechProvider.start() ignorado: STT ya está activo o iniciando.', {
+        isListening: this.isListening,
+        isStarting: this.isStarting,
+      })
       return
     }
+
+    if (this.isStopping) {
+      console.warn('[VOICE-LIFECYCLE] WebSpeechProvider.start() ignorado: esperando cierre definitivo de sesión previa.')
+      return
+    }
+
+    this.isStarting = true
 
     try {
       console.log('[VOICE-DEBUG][WebSpeechProvider] Ejecutando recognition.start()...')
       this.recognition.start()
       console.log('[VOICE-DEBUG][WebSpeechProvider] recognition.start() ejecutado sin lanzar excepción sincrónica.')
     } catch (err) {
+      this.isStarting = false
       console.error('[VOICE-DEBUG][WebSpeechProvider] Excepción en recognition.start():', err.name, err.message)
-      // Ignorar error si ya había iniciado
-      if (err.name !== 'InvalidStateError') {
-        throw err
+      // InvalidStateError ocurre si el motor ya había iniciado
+      if (err.name === 'InvalidStateError') {
+        this.isListening = true
+        return
+      }
+      throw err
+    }
+  }
+
+  requestStop() {
+    console.log('[VOICE-STT] requestStop() invocado en WebSpeechProvider. isListening:', this.isListening, 'isStopping:', this.isStopping)
+    if (this.recognition && this.isListening && !this.isStopping) {
+      this.isStopping = true
+      try {
+        this.recognition.stop()
+      } catch (err) {
+        console.warn('[VOICE-STT] Error en recognition.stop():', err)
       }
     }
   }
 
   stop() {
-    console.log('[VOICE-DEBUG][WebSpeechProvider] stop() invocado. isListening:', this.isListening)
-    if (this.recognition && this.isListening) {
-      try {
-        this.recognition.stop()
-      } catch (err) {
-        console.warn('[VOICE-DEBUG][WebSpeechProvider] Error en stop():', err)
-      }
-    }
-    this.isListening = false
+    this.requestStop()
   }
 
   cancel() {
@@ -162,6 +185,8 @@ export class WebSpeechProvider extends SpeechInputProvider {
         console.warn('[VOICE-DEBUG][WebSpeechProvider] Error en abort():', err)
       }
     }
+    this.isStarting = false
     this.isListening = false
+    this.isStopping = false
   }
 }
