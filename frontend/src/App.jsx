@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
+import { SpeedInsights } from '@vercel/speed-insights/react'
 import ProtectedRoute from './components/ProtectedRoute'
 import PlanProtectedRoute from './components/PlanProtectedRoute'
 import Layout from './components/layout/Layout'
@@ -18,7 +19,8 @@ import ConfigWhatsApp from './pages/ConfigWhatsApp'
 
 export default function App() {
   return (
-    <Routes>
+    <>
+      <Routes>
       <Route path="/login" element={<Login />} />
 
       <Route element={<ProtectedRoute />}>
@@ -45,6 +47,8 @@ export default function App() {
       <Route path="/superadmin" element={<SuperAdmin />} />
 
       <Route path="*" element={<Navigate to="/login" replace />} />
-    </Routes>
+      </Routes>
+      <SpeedInsights />
+    </>
   )
 }
