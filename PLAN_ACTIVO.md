@@ -330,11 +330,11 @@
 | # | Tarea | Recurso / Archivo | Estado |
 |---|-------|-------------------|--------|
 | 1 | **[Detect]** Detección robusta de capacidades y política Android-First (`isAndroid`, `isMobile`, `maxTouchPoints`) | `frontend/src/services/voice/voiceCapabilities.js` | ✅ Completado |
-| 2 | **[TurnManager]** Control de generaciones de proveedor (`providerGeneration`) para descartar callbacks obsoletos | `frontend/src/services/voice/VoiceTurnManager.js` | ✅ Completado |
-| 3 | **[Fallback]** Transición segura de `WebSpeechProvider` a `BackendSTTProvider` ante `no-speech`, `network` o expiración | `frontend/src/services/voice/VoiceTurnManager.js` | ✅ Completado |
-| 4 | **[Decouple]** Desacoplamiento de `BackendSTTProvider` de la orquestación de turnos + logs estructurados | `frontend/src/services/voice/stt/BackendSTTProvider.js` | ✅ Completado |
+| 2 | **[TurnManager]** Control de generaciones de proveedor (`providerGeneration`) y sesión (`sessionGeneration`) para descartar callbacks obsoletos | `frontend/src/services/voice/VoiceTurnManager.js` | ✅ Completado |
+| 3 | **[Lifecycle & Watchdog]** Cierre asíncrono de WebSpeech (`onend` único), `abortAndWait` / `stopAndWait`, recuperación controlada de `InvalidStateError` y watchdog 9s limitador de captura sin abortar transcripciones BackendSTT en vuelo | `WebSpeechProvider.js`, `BackendSTTProvider.js`, `VoiceTurnManager.js` | ✅ Completado |
+| 4 | **[Decouple]** Desacoplamiento de `BackendSTTProvider` de la orquestación de turnos, tracking de `turnId` y `isPendingTranscription` + logs estructurados | `frontend/src/services/voice/stt/BackendSTTProvider.js` | ✅ Completado |
 | 5 | **[Vite/Ngrok]** Soporte de túnel seguro HTTPS con `host: true` y `allowedHosts: true` para pruebas móviles reales | `frontend/vite.config.js` | ✅ Completado |
-| 6 | **[QA/Tests]** Suite de 27 pruebas unitarias formales para ciclo de voz (A, B, C, D, E, F, H, I, J, K) al 100% | `frontend/test_voice_turn_manager.js` | ✅ Completado |
+| 6 | **[QA/Tests]** Suite de 40 pruebas unitarias formales para ciclo de voz (A, B, C, D, E, F, H, I, J, K, L, M, N) al 100% pasando | `frontend/test_voice_turn_manager.js` | ✅ Completado |
 | 7 | **[DB/Local]** Sincronización de migraciones Alembic 001-010 en PostgreSQL local nativo + credenciales demo | `alembic/versions/`, `.env` | ✅ Completado |
 
 ---
