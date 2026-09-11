@@ -311,8 +311,8 @@ class LLMIntentProvider:
     """Proveedor que delega la interpretación al LLM si el parser determinístico no coincide."""
 
     def __init__(self, provider: str = "groq", model: str | None = None):
-        self.provider = provider.lower()
-        self.model = model or ("llama-3.3-70b-versatile" if self.provider == "groq" else "gemini-1.5-flash")
+        default_gemini = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
+        self.model = model or ("llama-3.3-70b-versatile" if self.provider == "groq" else default_gemini)
 
     def parse(self, text: str, context: dict[str, Any] | None = None) -> AgentInterpretation:
         # 1. Intentar el parser rápido determinístico primero

@@ -47,8 +47,9 @@ def _get_gemini_model():
     try:
         import google.generativeai as genai
         genai.configure(api_key=api_key)
-        _gemini_model = genai.GenerativeModel("gemini-1.5-flash")
-        logger.info("Modelo Gemini 1.5 Flash inicializado correctamente")
+        model_name = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
+        _gemini_model = genai.GenerativeModel(model_name)
+        logger.info("Modelo Gemini (%s) inicializado correctamente", model_name)
         return _gemini_model
     except Exception as exc:
         logger.error("Error al inicializar Gemini: %s", exc)

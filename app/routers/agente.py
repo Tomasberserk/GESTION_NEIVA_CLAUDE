@@ -84,10 +84,11 @@ async def transcribir_audio(
             "content_type": audio.content_type,
             "size": len(audio_bytes) if audio_bytes else 0,
         },
+        flush=True,
     )
 
     if not audio_bytes or len(audio_bytes) < 100:
-        print("[VOICE-STT] TRANSCRIPTION_RESULT", repr(""))
+        print("[VOICE-STT] TRANSCRIPTION_RESULT", repr(""), flush=True)
         return {"texto": ""}
 
     text = ""
@@ -104,12 +105,12 @@ async def transcribir_audio(
                 language="es",
             )
             text = transcription.text.strip()
-            print("[VOICE-STT] TRANSCRIPTION_RESULT (Groq Whisper):", repr(text))
+            print("[VOICE-STT] TRANSCRIPTION_RESULT (Groq Whisper):", repr(text), flush=True)
             return {"texto": text}
         except Exception as exc:
-            print("[VOICE-STT] ERROR en Groq Whisper:", exc)
+            print("[VOICE-STT] ERROR en Groq Whisper:", exc, flush=True)
     else:
-        print("[VOICE-STT] Groq no configurado (GROQ_API_KEY no presente)")
+        print("[VOICE-STT] Groq no configurado (GROQ_API_KEY no presente)", flush=True)
 
     # 2. Fallback con Google Gemini (usando GOOGLE_API_KEY o GEMINI_API_KEY)
     google_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
@@ -117,18 +118,19 @@ async def transcribir_audio(
         try:
             import google.generativeai as genai
             genai.configure(api_key=google_key)
-            model = genai.GenerativeModel("gemini-1.5-flash")
+            gemini_model_name = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
+            model = genai.GenerativeModel(gemini_model_name)
             response = model.generate_content([
                 "Transcribe de forma literal y exacta en español este audio de un tendero colombiano. Devuelve ÚNICAMENTE el texto transcrito, sin explicaciones ni comillas.",
                 {"mime_type": audio.content_type or "audio/webm", "data": audio_bytes},
             ])
             text = (response.text or "").strip()
-            print("[VOICE-STT] TRANSCRIPTION_RESULT (Google Gemini):", repr(text))
+            print("[VOICE-STT] TRANSCRIPTION_RESULT (Google Gemini):", repr(text), flush=True)
             return {"texto": text}
         except Exception as exc:
-            print("[VOICE-STT] ERROR en Google Gemini STT:", exc)
+            print("[VOICE-STT] ERROR en Google Gemini STT:", exc, flush=True)
     else:
-        print("[VOICE-STT] Google Gemini no configurado (falta GOOGLE_API_KEY / GEMINI_API_KEY)")
+        print("[VOICE-STT] Google Gemini no configurado (falta GOOGLE_API_KEY / GEMINI_API_KEY)", flush=True)
 
-    print("[VOICE-STT] TRANSCRIPTION_RESULT", repr(text))
+    print("[VOICE-STT] TRANSCRIPTION_RESULT", repr(text), flush=True)
     return {"texto": ""}

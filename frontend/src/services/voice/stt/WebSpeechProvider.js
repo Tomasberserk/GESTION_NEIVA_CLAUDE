@@ -82,7 +82,7 @@ export class WebSpeechProvider extends SpeechInputProvider {
     this.recognition.onspeechstart = () => {
       console.log('[VOICE-DEBUG][WebSpeechProvider] EVENTO: onspeechstart (habla detectada)')
       if (this.onSpeechStart) {
-        this.onSpeechStart()
+        this.onSpeechStart(this.turnId, this.sessionGeneration)
       }
     }
 
@@ -116,7 +116,7 @@ export class WebSpeechProvider extends SpeechInputProvider {
       console.log('[VOICE-DEBUG][WebSpeechProvider] onresult datos -> transcript:', transcript, 'isFinal:', isFinal, 'confidence:', confidence)
 
       if (transcript && this.onTranscript) {
-        this.onTranscript(transcript, isFinal)
+        this.onTranscript(transcript, isFinal, this.turnId, this.sessionGeneration)
       }
     }
 
@@ -136,7 +136,7 @@ export class WebSpeechProvider extends SpeechInputProvider {
         this.onError({
           code: errCode,
           message: event.message || `Error de reconocimiento de voz: ${errCode}`,
-        })
+        }, this.turnId, this.sessionGeneration)
       }
     }
 
@@ -152,7 +152,7 @@ export class WebSpeechProvider extends SpeechInputProvider {
       resolvers.forEach((resolve) => resolve())
 
       if (this.onEnd) {
-        this.onEnd()
+        this.onEnd(this.turnId, this.sessionGeneration)
       }
     }
   }
@@ -183,8 +183,10 @@ export class WebSpeechProvider extends SpeechInputProvider {
     resolvers.forEach((resolve) => resolve())
   }
 
-  async start() {
-    console.log('[VOICE-DEBUG][WebSpeechProvider] start() invocado. isListening:', this.isListening, 'isStarting:', this.isStarting, 'isStopping:', this.isStopping)
+  async start(turnId = null, sessionGeneration = 0) {
+    console.log('[VOICE-DEBUG][WebSpeechProvider] start() invocado. turnId:', turnId, 'isListening:', this.isListening, 'isStarting:', this.isStarting, 'isStopping:', this.isStopping)
+    this.turnId = turnId
+    this.sessionGeneration = sessionGeneration
 
     if (!this.recognition) {
       const err = new Error('Web Speech API no está soportada en este navegador.')
@@ -228,7 +230,7 @@ export class WebSpeechProvider extends SpeechInputProvider {
           this.onError({
             code: 'invalid-state',
             message: 'SpeechRecognition ya había iniciado o estado desincronizado (InvalidStateError)',
-          })
+          }, this.turnId, this.sessionGeneration)
         }
         return
       }
@@ -236,8 +238,8 @@ export class WebSpeechProvider extends SpeechInputProvider {
     }
   }
 
-  requestStop() {
-    console.log('[VOICE-STT] requestStop() invocado en WebSpeechProvider. isListening:', this.isListening, 'isStopping:', this.isStopping)
+  requestStop(turnId = null) {
+    console.log('[VOICE-STT] requestStop() invocado en WebSpeechProvider. turnId:', turnId ?? this.turnId, 'isListening:', this.isListening, 'isStopping:', this.isStopping)
     if (this.recognition && this.isListening && !this.isStopping) {
       this.isStopping = true
       try {
@@ -249,20 +251,20 @@ export class WebSpeechProvider extends SpeechInputProvider {
     // isListening=false solamente en onend
   }
 
-  stop() {
-    this.requestStop()
+  stop(turnId = null) {
+    this.requestStop(turnId)
   }
 
   async stopAndWait(timeoutMs = 800) {
-    this.requestStop()
+    this.requestStop(this.turnId)
     await this.waitForEnd(timeoutMs)
     if (this.isActive()) {
       this._forceResetRecognition()
     }
   }
 
-  cancel() {
-    console.log('[VOICE-DEBUG][WebSpeechProvider] cancel() invocado. isListening:', this.isListening, 'isStopping:', this.isStopping)
+  cancel(turnId = null) {
+    console.log('[VOICE-DEBUG][WebSpeechProvider] cancel() invocado. turnId:', turnId ?? this.turnId, 'isListening:', this.isListening, 'isStopping:', this.isStopping)
     if (this.recognition && this.isActive()) {
       this.isStopping = true
       try {
@@ -277,7 +279,7 @@ export class WebSpeechProvider extends SpeechInputProvider {
   async abortAndWait(timeoutMs = 800) {
     console.log('[VOICE-DEBUG][WebSpeechProvider] abortAndWait() invocado. isActive:', this.isActive())
     if (!this.isActive()) return
-    this.cancel()
+    this.cancel(this.turnId)
     await this.waitForEnd(timeoutMs)
     if (this.isActive()) {
       console.warn('[VOICE-DEBUG][WebSpeechProvider] abortAndWait timeout excedido, neutralizando instancia y recreando...')
