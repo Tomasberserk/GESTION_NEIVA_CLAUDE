@@ -77,10 +77,22 @@ async def transcribir_audio(
 ):
     """Fallback STT: recibe audio en formato Opus/WebM y devuelve el texto transcrito."""
     audio_bytes = await audio.read()
+    print(
+        "[VOICE-STT] AUDIO_RECEIVED",
+        {
+            "filename": audio.filename,
+            "content_type": audio.content_type,
+            "size": len(audio_bytes) if audio_bytes else 0,
+        },
+    )
+
     if not audio_bytes or len(audio_bytes) < 100:
+        print("[VOICE-STT] TRANSCRIPTION_RESULT", repr(""))
         return {"texto": ""}
 
-    # 1. Intentar con Groq Whisper (ultra-rápido ~150ms)
+    text = ""
+
+    # 1. Intentar con Groq Whisper si está disponible (ultra-rápido ~150ms)
     groq_key = os.getenv("GROQ_API_KEY")
     if groq_key:
         try:
@@ -91,12 +103,16 @@ async def transcribir_audio(
                 model="whisper-large-v3",
                 language="es",
             )
-            return {"texto": transcription.text.strip()}
+            text = transcription.text.strip()
+            print("[VOICE-STT] TRANSCRIPTION_RESULT (Groq Whisper):", repr(text))
+            return {"texto": text}
         except Exception as exc:
-            pass
+            print("[VOICE-STT] ERROR en Groq Whisper:", exc)
+    else:
+        print("[VOICE-STT] Groq no configurado (GROQ_API_KEY no presente)")
 
-    # 2. Fallback con Google Gemini
-    google_key = os.getenv("GOOGLE_API_KEY")
+    # 2. Fallback con Google Gemini (usando GOOGLE_API_KEY o GEMINI_API_KEY)
+    google_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
     if google_key:
         try:
             import google.generativeai as genai
@@ -106,8 +122,13 @@ async def transcribir_audio(
                 "Transcribe de forma literal y exacta en español este audio de un tendero colombiano. Devuelve ÚNICAMENTE el texto transcrito, sin explicaciones ni comillas.",
                 {"mime_type": audio.content_type or "audio/webm", "data": audio_bytes},
             ])
-            return {"texto": (response.text or "").strip()}
+            text = (response.text or "").strip()
+            print("[VOICE-STT] TRANSCRIPTION_RESULT (Google Gemini):", repr(text))
+            return {"texto": text}
         except Exception as exc:
-            pass
+            print("[VOICE-STT] ERROR en Google Gemini STT:", exc)
+    else:
+        print("[VOICE-STT] Google Gemini no configurado (falta GOOGLE_API_KEY / GEMINI_API_KEY)")
 
+    print("[VOICE-STT] TRANSCRIPTION_RESULT", repr(text))
     return {"texto": ""}

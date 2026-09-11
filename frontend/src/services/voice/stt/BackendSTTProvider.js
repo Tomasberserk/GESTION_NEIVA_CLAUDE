@@ -25,25 +25,33 @@ export class BackendSTTProvider extends SpeechInputProvider {
     this.speechStarted = false
     this.isStarting = false
     this.turnId = null
+    this.sessionGeneration = 0
     this.isPendingTranscription = false
   }
 
-  async start(turnId = null) {
+  isActive() {
+    return !!(this.isStarting || this.isRecording || this.isPendingTranscription)
+  }
+
+  async start(turnId = null, sessionGeneration = 0) {
     if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       throw new Error('La grabación de audio no está disponible en este dispositivo.')
     }
 
-    if (this.isRecording || this.isStarting) {
-      console.warn('[VOICE-LIFECYCLE] BackendSTTProvider.start() ignorado: ya está grabando o iniciando.')
+    if (this.isRecording || this.isStarting || this.isPendingTranscription) {
+      console.warn('[VOICE-LIFECYCLE] BackendSTTProvider.start() ignorado: ya está grabando, iniciando o transcribiendo.')
       return
     }
 
     this.turnId = turnId
+    this.sessionGeneration = sessionGeneration
     this.isStarting = true
     this.isPendingTranscription = false
     this._limpiarRecursos()
     this.audioChunks = []
     this.speechStarted = false
+
+    console.log(`[VOICE-STT] BACKEND_START turnId=${this.turnId ?? ''}`)
 
     try {
       this.audioStream = await navigator.mediaDevices.getUserMedia({
@@ -60,6 +68,11 @@ export class BackendSTTProvider extends SpeechInputProvider {
       this.mediaRecorder.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) {
           this.audioChunks.push(event.data)
+          console.log('[VOICE-STT] AUDIO_CHUNK', {
+            turnId: this.turnId,
+            size: event.data.size,
+            totalChunks: this.audioChunks.length,
+          })
         }
       }
 
@@ -71,13 +84,17 @@ export class BackendSTTProvider extends SpeechInputProvider {
       }
 
       this.mediaRecorder.onstop = async () => {
+        const turnId = this.turnId
+        const sessionGen = this.sessionGeneration
         this.isRecording = false
         this._limpiarTimers()
 
-        if (this.audioChunks.length === 0) {
+        const chunksCount = this.audioChunks.length
+        if (chunksCount === 0) {
+          console.warn('[VOICE-STT] AUDIO_READY: 0 chunks disponibles', { turnId })
           this.isPendingTranscription = false
           this._limpiarRecursos()
-          if (this.onEnd) this.onEnd()
+          if (this.onEnd) this.onEnd(turnId, sessionGen)
           return
         }
 
@@ -85,14 +102,19 @@ export class BackendSTTProvider extends SpeechInputProvider {
         const audioBlob = new Blob(this.audioChunks, { type: this.mimeType })
         this.audioChunks = []
 
+        console.log('[VOICE-STT] AUDIO_READY', {
+          turnId,
+          chunks: chunksCount,
+          blobSize: audioBlob.size,
+          mimeType: audioBlob.type || this.mimeType,
+        })
+
         try {
-          const transcript = await this._enviarAudioAlBackend(audioBlob)
-          console.log(`[VOICE-STT] BACKEND_TRANSCRIPT turnId=${this.turnId ?? ''} transcript="${transcript}"`)
+          const transcript = await this._enviarAudioAlBackend(audioBlob, turnId)
+          console.log(`[VOICE-STT] BACKEND_TRANSCRIPT turnId=${turnId ?? ''} transcript="${transcript}"`)
           this.isPendingTranscription = false
-          if (transcript && this.onTranscript) {
-            this.onTranscript(transcript, true)
-          } else if (this.onTranscript) {
-            this.onTranscript('', true)
+          if (this.onTranscript) {
+            this.onTranscript(transcript || '', true, turnId, sessionGen)
           }
         } catch (err) {
           this.isPendingTranscription = false
@@ -101,12 +123,12 @@ export class BackendSTTProvider extends SpeechInputProvider {
             this.onError({
               code: 'backend-stt-error',
               message: err.message || 'Error al transcribir audio en el servidor',
-            })
+            }, turnId, sessionGen)
           }
         } finally {
           this.isPendingTranscription = false
           this._limpiarRecursos()
-          if (this.onEnd) this.onEnd()
+          if (this.onEnd) this.onEnd(turnId, sessionGen)
         }
       }
 
@@ -116,7 +138,11 @@ export class BackendSTTProvider extends SpeechInputProvider {
       // Hard cap de seguridad: 8 segundos máximo para no colgarse nunca
       this.maxTimer = setTimeout(() => {
         console.info('[BackendSTTProvider] Límite máximo de turno (8s) alcanzado. Deteniendo...')
-        this.stop()
+        if (this.onRequestStop) {
+          this.onRequestStop(this.turnId, this.sessionGeneration)
+        } else {
+          this.requestStop(this.turnId)
+        }
       }, 8000)
 
     } catch (err) {
@@ -126,7 +152,7 @@ export class BackendSTTProvider extends SpeechInputProvider {
         this.onError({
           code: err.name === 'NotAllowedError' ? 'not-allowed' : 'mic-init-error',
           message: err.message,
-        })
+        }, this.turnId, this.sessionGeneration)
       }
     }
   }
@@ -166,7 +192,7 @@ export class BackendSTTProvider extends SpeechInputProvider {
             this.speechStarted = true
             console.log('[BackendSTTProvider] VAD: Habla detectada (RMS:', rms.toFixed(4), ')')
             if (this.onSpeechStart) {
-              this.onSpeechStart()
+              this.onSpeechStart(this.turnId, this.sessionGeneration)
             }
           }
           // Reiniciar timer de silencio si el tendero continúa hablando
@@ -178,7 +204,11 @@ export class BackendSTTProvider extends SpeechInputProvider {
           // El tendero terminó de hablar y se mantiene silencio
           this.silenceTimer = setTimeout(() => {
             console.log('[BackendSTTProvider] VAD: Silencio cómodo detectado (1.6s). Deteniendo...')
-            this.stop()
+            if (this.onRequestStop) {
+              this.onRequestStop(this.turnId, this.sessionGeneration)
+            } else {
+              this.requestStop(this.turnId)
+            }
           }, TIEMPO_SILENCIO_MS)
         }
       }, 100)
@@ -188,12 +218,12 @@ export class BackendSTTProvider extends SpeechInputProvider {
     }
   }
 
-  requestStop() {
-    console.log(`[VOICE-STT] requestStop() invocado en BackendSTTProvider. turnId=${this.turnId ?? ''} isRecording=${this.isRecording}`)
-    this.stop()
+  requestStop(turnId = null) {
+    console.log(`[VOICE-STT] requestStop() invocado en BackendSTTProvider. turnId=${turnId ?? this.turnId ?? ''} isRecording=${this.isRecording}`)
+    this.stop(turnId)
   }
 
-  stop() {
+  stop(turnId = null) {
     this.isStarting = false
     this._limpiarTimers()
     if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
@@ -205,7 +235,7 @@ export class BackendSTTProvider extends SpeechInputProvider {
     }
   }
 
-  cancel() {
+  cancel(turnId = null) {
     this.isStarting = false
     this.isPendingTranscription = false
     this._limpiarTimers()
@@ -254,7 +284,7 @@ export class BackendSTTProvider extends SpeechInputProvider {
     }
   }
 
-  async _enviarAudioAlBackend(blob) {
+  async _enviarAudioAlBackend(blob, turnId = null) {
     const token = localStorage.getItem('access_token')
     const formData = new FormData()
     formData.append('audio', blob, 'voz.webm')
@@ -270,11 +300,24 @@ export class BackendSTTProvider extends SpeechInputProvider {
       body: formData,
     })
 
+    let data = null
+    try {
+      data = await res.json()
+    } catch (_) {
+      data = {}
+    }
+
+    console.log('[VOICE-STT] BACKEND_RESPONSE', {
+      turnId: turnId ?? this.turnId,
+      status: res.status,
+      ok: res.ok,
+      data,
+    })
+
     if (!res.ok) {
       throw new Error(`Servidor devolvió código HTTP ${res.status}`)
     }
 
-    const data = await res.json()
-    return data.texto || ''
+    return data?.texto || ''
   }
 }
