@@ -357,6 +357,119 @@ async function runTests() {
     manager.detenerSesion();
   }
 
+  // TEST L: BackendSTT ciclo completo SIN transición espuria a READY entre SPEECH_DETECTED y BACKEND_TRANSCRIPT
+  console.log('\n--- EJECUTANDO TEST L: BackendSTT ciclo sin READY espurio entre SPEECH_DETECTED y BACKEND_TRANSCRIPT ---');
+  {
+    const stateHistory = [];
+    let messageSent = null;
+    let sendCount = 0;
+
+    const originalUA = navigator.userAgent;
+    Object.defineProperty(globalThis.navigator, 'userAgent', {
+      value: 'Mozilla/5.0 (Linux; Android 12; SM-A025M) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Mobile Safari/537.36',
+      configurable: true
+    });
+
+    const manager = new VoiceTurnManager({
+      onStateChange: (st) => stateHistory.push(st),
+      onSendMessage: async (text) => {
+        sendCount++;
+        messageSent = text;
+        return { respuesta: 'Venta realizada', estado: 'EXECUTED' };
+      }
+    });
+
+    await manager.iniciarEscucha();
+    const turnId = manager.currentTurnId;
+    assert(manager.activeProviderType === 'backend', 'Turno iniciado con BackendSTT en móvil');
+
+    // 1. VAD detecta voz
+    manager.currentSTT.onSpeechStart?.();
+    assert(manager.state === VoiceTurnState.SPEECH_DETECTED, 'Estado pasa a SPEECH_DETECTED');
+
+    // 2. Usuario o VAD solicita detener captura
+    manager.detenerYEnviar();
+    assert(manager.stopRequested === true, 'stopRequested registrado');
+    assert(manager.isTranscribing === true, 'isTranscribing marcado en true esperando audio');
+
+    // 3. Simular que el watchdog de 9s expira mientras la transcripción está pendiente
+    manager._iniciarWatchdogSTT(turnId);
+    assert(manager.state === VoiceTurnState.SPEECH_DETECTED, 'Watchdog NO mata el turno a READY mientras isTranscribing sea true');
+
+    // 4. Servidor responde con la transcripción
+    manager.currentSTT.onTranscript?.('un arroz y dos aceites', true);
+    await new Promise(r => setTimeout(r, 10));
+
+    // 5. Verificar que nunca hubo un READY intermedio entre SPEECH_DETECTED y PROCESSING
+    const speechIdx = stateHistory.indexOf(VoiceTurnState.SPEECH_DETECTED);
+    const procIdx = stateHistory.indexOf(VoiceTurnState.PROCESSING);
+    assert(speechIdx !== -1 && procIdx !== -1, 'Transicionó por SPEECH_DETECTED y PROCESSING');
+    const intermediateStates = stateHistory.slice(speechIdx + 1, procIdx);
+    assert(!intermediateStates.includes(VoiceTurnState.READY), `Sin estado READY intermedio (estados: ${intermediateStates.join(', ') || 'ninguno'})`);
+    assert(messageSent === 'un arroz y dos aceites', `Mensaje enviado al agente: "${messageSent}"`);
+    assert(sendCount === 1, `Exactamente 1 envío al backend (obtenido: ${sendCount})`);
+
+    // Restaurar UA original
+    Object.defineProperty(globalThis.navigator, 'userAgent', {
+      value: originalUA,
+      configurable: true
+    });
+    manager.detenerSesion();
+  }
+
+  // TEST M: InvalidStateError produce recuperación controlada sin dejar WebSpeech fantasma
+  console.log('\n--- EJECUTANDO TEST M: InvalidStateError produce recuperación sin fantasma ---');
+  {
+    const manager = new VoiceTurnManager();
+    const turnId = manager.currentTurnId;
+
+    // Simular que recognition.start lanza InvalidStateError
+    const origStart = manager.webSpeechProvider.recognition.start;
+    manager.webSpeechProvider.recognition.start = () => {
+      const err = new Error('recognition has already started');
+      err.name = 'InvalidStateError';
+      throw err;
+    };
+
+    let errorReceived = null;
+    manager.webSpeechProvider.onError = (err) => {
+      errorReceived = err;
+    };
+
+    await manager.webSpeechProvider.start();
+    assert(errorReceived !== null && errorReceived.code === 'invalid-state', 'InvalidStateError reportado como código invalid-state controlado');
+    assert(manager.webSpeechProvider.isListening === false, 'webSpeechProvider.isListening permanece en false');
+    assert(manager.webSpeechProvider.isActive() === false, 'webSpeechProvider.isActive() es false (sin fantasma)');
+
+    manager.detenerSesion();
+  }
+
+  // TEST N: No iniciar BackendSTT mientras WebSpeech esté en proceso de apagado
+  console.log('\n--- EJECUTANDO TEST N: No iniciar BackendSTT mientras WebSpeech esté en stopping ---');
+  {
+    const manager = new VoiceTurnManager();
+    await manager.iniciarEscucha();
+
+    // Poner WebSpeech en stopping
+    manager.webSpeechProvider.isStopping = true;
+    let webSpeechStoppedBeforeBackend = false;
+
+    // Simular que onend toma 30ms en dispararse
+    setTimeout(() => {
+      manager.webSpeechProvider.onend?.();
+    }, 30);
+
+    const origBackendStart = manager.backendSTTProvider.start;
+    manager.backendSTTProvider.start = async function() {
+      webSpeechStoppedBeforeBackend = !manager.webSpeechProvider.isActive();
+      return origBackendStart.apply(this, arguments);
+    };
+
+    await manager._conmutarABackendSTT(manager.currentTurnId);
+    assert(webSpeechStoppedBeforeBackend === true, 'BackendSTT sólo inició después de que WebSpeech completó su cierre definitivo');
+    manager.detenerSesion();
+  }
+
   console.log('\n====================================================');
   console.log(`🎉 TODOS LOS TESTS COMPLETADOS: ${passed}/${total} PASADOS`);
   console.log('====================================================');

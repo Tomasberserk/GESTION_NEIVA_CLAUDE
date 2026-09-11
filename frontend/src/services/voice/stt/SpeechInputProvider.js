@@ -9,10 +9,16 @@ export class SpeechInputProvider {
     this.onTranscript = null // (text: string, isFinal: boolean) => void
     this.onError = null // (error: { code: string, message: string }) => void
     this.onEnd = null
+    this.onRequestStop = null
+    this.generation = 0
   }
 
   async start() {
     throw new Error('start() debe ser implementado por la subclase')
+  }
+
+  requestStop() {
+    this.stop()
   }
 
   stop() {
@@ -21,5 +27,9 @@ export class SpeechInputProvider {
 
   cancel() {
     throw new Error('cancel() debe ser implementado por la subclase')
+  }
+
+  isActive() {
+    return false
   }
 }

@@ -24,9 +24,11 @@ export class BackendSTTProvider extends SpeechInputProvider {
     this.maxTimer = null
     this.speechStarted = false
     this.isStarting = false
+    this.turnId = null
+    this.isPendingTranscription = false
   }
 
-  async start() {
+  async start(turnId = null) {
     if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       throw new Error('La grabación de audio no está disponible en este dispositivo.')
     }
@@ -36,7 +38,9 @@ export class BackendSTTProvider extends SpeechInputProvider {
       return
     }
 
+    this.turnId = turnId
     this.isStarting = true
+    this.isPendingTranscription = false
     this._limpiarRecursos()
     this.audioChunks = []
     this.speechStarted = false
@@ -62,29 +66,36 @@ export class BackendSTTProvider extends SpeechInputProvider {
       this.mediaRecorder.onstart = () => {
         this.isStarting = false
         this.isRecording = true
-        console.log('[VOICE-STT] BACKEND_RECORDING')
+        console.log(`[VOICE-STT] BACKEND_RECORDING turnId=${this.turnId ?? ''}`)
         this._iniciarVAD()
       }
 
       this.mediaRecorder.onstop = async () => {
         this.isRecording = false
-        this._limpiarRecursos()
+        this._limpiarTimers()
 
         if (this.audioChunks.length === 0) {
+          this.isPendingTranscription = false
+          this._limpiarRecursos()
           if (this.onEnd) this.onEnd()
           return
         }
 
+        this.isPendingTranscription = true
         const audioBlob = new Blob(this.audioChunks, { type: this.mimeType })
         this.audioChunks = []
 
         try {
           const transcript = await this._enviarAudioAlBackend(audioBlob)
-          console.log(`[VOICE-STT] BACKEND_TRANSCRIPT transcript="${transcript}"`)
+          console.log(`[VOICE-STT] BACKEND_TRANSCRIPT turnId=${this.turnId ?? ''} transcript="${transcript}"`)
+          this.isPendingTranscription = false
           if (transcript && this.onTranscript) {
             this.onTranscript(transcript, true)
+          } else if (this.onTranscript) {
+            this.onTranscript('', true)
           }
         } catch (err) {
+          this.isPendingTranscription = false
           console.error('[BackendSTTProvider] Error en transcripción:', err)
           if (this.onError) {
             this.onError({
@@ -93,6 +104,8 @@ export class BackendSTTProvider extends SpeechInputProvider {
             })
           }
         } finally {
+          this.isPendingTranscription = false
+          this._limpiarRecursos()
           if (this.onEnd) this.onEnd()
         }
       }
@@ -176,7 +189,7 @@ export class BackendSTTProvider extends SpeechInputProvider {
   }
 
   requestStop() {
-    console.log('[VOICE-STT] requestStop() invocado en BackendSTTProvider. isRecording:', this.isRecording)
+    console.log(`[VOICE-STT] requestStop() invocado en BackendSTTProvider. turnId=${this.turnId ?? ''} isRecording=${this.isRecording}`)
     this.stop()
   }
 
@@ -193,6 +206,8 @@ export class BackendSTTProvider extends SpeechInputProvider {
   }
 
   cancel() {
+    this.isStarting = false
+    this.isPendingTranscription = false
     this._limpiarTimers()
     this.audioChunks = []
     if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {

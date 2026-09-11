@@ -14,8 +14,40 @@ export class WebSpeechProvider extends SpeechInputProvider {
     this.isStarting = false
     this.isStopping = false
     this.langIndex = 0
+    this._endResolvers = []
     console.log('[VOICE-DEBUG][WebSpeechProvider] constructor llamado con preferredLang:', preferredLang)
     this._initRecognition()
+  }
+
+  isActive() {
+    return this.isStarting || this.isListening || this.isStopping
+  }
+
+  waitForEnd(timeoutMs = 800) {
+    if (!this.isActive()) {
+      return Promise.resolve()
+    }
+    return new Promise((resolve) => {
+      let resolved = false
+      const timer = setTimeout(() => {
+        if (resolved) return
+        resolved = true
+        const idx = this._endResolvers.indexOf(resolveWrapper)
+        if (idx !== -1) this._endResolvers.splice(idx, 1)
+        this.isStarting = false
+        this.isListening = false
+        this.isStopping = false
+        resolve()
+      }, timeoutMs)
+
+      const resolveWrapper = () => {
+        if (resolved) return
+        resolved = true
+        clearTimeout(timer)
+        resolve()
+      }
+      this._endResolvers.push(resolveWrapper)
+    })
   }
 
   _initRecognition() {
@@ -113,10 +145,42 @@ export class WebSpeechProvider extends SpeechInputProvider {
       this.isStarting = false
       this.isListening = false
       this.isStopping = false
+
+      // Despertar promesas esperando el cierre asíncrono
+      const resolvers = this._endResolvers
+      this._endResolvers = []
+      resolvers.forEach((resolve) => resolve())
+
       if (this.onEnd) {
         this.onEnd()
       }
     }
+  }
+
+  _forceResetRecognition() {
+    if (this.recognition) {
+      try {
+        this.recognition.onstart = null
+        this.recognition.onend = null
+        this.recognition.onerror = null
+        this.recognition.onresult = null
+        this.recognition.onspeechstart = null
+        this.recognition.onspeechend = null
+        this.recognition.onaudiostart = null
+        this.recognition.onaudioend = null
+        this.recognition.onsoundstart = null
+        this.recognition.onsoundend = null
+        this.recognition.abort()
+      } catch (_) {}
+    }
+    this._initRecognition()
+    this.isStarting = false
+    this.isListening = false
+    this.isStopping = false
+
+    const resolvers = this._endResolvers
+    this._endResolvers = []
+    resolvers.forEach((resolve) => resolve())
   }
 
   async start() {
@@ -138,8 +202,12 @@ export class WebSpeechProvider extends SpeechInputProvider {
     }
 
     if (this.isStopping) {
-      console.warn('[VOICE-LIFECYCLE] WebSpeechProvider.start() ignorado: esperando cierre definitivo de sesión previa.')
-      return
+      console.warn('[VOICE-LIFECYCLE] WebSpeechProvider.start(): esperando cierre definitivo de sesión previa...')
+      await this.waitForEnd(800)
+      if (this.isActive()) {
+        console.warn('[VOICE-LIFECYCLE] WebSpeechProvider.start(): forzando reinicio tras timeout de cierre.')
+        this._forceResetRecognition()
+      }
     }
 
     this.isStarting = true
@@ -151,9 +219,17 @@ export class WebSpeechProvider extends SpeechInputProvider {
     } catch (err) {
       this.isStarting = false
       console.error('[VOICE-DEBUG][WebSpeechProvider] Excepción en recognition.start():', err.name, err.message)
-      // InvalidStateError ocurre si el motor ya había iniciado
       if (err.name === 'InvalidStateError') {
-        this.isListening = true
+        // Transición de recuperación controlada, NO dejar un WebSpeech fantasma
+        console.warn('[VOICE-STT] WebSpeech InvalidStateError: recognition already started en Chrome. Neutralizando instancia y reseteando sin dejar fantasma...')
+        this._forceResetRecognition()
+
+        if (this.onError) {
+          this.onError({
+            code: 'invalid-state',
+            message: 'SpeechRecognition ya había iniciado o estado desincronizado (InvalidStateError)',
+          })
+        }
         return
       }
       throw err
@@ -170,23 +246,42 @@ export class WebSpeechProvider extends SpeechInputProvider {
         console.warn('[VOICE-STT] Error en recognition.stop():', err)
       }
     }
+    // isListening=false solamente en onend
   }
 
   stop() {
     this.requestStop()
   }
 
+  async stopAndWait(timeoutMs = 800) {
+    this.requestStop()
+    await this.waitForEnd(timeoutMs)
+    if (this.isActive()) {
+      this._forceResetRecognition()
+    }
+  }
+
   cancel() {
-    console.log('[VOICE-DEBUG][WebSpeechProvider] cancel() invocado. isListening:', this.isListening)
-    if (this.recognition) {
+    console.log('[VOICE-DEBUG][WebSpeechProvider] cancel() invocado. isListening:', this.isListening, 'isStopping:', this.isStopping)
+    if (this.recognition && this.isActive()) {
+      this.isStopping = true
       try {
         this.recognition.abort()
       } catch (err) {
         console.warn('[VOICE-DEBUG][WebSpeechProvider] Error en abort():', err)
       }
     }
-    this.isStarting = false
-    this.isListening = false
-    this.isStopping = false
+    // isListening=false solamente en onend
+  }
+
+  async abortAndWait(timeoutMs = 800) {
+    console.log('[VOICE-DEBUG][WebSpeechProvider] abortAndWait() invocado. isActive:', this.isActive())
+    if (!this.isActive()) return
+    this.cancel()
+    await this.waitForEnd(timeoutMs)
+    if (this.isActive()) {
+      console.warn('[VOICE-DEBUG][WebSpeechProvider] abortAndWait timeout excedido, neutralizando instancia y recreando...')
+      this._forceResetRecognition()
+    }
   }
 }
