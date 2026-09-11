@@ -62,6 +62,7 @@ export class BackendSTTProvider extends SpeechInputProvider {
       this.mediaRecorder.onstart = () => {
         this.isStarting = false
         this.isRecording = true
+        console.log('[VOICE-STT] BACKEND_RECORDING')
         this._iniciarVAD()
       }
 
@@ -79,6 +80,7 @@ export class BackendSTTProvider extends SpeechInputProvider {
 
         try {
           const transcript = await this._enviarAudioAlBackend(audioBlob)
+          console.log(`[VOICE-STT] BACKEND_TRANSCRIPT transcript="${transcript}"`)
           if (transcript && this.onTranscript) {
             this.onTranscript(transcript, true)
           }

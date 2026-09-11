@@ -259,6 +259,104 @@ async function runTests() {
     manager.detenerSesion();
   }
 
+  // TEST H: no-speech en WebSpeech -> Fallback a BackendSTT en mismo turnId con nuevo providerGeneration
+  console.log('\n--- EJECUTANDO TEST H: no-speech en WebSpeech activa fallback a BackendSTT ---');
+  {
+    let messageReceived = null;
+    const manager = new VoiceTurnManager({
+      onSendMessage: async (text) => {
+        messageReceived = text;
+        return { respuesta: 'Venta procesada con éxito', estado: 'EXECUTED' };
+      }
+    });
+
+    await manager.iniciarEscucha();
+    const turnId = manager.currentTurnId;
+    const initialGen = manager.providerGeneration;
+    assert(manager.activeProviderType === 'webspeech', 'Inicia con WebSpeech en desktop');
+    assert(initialGen === 1, `providerGeneration inicial es 1 (obtenido: ${initialGen})`);
+
+    // WebSpeech emite no-speech
+    manager.webSpeechProvider.onError?.({ code: 'no-speech' });
+
+    // Verificar que conservó turnId pero incrementó providerGeneration
+    assert(manager.currentTurnId === turnId, `Mismo turnId conservado tras fallback (turnId=${turnId})`);
+    assert(manager.providerGeneration === initialGen + 1, `providerGeneration incrementado a ${initialGen + 1} (obtenido: ${manager.providerGeneration})`);
+    assert(manager.activeProviderType === 'backend', 'Proveedor activo conmutó a backend (BackendSTT)');
+
+    // Simular que WebSpeech emite un onEnd tardío con providerGeneration viejo
+    let staleIgnored = false;
+    const origWarn = console.warn;
+    console.warn = (msg) => {
+      if (typeof msg === 'string' && msg.includes('STALE_CALLBACK_IGNORED')) {
+        staleIgnored = true;
+      }
+      origWarn(msg);
+    };
+    manager.webSpeechProvider.onEnd?.();
+    console.warn = origWarn;
+    assert(staleIgnored === true, 'Callback tardío de WebSpeech descartado por providerGeneration desfasado');
+
+    // Ahora BackendSTT emite transcripción
+    manager.backendSTTProvider.onTranscript?.('tres bolsas de leche', true);
+    await new Promise(r => setTimeout(r, 10));
+
+    assert(messageReceived === 'tres bolsas de leche', `Venta enviada a backend tras fallback (obtenido: "${messageReceived}")`);
+    assert(manager.state === VoiceTurnState.SPEAKING, 'Estado pasa a SPEAKING con respuesta del agente');
+    manager.detenerSesion();
+  }
+
+  // TEST I: aborted con stopRequested === true no dispara fallback erróneo
+  console.log('\n--- EJECUTANDO TEST I: aborted con stopRequested no dispara fallback erróneo ---');
+  {
+    const manager = new VoiceTurnManager();
+    await manager.iniciarEscucha();
+    manager.stopRequested = true;
+
+    // WebSpeech aborta debido a la solicitud de stop
+    manager.webSpeechProvider.onError?.({ code: 'aborted' });
+
+    assert(manager.activeProviderType === 'webspeech', 'No conmutó erróneamente por abort intencional');
+    assert(manager.state === VoiceTurnState.LISTENING, 'Permanece en escucha esperando resultado o timer');
+    manager.detenerSesion();
+  }
+
+  // TEST J: not-allowed (permiso denegado) no intenta fallback y pasa a ERROR
+  console.log('\n--- EJECUTANDO TEST J: not-allowed pasa directamente a ERROR ---');
+  {
+    const manager = new VoiceTurnManager();
+    await manager.iniciarEscucha();
+
+    // WebSpeech reporta permiso denegado
+    manager.webSpeechProvider.onError?.({ code: 'not-allowed' });
+
+    assert(manager.state === VoiceTurnState.ERROR, 'Transiciona directamente a ERROR sin reintentar');
+    assert(manager.activeProviderType === 'webspeech', 'No intenta conmutar a BackendSTT');
+    manager.detenerSesion();
+  }
+
+  // TEST K: En dispositivo Android físico, BackendSTT es primario y WebSpeech no participa
+  console.log('\n--- EJECUTANDO TEST K: Android-First asigna BackendSTTProvider desde el inicio ---');
+  {
+    // Simular User-Agent Android
+    const originalUA = navigator.userAgent;
+    Object.defineProperty(globalThis.navigator, 'userAgent', {
+      value: 'Mozilla/5.0 (Linux; Android 12; SM-A025M) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Mobile Safari/537.36',
+      configurable: true
+    });
+
+    const manager = new VoiceTurnManager();
+    assert(manager.activeProviderType === 'backend', 'En Android, activeProviderType es "backend" desde el inicio');
+    assert(manager.currentSTT === manager.backendSTTProvider, 'currentSTT es BackendSTTProvider');
+
+    // Restaurar UA original
+    Object.defineProperty(globalThis.navigator, 'userAgent', {
+      value: originalUA,
+      configurable: true
+    });
+    manager.detenerSesion();
+  }
+
   console.log('\n====================================================');
   console.log(`🎉 TODOS LOS TESTS COMPLETADOS: ${passed}/${total} PASADOS`);
   console.log('====================================================');

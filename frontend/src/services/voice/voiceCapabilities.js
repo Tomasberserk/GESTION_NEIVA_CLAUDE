@@ -37,10 +37,48 @@ export function getSupportedAudioMime() {
 }
 
 /**
+ * Detecta características del dispositivo y sistema operativo de forma exhaustiva.
+ */
+export function detectDeviceCapabilities() {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+    return {
+      isAndroid: false,
+      isMobile: false,
+      userAgent: 'server',
+      platform: 'unknown',
+      maxTouchPoints: 0,
+    }
+  }
+
+  const ua = navigator.userAgent || ''
+  const platform = navigator.platform || ''
+  const maxTouchPoints = navigator.maxTouchPoints || 0
+
+  // 1. Detección estricta de Android (UA o UserAgentData API)
+  const isAndroid = /Android/i.test(ua) ||
+    (typeof navigator.userAgentData !== 'undefined' && navigator.userAgentData?.platform === 'Android')
+
+  // 2. Detección general de móvil / tablet
+  const isMobile = isAndroid ||
+    /iPhone|iPad|iPod/i.test(ua) ||
+    (typeof navigator.userAgentData !== 'undefined' && !!navigator.userAgentData?.mobile) ||
+    (maxTouchPoints > 1 && /Macintosh|Linux/i.test(ua))
+
+  return {
+    isAndroid,
+    isMobile,
+    userAgent: ua,
+    platform,
+    maxTouchPoints,
+  }
+}
+
+/**
  * Detecta capacidades completas del entorno del navegador.
  */
 export async function getVoiceCapabilities() {
   const isBrowser = typeof window !== 'undefined'
+  const device = detectDeviceCapabilities()
 
   const hasSpeechRecognition = isBrowser && !!(window.SpeechRecognition || window.webkitSpeechRecognition)
   const hasSpeechSynthesis = isBrowser && !!window.speechSynthesis
@@ -60,6 +98,9 @@ export async function getVoiceCapabilities() {
   }
 
   return {
+    isAndroid: device.isAndroid,
+    isMobile: device.isMobile,
+    device,
     speechRecognitionAvailable: hasSpeechRecognition,
     speechSynthesisAvailable: hasSpeechSynthesis,
     mediaRecorderAvailable: hasMediaRecorder,
@@ -71,3 +112,4 @@ export async function getVoiceCapabilities() {
     preferredLang: 'es-CO',
   }
 }
+
