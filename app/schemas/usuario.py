@@ -1,3 +1,4 @@
+from typing import Optional
 from uuid import UUID
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
@@ -6,6 +7,7 @@ from app.models import RolUsuario
 
 
 class UsuarioCrear(BaseModel):
+    nombre: Optional[str] = None
     email: EmailStr
     password: str
     empresa_id: UUID
@@ -34,6 +36,7 @@ class UsuarioRespuesta(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    nombre: Optional[str] = None
     email: str
     empresa_id: UUID
     rol: RolUsuario
@@ -45,6 +48,7 @@ class UsuarioCrearConEmpresa(BaseModel):
     """Schema para registro atómico de empresa + usuario en un solo endpoint."""
     nombre_comercial: str
     nit_o_cedula: str
+    nombre: Optional[str] = None
     email: EmailStr
     password: str
     rol: RolUsuario = RolUsuario.ADMIN

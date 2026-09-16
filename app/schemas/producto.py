@@ -77,14 +77,13 @@ class ProductoActualizar(BaseModel):
         return v
 
 
-class ProductoRespuesta(BaseModel):
+class ProductoBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
     empresa_id: UUID
     nombre: str
     codigo_barras: str
-    precio_costo: float
     precio_venta: float
     cantidad_actual: float
     unidad_medida: str
@@ -95,8 +94,32 @@ class ProductoRespuesta(BaseModel):
     is_active: bool
 
 
-class InventarioRespuesta(BaseModel):
-    """Respuesta de GET /productos/{empresa_id}"""
+class ProductoAdminOut(ProductoBase):
+    """Schema para administradores: incluye precio de costo y margen."""
+    precio_costo: float
+
+
+class ProductoCajeroOut(ProductoBase):
+    """Schema estricto para cajeros/vendedores: CERO exposicion de precio_costo."""
+    pass
+
+
+# Retrocompatibilidad para imports existentes
+ProductoRespuesta = ProductoAdminOut
+
+
+class InventarioAdminRespuesta(BaseModel):
+    """Respuesta para administradores con costos."""
     tienda: str
     total_items: int
-    inventario: List[ProductoRespuesta]
+    inventario: List[ProductoAdminOut]
+
+
+class InventarioCajeroRespuesta(BaseModel):
+    """Respuesta para cajeros/vendedores sin costos."""
+    tienda: str
+    total_items: int
+    inventario: List[ProductoCajeroOut]
+
+
+InventarioRespuesta = InventarioAdminRespuesta

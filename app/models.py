@@ -126,16 +126,18 @@ class Usuario(AuditMixin, Base):
         nullable=False,
         default=RolUsuario.TENDERO,
     )
+    nombre = Column(String(100), nullable=True)
     telefono_whatsapp = Column(String(20), nullable=True, unique=True)
 
     empresa = relationship("Empresa", back_populates="usuarios")
+    ventas  = relationship("Venta", back_populates="usuario")
 
     __table_args__ = (
         Index("idx_usuarios_email", "email"),
     )
 
     def __repr__(self) -> str:
-        return f"<Usuario {self.email!r} rol={self.rol}>"
+        return f"<Usuario {self.email!r} nombre={self.nombre!r} rol={self.rol}>"
 
 
 # ---------------------------------------------------------------------------
@@ -195,16 +197,24 @@ class Venta(AuditMixin, Base):
     )
     fecha_venta = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     total = Column(Numeric(10, 2), nullable=False, server_default="0.00")
+    usuario_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("usuarios.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    vendedor_nombre_snapshot = Column(String(100), nullable=True)
 
     empresa  = relationship("Empresa", back_populates="ventas")
+    usuario  = relationship("Usuario", back_populates="ventas")
     detalles = relationship("DetalleVenta", back_populates="venta", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index("idx_ventas_empresa_fecha", "empresa_id", "fecha_venta"),
+        Index("idx_ventas_usuario_id", "usuario_id"),
     )
 
     def __repr__(self) -> str:
-        return f"<Venta id={self.id} total={self.total}>"
+        return f"<Venta id={self.id} total={self.total} usuario_id={self.usuario_id}>"
 
 
 # ---------------------------------------------------------------------------

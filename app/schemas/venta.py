@@ -1,7 +1,7 @@
 from uuid import UUID
 from datetime import datetime
 from decimal import Decimal
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 
@@ -68,6 +68,8 @@ class VentaRespuesta(BaseModel):
     empresa_id: UUID
     fecha_venta: datetime
     total: float
+    usuario_id: Optional[UUID] = None
+    vendedor_nombre_snapshot: Optional[str] = None
     detalles: List[DetalleVentaRespuesta]
 
 
