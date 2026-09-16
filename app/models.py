@@ -22,6 +22,7 @@ class RolUsuario(str, enum.Enum):
 
 class PlanEmpresa(str, enum.Enum):
     BASIC   = "basic"
+    PRO     = "pro"
     MEDIUM  = "medium"
     PREMIUM = "premium"
 
@@ -31,7 +32,6 @@ class UnidadMedida(str, enum.Enum):
     GRAMO  = "gramo"
     LIBRA  = "libra"
     KILO   = "kilo"
-    # ERP Distribuidora units — Sprint 7.8
     CAJA   = "caja"
     BULTO  = "bulto"
     KG     = "kg"
@@ -57,32 +57,6 @@ class EstadoTicket(str, enum.Enum):
 class RemitenteRol(str, enum.Enum):
     SUPERADMIN = "superadmin"
     USUARIO    = "usuario"
-
-
-# ERP Distribuidora enums — Sprint 7.8 (columns stored as String(50) for
-# compatibility with existing compra_service string comparisons)
-class MetodoPagoCompra(str, enum.Enum):
-    EFECTIVO      = "EFECTIVO"
-    CREDITO       = "CREDITO"
-    TRANSFERENCIA = "TRANSFERENCIA"
-
-
-class EstadoCompra(str, enum.Enum):
-    PAGADA    = "PAGADA"
-    PENDIENTE = "PENDIENTE"
-    ANULADA   = "ANULADA"
-
-
-class EstadoCuentaPorPagar(str, enum.Enum):
-    PENDIENTE = "PENDIENTE"
-    PAGADA    = "PAGADA"
-    VENCIDA   = "VENCIDA"
-
-
-class MetodoPagoAbono(str, enum.Enum):
-    EFECTIVO      = "EFECTIVO"
-    TRANSFERENCIA = "TRANSFERENCIA"
-    CHEQUE        = "CHEQUE"
 
 
 # ---------------------------------------------------------------------------
@@ -126,9 +100,6 @@ class Empresa(AuditMixin, Base):
     productos         = relationship("Producto",       back_populates="empresa", cascade="all, delete-orphan")
     ventas            = relationship("Venta",          back_populates="empresa", cascade="all, delete-orphan")
     soporte_tickets   = relationship("SoporteTicket",  back_populates="empresa", cascade="all, delete-orphan")
-    proveedores       = relationship("Proveedor",      back_populates="empresa", cascade="all, delete-orphan")
-    compras           = relationship("Compra",         back_populates="empresa", cascade="all, delete-orphan")
-    cuentas_por_pagar = relationship("CuentaPorPagar", back_populates="empresa", cascade="all, delete-orphan")
     agent_commands    = relationship("AgentCommand",    back_populates="empresa", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
@@ -158,7 +129,6 @@ class Usuario(AuditMixin, Base):
     telefono_whatsapp = Column(String(20), nullable=True, unique=True)
 
     empresa = relationship("Empresa", back_populates="usuarios")
-    compras = relationship("Compra", back_populates="usuario")
 
     __table_args__ = (
         Index("idx_usuarios_email", "email"),
@@ -181,11 +151,11 @@ class Producto(AuditMixin, Base):
         ForeignKey("empresas.id", ondelete="CASCADE"),
         nullable=False,
     )
-    nombre = Column(String, nullable=False)
-    codigo_barras = Column(String(50), nullable=False)
-    precio_costo = Column(Numeric(10, 2), server_default="0.00", nullable=False)
-    precio_venta = Column(Numeric(10, 2), server_default="0.00", nullable=False)
-    cantidad_actual = Column(Numeric(10, 3), server_default="0.000", nullable=False)
+    codigo_barras = Column(String(100), nullable=False)
+    nombre = Column(String(150), nullable=False)
+    precio_costo = Column(Numeric(12, 2), nullable=False)
+    precio_venta = Column(Numeric(12, 2), nullable=False)
+    cantidad_actual = Column(Numeric(10, 3), nullable=False, default=0.0)
     unidad_medida = Column(
         SAEnum(UnidadMedida, name="unidadmedida", values_callable=lambda x: [e.value for e in x]),
         nullable=False,
@@ -200,7 +170,6 @@ class Producto(AuditMixin, Base):
 
     empresa = relationship("Empresa", back_populates="productos")
     detalles_venta = relationship("DetalleVenta", back_populates="producto", passive_deletes=True)
-    detalles_compra = relationship("DetalleCompra", back_populates="producto", passive_deletes=True)
 
     __table_args__ = (
         UniqueConstraint("empresa_id", "codigo_barras", name="uq_producto_empresa_barras"),
@@ -345,136 +314,8 @@ class SoporteMensaje(Base):
 
 
 # ---------------------------------------------------------------------------
-# ERP Distribuidora — Sprint 7.8
+# Agente IA — Transacciones e Idempotencia
 # ---------------------------------------------------------------------------
-
-class Proveedor(AuditMixin, Base):
-    __tablename__ = "proveedores"
-
-    id              = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    empresa_id      = Column(UUID(as_uuid=True), ForeignKey("empresas.id", ondelete="CASCADE"), nullable=False)
-    nit_o_cedula    = Column(String(50), nullable=False)
-    razon_social    = Column(String(150), nullable=False)
-    contacto_nombre = Column(String(100), nullable=True)
-    telefono        = Column(String(50), nullable=True)
-    email           = Column(String(255), nullable=True)
-    direccion       = Column(String(255), nullable=True)
-
-    empresa           = relationship("Empresa", back_populates="proveedores")
-    compras           = relationship("Compra", back_populates="proveedor")
-    cuentas_por_pagar = relationship("CuentaPorPagar", back_populates="proveedor")
-
-    __table_args__ = (
-        UniqueConstraint("empresa_id", "nit_o_cedula", name="uq_proveedor_empresa_nit"),
-        Index("idx_proveedores_empresa", "empresa_id"),
-        Index("idx_proveedores_razon_social", "razon_social"),
-    )
-
-    def __repr__(self) -> str:
-        return f"<Proveedor {self.razon_social!r} NIT={self.nit_o_cedula}>"
-
-
-class Compra(AuditMixin, Base):
-    __tablename__ = "compras"
-
-    id                = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    empresa_id        = Column(UUID(as_uuid=True), ForeignKey("empresas.id", ondelete="CASCADE"), nullable=False)
-    proveedor_id      = Column(UUID(as_uuid=True), ForeignKey("proveedores.id", ondelete="RESTRICT"), nullable=False)
-    usuario_id        = Column(UUID(as_uuid=True), ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
-    numero_factura    = Column(String(100), nullable=True)
-    fecha_compra      = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    metodo_pago       = Column(String(50), nullable=False, default="EFECTIVO")
-    fecha_vencimiento = Column(DateTime(timezone=True), nullable=True)
-    estado            = Column(String(50), nullable=False, default="PAGADA")
-    total             = Column(Numeric(12, 2), server_default="0.00", nullable=False)
-
-    empresa          = relationship("Empresa", back_populates="compras")
-    proveedor        = relationship("Proveedor", back_populates="compras")
-    usuario          = relationship("Usuario", back_populates="compras")
-    detalles         = relationship("DetalleCompra", back_populates="compra", cascade="all, delete-orphan")
-    cuenta_por_pagar = relationship("CuentaPorPagar", back_populates="compra", uselist=False, cascade="all, delete-orphan")
-
-    __table_args__ = (
-        Index("idx_compras_empresa", "empresa_id"),
-        Index("idx_compras_proveedor", "proveedor_id"),
-        Index("idx_compras_fecha", "fecha_compra"),
-        Index("idx_compras_estado", "estado"),
-    )
-
-    def __repr__(self) -> str:
-        return f"<Compra id={self.id} total={self.total}>"
-
-
-class DetalleCompra(AuditMixin, Base):
-    __tablename__ = "detalle_compras"
-
-    id           = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    compra_id    = Column(UUID(as_uuid=True), ForeignKey("compras.id", ondelete="CASCADE"), nullable=False)
-    producto_id  = Column(UUID(as_uuid=True), ForeignKey("productos.id", ondelete="RESTRICT"), nullable=False)
-    cantidad     = Column(Numeric(10, 3), nullable=False)
-    precio_costo = Column(Numeric(12, 2), nullable=False)
-    subtotal     = Column(Numeric(12, 2), nullable=False)
-
-    compra   = relationship("Compra", back_populates="detalles")
-    producto = relationship("Producto", back_populates="detalles_compra")
-
-    __table_args__ = (
-        Index("idx_detalle_compra_compra", "compra_id"),
-        Index("idx_detalle_compra_producto", "producto_id"),
-    )
-
-    def __repr__(self) -> str:
-        return f"<DetalleCompra compra={self.compra_id} producto={self.producto_id}>"
-
-
-class CuentaPorPagar(AuditMixin, Base):
-    __tablename__ = "cuentas_por_pagar"
-
-    id                = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    empresa_id        = Column(UUID(as_uuid=True), ForeignKey("empresas.id", ondelete="CASCADE"), nullable=False)
-    compra_id         = Column(UUID(as_uuid=True), ForeignKey("compras.id", ondelete="CASCADE"), nullable=False)
-    proveedor_id      = Column(UUID(as_uuid=True), ForeignKey("proveedores.id", ondelete="RESTRICT"), nullable=False)
-    monto_total       = Column(Numeric(12, 2), nullable=False)
-    saldo_pendiente   = Column(Numeric(12, 2), nullable=False)
-    fecha_vencimiento = Column(DateTime(timezone=True), nullable=False)
-    estado            = Column(String(50), nullable=False, default="PENDIENTE")
-
-    empresa   = relationship("Empresa", back_populates="cuentas_por_pagar")
-    compra    = relationship("Compra", back_populates="cuenta_por_pagar")
-    proveedor = relationship("Proveedor", back_populates="cuentas_por_pagar")
-    abonos    = relationship("AbonoCuentaPorPagar", back_populates="cuenta_por_pagar", cascade="all, delete-orphan")
-
-    __table_args__ = (
-        Index("idx_cuentas_pagar_empresa", "empresa_id"),
-        Index("idx_cuentas_pagar_proveedor", "proveedor_id"),
-        Index("idx_cuentas_pagar_estado", "estado"),
-        Index("idx_cuentas_pagar_vencimiento", "fecha_vencimiento"),
-    )
-
-    def __repr__(self) -> str:
-        return f"<CuentaPorPagar id={self.id} saldo={self.saldo_pendiente}>"
-
-
-class AbonoCuentaPorPagar(AuditMixin, Base):
-    __tablename__ = "abonos_cuentas_por_pagar"
-
-    id                  = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    cuenta_por_pagar_id = Column(UUID(as_uuid=True), ForeignKey("cuentas_por_pagar.id", ondelete="CASCADE"), nullable=False)
-    monto               = Column(Numeric(12, 2), nullable=False)
-    fecha_abono         = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    metodo_pago         = Column(String(50), nullable=False, default="EFECTIVO")
-    nota                = Column(String(500), nullable=True)
-
-    cuenta_por_pagar = relationship("CuentaPorPagar", back_populates="abonos")
-
-    __table_args__ = (
-        Index("idx_abonos_cxp", "cuenta_por_pagar_id"),
-        Index("idx_abonos_fecha", "fecha_abono"),
-    )
-
-    def __repr__(self) -> str:
-        return f"<Abono id={self.id} monto={self.monto}>"
-
 
 class AgentCommand(AuditMixin, Base):
     __tablename__ = "agent_commands"

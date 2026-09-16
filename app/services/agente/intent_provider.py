@@ -311,6 +311,7 @@ class LLMIntentProvider:
     """Proveedor que delega la interpretación al LLM si el parser determinístico no coincide."""
 
     def __init__(self, provider: str = "groq", model: str | None = None):
+        self.provider = provider
         default_gemini = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
         self.model = model or ("llama-3.3-70b-versatile" if self.provider == "groq" else default_gemini)
 

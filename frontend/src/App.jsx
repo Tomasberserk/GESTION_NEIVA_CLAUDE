@@ -1,6 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute'
-import PlanProtectedRoute from './components/PlanProtectedRoute'
 import Layout from './components/layout/Layout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
@@ -8,13 +7,8 @@ import Inventario from './pages/Inventario'
 import Ventas from './pages/Ventas'
 import Reportes from './pages/Reportes'
 import Soporte from './pages/Soporte'
-import FabricaApps from './pages/FabricaApps'
+import Planes from './pages/Planes'
 import SuperAdmin from './pages/SuperAdmin'
-import Proveedores from './pages/Proveedores'
-import Compras from './pages/Compras'
-import RegistrarCompra from './pages/RegistrarCompra'
-import CuentasPorPagar from './pages/CuentasPorPagar'
-import ConfigWhatsApp from './pages/ConfigWhatsApp'
 
 export default function App() {
   return (
@@ -29,16 +23,8 @@ export default function App() {
           <Route path="/ventas" element={<Ventas />} />
           <Route path="/reportes" element={<Reportes />} />
           <Route path="/soporte" element={<Soporte />} />
-          <Route path="/fabrica-apps" element={<FabricaApps />} />
-          <Route path="/whatsapp" element={<ConfigWhatsApp />} />
-
-          {/* Módulos ERP del Plan Medium/Premium */}
-          <Route element={<PlanProtectedRoute planesPermitidos={['medium', 'premium']} />}>
-            <Route path="/proveedores" element={<Proveedores />} />
-            <Route path="/compras" element={<Compras />} />
-            <Route path="/compras/nueva" element={<RegistrarCompra />} />
-            <Route path="/cuentas-por-pagar" element={<CuentasPorPagar />} />
-          </Route>
+          <Route path="/planes" element={<Planes />} />
+          <Route path="/fabrica-apps" element={<Navigate to="/planes" replace />} />
         </Route>
       </Route>
 

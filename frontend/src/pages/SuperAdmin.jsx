@@ -361,8 +361,8 @@ function EmpresaCard({ empresa, clave, onRefresh }) {
               onChange={(e) => setPlanSeleccionado(e.target.value)}
               className="w-full text-xs border border-violet-300 rounded px-2.5 py-1.5 bg-white focus:outline-none"
             >
-              <option value="basic">Basic (POS simple)</option>
-              <option value="medium">Medium (ERP Distribuidora)</option>
+              <option value="basic">Basic (POS Esencial)</option>
+              <option value="pro">Pro (Gestión Inteligente IA)</option>
               <option value="premium">Premium (Acceso total)</option>
             </select>
           </div>

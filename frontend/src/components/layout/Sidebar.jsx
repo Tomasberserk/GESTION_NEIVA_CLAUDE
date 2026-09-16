@@ -8,10 +8,7 @@ import {
   MessageCircle,
   Settings,
   X,
-  Rocket,
-  Users,
-  CreditCard,
-  Receipt,
+  Sparkles,
   Bot,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
@@ -20,17 +17,13 @@ import authService from '../../services/authService'
 const BASE = import.meta.env.VITE_API_URL || '/api'
 
 const navItems = [
-  { to: '/dashboard',       label: 'Dashboard',        icon: LayoutDashboard },
-  { to: '/inventario',      label: 'Inventario',        icon: Package },
-  { to: '/ventas',          label: 'Ventas',            icon: ShoppingCart },
-  { to: '/proveedores',     label: 'Proveedores',      icon: Users,          planes: ['medium', 'premium'] },
-  { to: '/compras',         label: 'Compras',          icon: Receipt,        planes: ['medium', 'premium'] },
-  { to: '/cuentas-por-pagar', label: 'Cuentas por Pagar', icon: CreditCard,   planes: ['medium', 'premium'] },
-  { to: '/reportes',        label: 'Reportes',          icon: BarChart3 },
-  { to: '/soporte',         label: 'Soporte Técnico',   icon: MessageCircle },
-  { to: '/fabrica-apps',    label: 'Fábrica Apps',      icon: Rocket },
-  { to: '/whatsapp',        label: 'WhatsApp IA',        icon: Bot },
-  { to: '/configuracion',   label: 'Configuración',     icon: Settings },
+  { to: '/dashboard',     label: 'Dashboard',       icon: LayoutDashboard },
+  { to: '/inventario',    label: 'Inventario',       icon: Package },
+  { to: '/ventas',        label: 'Ventas',           icon: ShoppingCart },
+  { to: '/reportes',      label: 'Reportes',         icon: BarChart3 },
+  { to: '/soporte',       label: 'Soporte Técnico',  icon: MessageCircle },
+  { to: '/planes',        label: 'Planes',           icon: Sparkles },
+  { to: '/configuracion', label: 'Configuración',    icon: Settings },
 ]
 
 export default function Sidebar({ abierto, onCerrar }) {

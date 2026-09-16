@@ -88,13 +88,13 @@ def obtener_ticket(
 
 
 @router.post("/solicitar-upgrade", status_code=status.HTTP_201_CREATED)
-def solicitar_upgrade_medium(
+def solicitar_upgrade_pro(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(get_current_user),
 ):
     """
-    Solicita el upgrade a Plan Medium (ERP Distribuidora).
-    Marca el flag en la empresa y crea un ticket de soporte automático.
+    Solicita el upgrade a Plan Pro (Gestión Inteligente IA).
+    Crea un ticket de soporte automático para el superadmin.
     Idempotente: devuelve 409 si ya fue solicitado.
     """
     # Verificar si ya existe una solicitud abierta para evitar spam
@@ -102,7 +102,7 @@ def solicitar_upgrade_medium(
         db.query(models.SoporteTicket)
         .filter(
             models.SoporteTicket.empresa_id == current_user.empresa_id,
-            models.SoporteTicket.asunto == "Solicitud de upgrade a Plan Medium (ERP Distribuidora)",
+            models.SoporteTicket.asunto.ilike("%Solicitud de upgrade%"),
             models.SoporteTicket.estado != models.EstadoTicket.CERRADO,
             models.SoporteTicket.is_active.is_(True),
         )
@@ -122,7 +122,7 @@ def solicitar_upgrade_medium(
     ticket = models.SoporteTicket(
         empresa_id=current_user.empresa_id,
         usuario_id=current_user.id,
-        asunto="Solicitud de upgrade a Plan Medium (ERP Distribuidora)",
+        asunto="Solicitud de upgrade a Plan Pro (Gestión Inteligente IA)",
         is_active=True,
     )
     db.add(ticket)
@@ -134,8 +134,8 @@ def solicitar_upgrade_medium(
         remitente_email=current_user.email,
         mensaje=(
             f"Hola, soy {current_user.email} de la empresa {empresa.nombre_comercial}. "
-            "Me interesa probar el Plan Medium con el ERP Distribuidora. "
-            "Por favor actívenme el trial de 8 días."
+            "Me interesa activar el Plan Pro con Gestión Inteligente (Asistente de Voz y Chatbot IA). "
+            "Por favor contáctenme para la activación y configuración de mi negocio."
         ),
     )
     db.add(mensaje)
