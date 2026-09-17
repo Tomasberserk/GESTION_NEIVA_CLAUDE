@@ -1,7 +1,8 @@
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date, time
 from decimal import Decimal
 from typing import Optional
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, joinedload
@@ -30,8 +31,14 @@ def registrar_venta(
             detail="No tienes permiso para operar en esta empresa",
         )
 
-    # 2. Crear el documento maestro de venta con total provisional = 0
-    nueva_venta = models.Venta(empresa_id=empresa_id, total=Decimal("0.00"), is_active=True)
+    # 2. Crear el documento maestro de venta con total provisional = 0 y trazabilidad inmutable
+    nueva_venta = models.Venta(
+        empresa_id=empresa_id,
+        total=Decimal("0.00"),
+        is_active=True,
+        usuario_id=current_user.id,
+        vendedor_nombre_snapshot=current_user.nombre or current_user.email,
+    )
     db.add(nueva_venta)
     # flush: escribe en la transacción activa sin hacer commit,
     # para obtener el UUID asignado por PostgreSQL
@@ -156,3 +163,69 @@ def obtener_ventas_empresa(
         .order_by(models.Venta.fecha_venta.desc())
         .all()
     )
+
+
+try:
+    COLOMBIA_TZ = ZoneInfo("America/Bogota")
+except Exception:
+    COLOMBIA_TZ = timezone(timedelta(hours=-5))
+
+
+def obtener_actividad_ventas(
+    admin_user: models.Usuario,
+    db: Session,
+    fecha: Optional[str] = None,
+    usuario_id: Optional[UUID] = None,
+) -> list[models.Venta]:
+    """
+    Retorna la actividad de ventas de un día comercial en Colombia (America/Bogota).
+    Usa intervalo semiabierto [inicio, fin) y orden determinista (fecha_venta ASC, id ASC).
+    Valida pertenencia multi-tenant estricta si se filtra por usuario_id.
+    """
+    if not fecha:
+        fecha_dt = datetime.now(COLOMBIA_TZ).date()
+    else:
+        try:
+            fecha_dt = date.fromisoformat(fecha)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Formato de fecha inválido. Use YYYY-MM-DD",
+            )
+
+    inicio = datetime.combine(fecha_dt, time.min, tzinfo=COLOMBIA_TZ)
+    fin = inicio + timedelta(days=1)
+
+    if usuario_id:
+        vendedor = (
+            db.query(models.Usuario)
+            .filter(
+                models.Usuario.id == usuario_id,
+                models.Usuario.empresa_id == admin_user.empresa_id,
+            )
+            .first()
+        )
+        if not vendedor:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Vendedor no encontrado en esta empresa",
+            )
+
+    query = (
+        db.query(models.Venta)
+        .options(
+            joinedload(models.Venta.detalles).joinedload(models.DetalleVenta.producto)
+        )
+        .filter(
+            models.Venta.empresa_id == admin_user.empresa_id,
+            models.Venta.is_active.is_(True),
+            models.Venta.fecha_venta >= inicio,
+            models.Venta.fecha_venta < fin,
+        )
+    )
+
+    if usuario_id:
+        query = query.filter(models.Venta.usuario_id == usuario_id)
+
+    return query.order_by(models.Venta.fecha_venta.asc(), models.Venta.id.asc()).all()
+

@@ -164,12 +164,18 @@ def login_usuario(email: str, password: str, db: Session, ip: str = "unknown") -
 
     usuario = db.query(models.Usuario).filter(
         models.Usuario.email == email,
-        models.Usuario.is_active.is_(True),
     ).first()
 
     if not usuario or not verificar_password(password, usuario.hashed_password):
         log_security_event("LOGIN_FAILED", email, ip=ip, level="WARNING")
         raise _credenciales_invalidas
+
+    if not usuario.is_active:
+        log_security_event("LOGIN_BLOCKED_INACTIVE_USER", email, user_id=str(usuario.id), ip=ip, level="WARNING")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuario desactivado. Contacta al administrador.",
+        )
 
     token = crear_token_acceso({"sub": str(usuario.id)})
     log_security_event("LOGIN_SUCCESS", usuario.email, user_id=str(usuario.id), ip=ip)

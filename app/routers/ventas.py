@@ -7,11 +7,31 @@ from sqlalchemy.orm import Session
 
 from app import models
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, get_current_user_admin
 from app.schemas.venta import VentaCrear, VentaRespuesta, VentaResumen
 from app.services import venta_service
 
 router = APIRouter(prefix="/ventas", tags=["Ventas"])
+
+
+@router.get("/actividad", response_model=list[VentaRespuesta])
+@router.get("/actividad-hoy", response_model=list[VentaRespuesta])
+def actividad_ventas(
+    fecha: Optional[str] = Query(None, description="Fecha comercial YYYY-MM-DD (America/Bogota). Por defecto hoy."),
+    usuario_id: Optional[UUID] = Query(None, description="Filtrar por ID de vendedor"),
+    db: Session = Depends(get_db),
+    current_user: models.Usuario = Depends(get_current_user_admin),
+):
+    """
+    Timeline cronológico de ventas de un día comercial en Colombia (orden determinista).
+    Solo accesible para administradores de la empresa.
+    """
+    return venta_service.obtener_actividad_ventas(
+        admin_user=current_user,
+        db=db,
+        fecha=fecha,
+        usuario_id=usuario_id,
+    )
 
 
 @router.post("/{empresa_id}", response_model=VentaResumen, status_code=status.HTTP_201_CREATED)

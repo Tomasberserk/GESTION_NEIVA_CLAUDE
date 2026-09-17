@@ -363,39 +363,21 @@
 
 ## Propuestas pendientes de evaluación
 
-> [GEMINI PROPONE] Sprint 8.1 — RBAC (Dueño vs. Cajero), Actividad del Día y Límite de Cajeros por Plan (Auditado)
-> **Dictamen de Auditoría:** Aprobado 9.5/10 — Incorpora correcciones P0 de trazabilidad histórica, concurrencia PostgreSQL pura y schemas Pydantic ciegos.
+> [GEMINI PROPONE → ✅ GEMINI IMPLEMENTA] Sprint 8.1 — RBAC (Dueño vs. Cajero), Actividad del Día y Límite de Cajeros por Plan (Auditado)
+> **Dictamen de Auditoría:** Aprobado 9.7/10 — Fase 1 (DB/Modelos) y Fase 2 (Backend/RBAC/Concurrencia) **COMPLETADAS**.
 >
-> **Motivo y Reglas de Negocio:**
-> 1. **Privacidad y Segregación Real:** El cajero nunca debe recibir el `precio_costo` ni márgenes (blindaje en API backend con `ProductoCajeroOut`, jamás solo en frontend).
-> 2. **Trazabilidad Histórica Inmutable:** La tabla `ventas` debe guardar `usuario_id` (relación viva) Y `vendedor_nombre_snapshot` (evidencia histórica). Si el cajero es desactivado o borrado, la venta histórica mantiene el nombre original del vendedor.
-> 3. **Límite de Cajeros Activos (No usuarios totales):** El Plan Básico permite hasta 3 cajeros *activos* (`rol == TENDERO` y `is_active == True`). El Admin no consume asiento. Desactivar un cajero libera cupo.
-> 4. **Concurrencia Blindada en PostgreSQL:** La verificación de límite $\le 3$ se ejecuta con transacción ACID y bloqueo `SELECT FOR UPDATE` sobre la fila de la `Empresa`, protegiendo tanto la **creación** como la **reactivación**.
-> 5. **Alfabetización y UX de Mostrador:** "Actividad del Día" cronológica para el dueño y mostrador POS directo para el cajero.
->
-> **Propuesta Técnica (Checklist P0):**
-> - **Base de Datos (Alembic):**
->   - Columna `nombre` (String 100, nullable=True) en tabla `usuarios`.
->   - Columna `usuario_id` (UUID, ForeignKey `usuarios.id`, nullable=True, ondelete='SET NULL') en tabla `ventas`.
->   - Columna `vendedor_nombre_snapshot` (String 100, nullable=False, server_default='Administrador') en tabla `ventas`.
-> - **Backend (FastAPI):**
->   - `schemas/producto.py`: Separar `ProductoAdminOut` (con `precio_costo`) y `ProductoCajeroOut` (sin `precio_costo`).
->   - `routers/productos.py`: Retornar dinámicamente según `current_user.rol`.
->   - `venta_service.registrar_venta`: Asignar `usuario_id = current_user.id` y `vendedor_nombre_snapshot = current_user.nombre or current_user.email`.
->   - `routers/usuarios.py`: Endpoints para crear (`POST`) y alternar estado (`PATCH /{id}/estado`) de cajeros con `SELECT FOR UPDATE` sobre `Empresa` para validar `count(cajeros activos) < 3` en Plan Básico.
->   - Proteger endpoints administrativos (`/reportes/*`, `/dashboard/*`, `/empresas/*`) con `Depends(get_current_user_admin)`.
->   - Impedir login de usuarios inactivos (`is_active is False`).
->   - `GET /api/ventas/actividad-hoy`: Endpoint cronológico del día con hora, snapshot del vendedor, total y desglose.
-> - **Frontend (React 19 JSX):**
->   - `Sidebar.jsx`: Ocultar Dashboard, Reportes y Planes al rol `tendero`.
->   - `App.jsx`: Redirección automática de cajeros a `/ventas` (POS).
->   - `Configuracion.jsx`: Pestaña "Equipo de Trabajo" con contador `X de 3 cajeros activos`, switch activo/inactivo y modal contextual de upselling a Plan Pro ("¡Tu equipo está creciendo!").
->   - `Ventas.jsx`: Vista "Actividad del Día" para el Administrador con línea de tiempo cronológica.
->
-> **Impacto y Garantía:**
-> - Cero fugas de información financiera en DevTools/API.
-> - Cero race conditions en la creación/activación de cajeros.
-> - Auditoría histórica permanente a prueba de renuncias o eliminaciones de personal.
+> **Estado de Implementación:**
+> - [x] **Fase 1 (DB & Schemas):** Migración Alembic 012 aplicada y reversible, `Usuario.nombre`, `Venta.usuario_id`, `Venta.vendedor_nombre_snapshot` inmutable, schemas `ProductoAdminOut` vs `ProductoCajeroOut`. (6/6 tests passing)
+> - [x] **Fase 2 (Backend, RBAC & Concurrencia):**
+>   - Inactivación inmediata de JWT en `get_current_user` (`is_active is False` ➡️ HTTP 403) y bloqueo de login.
+>   - Aislamiento multi-tenant estricto anti-IDOR en gestión de empleados y actividad de ventas.
+>   - Servicio transaccional `usuario_service.py` con `SELECT ... FOR UPDATE` en PostgreSQL: control atómico de $\le 3$ cajeros activos en Plan Básico tanto en creación como en reactivación.
+>   - Trazabilidad automática de ventas con inyección de `usuario_id` y snapshot del vendedor desde el JWT.
+>   - Blindaje de endpoints administrativos (`/reportes/*`, `/dashboard/*`, `/usuarios/*`, mutaciones de productos) con `get_current_user_admin`.
+>   - Catálogo ciego en `/api/productos`: cajero jamás recibe `precio_costo` a nivel de red ni serialización.
+>   - Endpoint de Actividad del Día (`/api/ventas/actividad` y `/api/ventas/actividad-hoy`) con timezone `America/Bogota`, intervalo semiabierto `[inicio, fin)` y orden determinista.
+>   - **Verificación:** 8/8 tests de Fase 2 passing (`tests/test_fase2_backend_rbac.py`) + 5/5 integración PostgreSQL + 57/57 tests globales passing al 100%.
+> - [ ] **Fase 3 (Frontend & UX):** Menú condicional en `Sidebar.jsx`, redirección a POS en `App.jsx`, pestaña "Equipo de Trabajo" en `Configuracion.jsx` con modal de upselling y vista "Actividad del Día" en `Ventas.jsx`. (SIGUIENTE)
 
 _
 

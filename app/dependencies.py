@@ -38,11 +38,16 @@ def get_current_user(
 
     usuario = db.query(models.Usuario).filter(
         models.Usuario.id == user_id_uuid,
-        models.Usuario.is_active.is_(True),
     ).first()
 
     if not usuario:
         raise _no_autenticado
+
+    if not usuario.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuario desactivado. Contacta al administrador.",
+        )
 
     empresa = db.query(models.Empresa).filter(
         models.Empresa.id == usuario.empresa_id,

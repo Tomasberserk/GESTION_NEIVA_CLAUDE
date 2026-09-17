@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app import models
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user_admin
 from app.services.venta_service import obtener_ventas_empresa
 
 router = APIRouter(prefix="/reportes", tags=["Reportes"])
@@ -22,7 +22,7 @@ _HEADER_FONT = Font(bold=True, color="FFFFFF")
 def exportar_ventas_excel(
     empresa_id: UUID,
     db: Session = Depends(get_db),
-    current_user: models.Usuario = Depends(get_current_user),
+    current_user: models.Usuario = Depends(get_current_user_admin),
 ):
     if current_user.empresa_id != empresa_id:
         raise HTTPException(
@@ -85,7 +85,7 @@ def exportar_ventas_excel(
 def obtener_resumen_financiero(
     empresa_id: UUID,
     db: Session = Depends(get_db),
-    current_user: models.Usuario = Depends(get_current_user),
+    current_user: models.Usuario = Depends(get_current_user_admin),
 ):
     if current_user.empresa_id != empresa_id:
         raise HTTPException(

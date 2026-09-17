@@ -101,3 +101,54 @@ class TokenRespuesta(BaseModel):
     access_token: str
     token_type: str = "bearer"
     usuario: UsuarioRespuesta
+
+
+class EmpleadoCrear(BaseModel):
+    nombre: str
+    email: EmailStr
+    password: str
+
+    @field_validator("nombre")
+    @classmethod
+    def nombre_no_vacio(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("El nombre no puede estar vacío")
+        if len(v) > 100:
+            raise ValueError("El nombre no puede exceder 100 caracteres")
+        return v
+
+    @field_validator("password")
+    @classmethod
+    def password_minimo(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("La contraseña debe tener al menos 8 caracteres")
+        import re
+        if (
+            not re.search(r"[A-Z]", v)
+            or not re.search(r"[a-z]", v)
+            or not re.search(r"[0-9]", v)
+            or not re.search(r"[!@#$%^&*(),.?\":{}|<>]", v)
+        ):
+            raise ValueError(
+                "La contraseña debe incluir al menos una letra mayúscula, "
+                "una letra minúscula, un número y un carácter especial"
+            )
+        return v
+
+
+class EmpleadoEstadoUpdate(BaseModel):
+    is_active: bool
+
+
+class EmpleadoRespuesta(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    nombre: Optional[str] = None
+    email: str
+    empresa_id: UUID
+    rol: RolUsuario
+    is_active: bool
+    created_at: datetime
+

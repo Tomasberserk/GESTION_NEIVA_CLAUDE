@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.routers import auth, dashboard, empresas, productos, reportes, ventas, superadmin, soporte, agente
+from app.routers import auth, dashboard, empresas, productos, reportes, ventas, superadmin, soporte, agente, usuarios
 from app.core.security_middleware import SecurityHeadersMiddleware
 
 _DEBUG = os.getenv("DEBUG", "false").lower() == "true"
@@ -62,16 +62,20 @@ app.mount("/media", StaticFiles(directory=_media_dir), name="media")
 # ---------------------------------------------------------------------------
 # Routers — cada uno con su propio prefijo y método HTTP definido
 # ---------------------------------------------------------------------------
-app.include_router(auth.router)
-app.include_router(dashboard.router)
-app.include_router(empresas.router)
-app.include_router(productos.router)
-app.include_router(ventas.router)
-app.include_router(reportes.router)
-app.include_router(superadmin.router)
-app.include_router(soporte.router)
-app.include_router(agente.router)
-app.include_router(agente.router, prefix="/api")
+for r in (
+    auth.router,
+    dashboard.router,
+    empresas.router,
+    productos.router,
+    ventas.router,
+    reportes.router,
+    superadmin.router,
+    soporte.router,
+    usuarios.router,
+    agente.router,
+):
+    app.include_router(r)
+    app.include_router(r, prefix="/api")
 
 # ---------------------------------------------------------------------------
 # Exception handlers globales
