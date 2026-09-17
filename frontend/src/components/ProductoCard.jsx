@@ -1,12 +1,13 @@
 import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
+import { canEditProducts } from '../utils/permissions'
 
 const BASE = import.meta.env.VITE_API_URL || '/api'
 
 export default function ProductoCard({ producto, onEditar, onEliminar }) {
   const { agregar } = useCart()
   const { usuario } = useAuth()
-  const esAdmin = usuario?.rol === 'admin'
+  const esAdmin = canEditProducts(usuario)
   const sinStock = producto.cantidad_actual === 0
 
   return (

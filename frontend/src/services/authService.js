@@ -10,6 +10,8 @@ async function parseJsonSafe(res) {
   }
 }
 
+let isRedirecting401 = false
+
 const authService = {
   setToken(token) {
     localStorage.setItem('access_token', token)
@@ -90,7 +92,10 @@ const authService = {
     const res = await fetch(url, { ...options, headers })
     if (res.status === 401) {
       this.clearToken()
-      window.location.href = '/login'
+      if (!isRedirecting401 && typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+        isRedirecting401 = true
+        window.location.href = '/login?expirado=1'
+      }
     }
     return res
   },

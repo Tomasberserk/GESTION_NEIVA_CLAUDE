@@ -1,12 +1,15 @@
-import { Bell, User, Menu } from 'lucide-react'
+import { Bell, User, Menu, LogOut } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
+import { isAdmin } from '../../utils/permissions'
 
 export default function Header({ onMenuToggle }) {
   const { usuario, logout } = useAuth()
+  const esAdmin = isAdmin(usuario)
+  const nombreMostrar = usuario?.nombre?.trim() || usuario?.email?.split('@')[0] || 'Usuario'
+  const rolTexto = esAdmin ? 'Administrador' : 'Cajero'
 
   return (
     <header className="h-14 bg-slate-800 border-b border-slate-700 flex items-center justify-between px-4 sm:px-6 shrink-0">
-
       <div className="flex items-center gap-3">
         {/* Hamburguesa — solo visible en mobile */}
         <button
@@ -17,25 +20,46 @@ export default function Header({ onMenuToggle }) {
           <Menu size={22} />
         </button>
 
-        <span className="text-white font-semibold text-lg tracking-tight">
-          Gestión Neiva
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-white font-semibold text-lg tracking-tight">
+            Gestión Neiva
+          </span>
+          <span className="hidden md:inline-block text-slate-500 text-xs font-mono">
+            v1.0
+          </span>
+        </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        <button className="text-slate-400 hover:text-white transition-colors">
-          <Bell size={18} />
-        </button>
+      <div className="flex items-center gap-3 sm:gap-4">
+        {/* Identidad del usuario con badge sutil */}
+        <div className="flex items-center gap-2 text-slate-300 text-sm">
+          <div className="w-8 h-8 rounded-full bg-slate-700 border border-slate-600 flex items-center justify-center text-slate-200 text-xs font-bold">
+            {nombreMostrar.charAt(0).toUpperCase()}
+          </div>
+          <div className="hidden sm:flex flex-col text-left">
+            <span className="font-medium text-slate-200 truncate max-w-[150px] leading-tight">
+              {nombreMostrar}
+            </span>
+            <span
+              className={`text-[10px] font-medium leading-none mt-0.5 px-1.5 py-0.5 rounded w-fit ${
+                esAdmin
+                  ? 'bg-violet-900/60 text-violet-300 border border-violet-700/50'
+                  : 'bg-emerald-900/60 text-emerald-300 border border-emerald-700/50'
+              }`}
+            >
+              {rolTexto}
+            </span>
+          </div>
+        </div>
+
+        {/* Botón de cerrar sesión */}
         <button
           onClick={logout}
-          className="flex items-center gap-2 text-slate-300 hover:text-white text-sm transition-colors"
+          className="flex items-center gap-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-700/50 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ml-1"
           title="Cerrar sesión"
         >
-          <User size={18} />
-          {/* Email oculto en pantallas muy pequeñas para no achicar el header */}
-          <span className="hidden sm:block truncate max-w-[140px]">
-            {usuario?.email ?? 'Usuario'}
-          </span>
+          <LogOut size={16} />
+          <span className="hidden md:inline">Salir</span>
         </button>
       </div>
     </header>

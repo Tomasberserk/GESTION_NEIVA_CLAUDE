@@ -9,25 +9,28 @@ import {
   Settings,
   X,
   Sparkles,
-  Bot,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import authService from '../../services/authService'
+import { useAuth } from '../../context/AuthContext'
+import { isAdmin } from '../../utils/permissions'
 
 const BASE = import.meta.env.VITE_API_URL || '/api'
 
 const navItems = [
-  { to: '/dashboard',     label: 'Dashboard',       icon: LayoutDashboard },
-  { to: '/inventario',    label: 'Inventario',       icon: Package },
-  { to: '/ventas',        label: 'Ventas',           icon: ShoppingCart },
-  { to: '/reportes',      label: 'Reportes',         icon: BarChart3 },
-  { to: '/soporte',       label: 'Soporte Técnico',  icon: MessageCircle },
-  { to: '/planes',        label: 'Planes',           icon: Sparkles },
-  { to: '/configuracion', label: 'Configuración',    icon: Settings },
+  { to: '/dashboard',     label: 'Dashboard',   icon: LayoutDashboard, adminOnly: true },
+  { to: '/ventas',        label: 'Ventas',      icon: ShoppingCart,    adminOnly: false },
+  { to: '/inventario',    label: 'Productos',   icon: Package,         adminOnly: false },
+  { to: '/reportes',      label: 'Reportes',    icon: BarChart3,       adminOnly: true },
+  { to: '/soporte',       label: 'Ayuda',       icon: MessageCircle,   adminOnly: false },
+  { to: '/planes',        label: 'Planes',      icon: Sparkles,        adminOnly: true },
+  { to: '/configuracion', label: 'Configuración', icon: Settings,      adminOnly: true },
 ]
 
 export default function Sidebar({ abierto, onCerrar }) {
+  const { usuario } = useAuth()
   const [empresa, setEmpresa] = useState(null)
+  const esAdmin = isAdmin(usuario)
 
   useEffect(() => {
     authService
@@ -73,6 +76,7 @@ export default function Sidebar({ abierto, onCerrar }) {
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {navItems
             .filter((item) => !item.planes || item.planes.includes(empresa?.plan || 'basic'))
+            .filter((item) => !item.adminOnly || esAdmin)
             .map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}

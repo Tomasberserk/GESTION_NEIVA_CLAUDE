@@ -377,7 +377,17 @@
 >   - Catálogo ciego en `/api/productos`: cajero jamás recibe `precio_costo` a nivel de red ni serialización.
 >   - Endpoint de Actividad del Día (`/api/ventas/actividad` y `/api/ventas/actividad-hoy`) con timezone `America/Bogota`, intervalo semiabierto `[inicio, fin)` y orden determinista.
 >   - **Verificación:** 8/8 tests de Fase 2 passing (`tests/test_fase2_backend_rbac.py`) + 5/5 integración PostgreSQL + 57/57 tests globales passing al 100%.
-> - [ ] **Fase 3 (Frontend & UX):** Menú condicional en `Sidebar.jsx`, redirección a POS en `App.jsx`, pestaña "Equipo de Trabajo" en `Configuracion.jsx` con modal de upselling y vista "Actividad del Día" en `Ventas.jsx`. (SIGUIENTE)
+> - [x] **Fase 3 (Frontend & UX):** Menú condicional en `Sidebar.jsx`, redirección a POS en `App.jsx`, pestaña "Equipo de Trabajo" en `Configuracion.jsx` con modal de upselling y vista "Actividad del Día" en `Ventas.jsx`. (COMPLETO)
+>   - Helpers puros de permisos en `frontend/src/utils/permissions.js` (`isAdmin`, `isTendero`, `canViewAdminModules`, `canEditProducts`).
+>   - Servicio `usuarioService.js` para consumir `/api/usuarios/empleados` capturando semánticamente `LIMIT_CAJEROS_REACHED`.
+>   - Protección de rutas en cliente en `ProtectedRoute.jsx` con flag `adminOnly` e intercepción inmediata previa al montaje.
+>   - Redirección raíz `/` y post-login inteligente según rol (`/dashboard` para admin, `/ventas` para cajero/tendero).
+>   - Manejo seguro de sesión expirada 401 en `authService.js` con bandera contra tormentas de redirecciones y persistencia del carrito del mostrador en `CartContext.jsx` (`localStorage`).
+>   - Reetiquetado amigable de baja fricción: *"Productos"* (ex Inventario) y *"Ayuda"* (ex Soporte Técnico) en `Sidebar.jsx`.
+>   - Identidad humana en `Header.jsx` sin nombres hardcodeados y con pastilla sutil de rol.
+>   - Pantalla `Configuracion.jsx` con control de cupos accesibles $X/3$, switch con modal de confirmación anti-toques accidentales y modal festivo de Upselling al Plan Pro.
+>   - Vista "Actividad del Día" en `Ventas.jsx`: timeline compacto en zona horaria `America/Bogota`, acordeón colapsable para tickets de venta, selector mobile de fechas y filtro server-side por cajero.
+>   - **Verificación:** `npm run build` exitoso en 29s (0 errores) + 62/62 pruebas globales backend pasando al 100%.
 
 _
 

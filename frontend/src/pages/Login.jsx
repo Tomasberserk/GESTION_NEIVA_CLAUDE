@@ -9,6 +9,8 @@ export default function Login() {
   const [error, setError] = useState(null)
   const [cargando, setCargando] = useState(false)
 
+  const sesionExpirada = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('expirado') === '1'
+
   const cambiar = (e) => setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
 
   const enviar = async (e) => {
@@ -16,8 +18,9 @@ export default function Login() {
     setCargando(true)
     setError(null)
     try {
-      await login(form.email, form.password)
-      navigate('/inventario', { replace: true })
+      const data = await login(form.email, form.password)
+      const rutaDestino = data?.usuario?.rol === 'admin' ? '/dashboard' : '/ventas'
+      navigate(rutaDestino, { replace: true })
     } catch (e) {
       setError(e.message)
     } finally {
@@ -30,11 +33,17 @@ export default function Login() {
       <div className="w-full max-w-[340px]">
         <div className="text-center mb-10">
           <div className="text-6xl mb-4">📦</div>
-          <h1 className="text-[28px] font-extrabold text-[#1a1f2c] tracking-tight mb-1">TiendAppS</h1>
-          <p className="text-[15px] text-slate-500 font-medium">Acceso Administrativo</p>
+          <h1 className="text-[28px] font-extrabold text-[#1a1f2c] tracking-tight mb-1">Gestión Neiva</h1>
+          <p className="text-[14px] text-slate-500 font-medium">Punto de Venta y Administración</p>
         </div>
 
         <form onSubmit={enviar} className="space-y-5">
+          {sesionExpirada && !error && (
+            <div className="bg-amber-50 text-amber-800 p-3.5 rounded-2xl text-xs text-center font-medium border border-amber-200 leading-relaxed">
+              ⚠️ Tu sesión terminó por seguridad o inactividad. Por favor inicia sesión nuevamente.
+            </div>
+          )}
+
           {error && (
             <div className="bg-red-50 text-red-600 p-3 rounded-2xl text-sm text-center font-medium border border-red-100">
               {error}

@@ -1,10 +1,30 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useState, useEffect } from 'react'
 
 const CartContext = createContext(null)
 
+const CART_STORAGE_KEY = 'pos_carrito'
+
+function getSavedCart() {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = localStorage.getItem(CART_STORAGE_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
 export function CartProvider({ children }) {
-  const [carrito, setCarrito] = useState([])
+  const [carrito, setCarrito] = useState(getSavedCart)
   const [carritoAbierto, setCarritoAbierto] = useState(false)
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(carrito))
+    } catch {
+      // ignorar errores de almacenamiento
+    }
+  }, [carrito])
 
   const agregar = (producto) => {
     setCarrito(prev => {

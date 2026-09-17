@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { useProductos } from '../hooks/useProductos'
 import ProductoCard from '../components/ProductoCard'
 import ModalProducto from '../components/ModalProducto'
+import { canEditProducts } from '../utils/permissions'
 
 export default function Inventario() {
   const { usuario } = useAuth()
@@ -16,7 +17,7 @@ export default function Inventario() {
   }, [cargar])
   const [modalAbierto, setModalAbierto] = useState(false)
   const [productoEditar, setProductoEditar] = useState(null)
-  const esAdmin = usuario?.rol === 'admin'
+  const esAdmin = canEditProducts(usuario)
 
   const filtrados = productos.filter(
     p =>
