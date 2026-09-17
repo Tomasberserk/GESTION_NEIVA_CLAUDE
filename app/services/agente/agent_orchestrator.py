@@ -186,20 +186,44 @@ class AgentOrchestrator:
                 "respuesta": "No tienes ninguna operación pendiente por confirmar. ¿En qué te puedo ayudar?",
             }
 
-        # 3.5. Consultas financieras directas
+        # 3.5. Frases ambiguas que requieren aclaración guiada (sin adivinar)
+        if interp.intent == "ambiguo":
+            resp_amb = response_formatter.formatear_aclaracion_ambiguedad(interp.slots.get("ambiguity_type"))
+            return {
+                "conversation_id": conv_id,
+                "estado": AgentState.IDLE.value,
+                "respuesta": resp_amb,
+            }
+
+        # 3.6. Consultas financieras directas (ventas hoy, ayer, semana, mes, recaudo, vendedor)
         if interp.intent == "consulta_financiera":
-            return self._procesar_consulta_financiera(interp, conv_id, empresa_id, db)
+            return await self._procesar_consulta_financiera(interp, conv_id, empresa_id, db, current_user, session)
 
-        # 3.6. Consultar stock
+        # 3.7. Consultar stock de producto específico
         if interp.intent == "consultar_stock":
-            return self._procesar_consultar_stock(interp, conv_id, empresa_id, db)
+            return await self._procesar_consultar_stock(interp, conv_id, empresa_id, db, session, current_user)
 
-        # 3.7. Operaciones de escritura (registrar_venta, reabastecer, crear_producto)
+        # 3.8. Consulta de catálogo / precios / conteo de productos
+        if interp.intent == "consulta_productos":
+            return await self._procesar_consulta_productos(interp, conv_id, empresa_id, db, session, current_user)
+
+        # 3.9. Inventario crítico (productos agotados, stock bajo)
+        if interp.intent == "consulta_inventario_critico":
+            return await self._procesar_inventario_critico(interp, conv_id, empresa_id, db, session, current_user)
+
+        # 3.10. Reportes (top más vendidos, menor rotación)
+        if interp.intent == "consulta_top_ventas":
+            return await self._procesar_top_ventas(interp, conv_id, empresa_id, db, session, current_user)
+
+        # 3.11. Comparaciones de negocio (hoy vs ayer, productos, vendedores)
+        if interp.intent == "comparacion":
+            return await self._procesar_comparacion(interp, conv_id, empresa_id, db, session, current_user)
+
+        # 3.12. Operaciones de escritura (registrar_venta, reabastecer, crear_producto)
         if interp.intent in ["registrar_venta", "reabastecer", "crear_producto"] or estado_actual == AgentState.NEEDS_CLARIFICATION.value:
             return await self._procesar_escritura(interp, session, conv_id, current_user, db, mensaje=mensaje)
 
-
-        # 3.8. Desconocido / No entendido
+        # 3.13. Desconocido / No entendido
         return {
             "conversation_id": conv_id,
             "estado": AgentState.IDLE.value,
@@ -210,38 +234,131 @@ class AgentOrchestrator:
     # Manejadores Internos
     # -----------------------------------------------------------------------
 
-    def _procesar_consulta_financiera(
-        self, interp: AgentInterpretation, conv_id: str, empresa_id: UUID, db: Session
+    async def _guardar_contexto_negocio(
+        self,
+        conv_id: str,
+        session: dict[str, Any] | None,
+        empresa_id: UUID,
+        usuario_id: UUID,
+        domain: str,
+        period: str | None = None,
+        product: str | None = None,
+        product_id: str | None = None,
+        seller: str | None = None,
+        action: str | None = None,
+    ) -> None:
+        sess = session.copy() if session else {
+            "conversation_id": conv_id,
+            "empresa_id": str(empresa_id),
+            "usuario_id": str(usuario_id),
+            "estado": AgentState.IDLE.value,
+        }
+        b_ctx = sess.get("business_context", {})
+        b_ctx["last_domain"] = domain
+        if period:
+            b_ctx["last_period"] = period
+        if product:
+            b_ctx["last_product"] = product
+        if product_id:
+            b_ctx["last_product_id"] = product_id
+        if seller:
+            b_ctx["last_seller"] = seller
+        if action:
+            b_ctx["last_action"] = action
+        sess["business_context"] = b_ctx
+        await self.session_store.save(conv_id, sess, ttl=1800)
+
+    async def _procesar_consulta_financiera(
+        self,
+        interp: AgentInterpretation,
+        conv_id: str,
+        empresa_id: UUID,
+        db: Session,
+        current_user: models.Usuario,
+        session: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         metric = interp.slots.get("metric", "ventas_hoy")
+        period = interp.slots.get("period", "hoy")
+        seller_name = interp.slots.get("seller_name")
 
-        if metric == "ventas_hoy":
-            datos = consultas_service.consultar_ventas_periodo(empresa_id, db, "hoy")
+        if seller_name or metric == "ventas_vendedor":
+            vend_query = seller_name or "yo"
+            datos = consultas_service.consultar_ventas_vendedor(
+                empresa_id=empresa_id,
+                db=db,
+                vendedor_query=vend_query,
+                periodo=period or "hoy",
+                current_user_id=current_user.id,
+            )
+            resp = response_formatter.formatear_consulta_ventas_vendedor(datos)
+            await self._guardar_contexto_negocio(
+                conv_id, session, empresa_id, current_user.id,
+                domain="VENTAS", period=period, seller=vend_query,
+            )
+        elif metric == "ventas_ayer" or period == "ayer":
+            datos = consultas_service.consultar_ventas_periodo(empresa_id, db, "ayer")
             resp = response_formatter.formatear_consulta_ventas(datos)
-        elif metric == "ventas_semana":
+            await self._guardar_contexto_negocio(
+                conv_id, session, empresa_id, current_user.id,
+                domain="VENTAS", period="ayer",
+            )
+        elif metric == "ventas_semana" or period == "semana":
             datos = consultas_service.consultar_ventas_periodo(empresa_id, db, "semana")
             resp = response_formatter.formatear_consulta_ventas(datos)
-        elif metric == "ventas_mes":
+            await self._guardar_contexto_negocio(
+                conv_id, session, empresa_id, current_user.id,
+                domain="VENTAS", period="semana",
+            )
+        elif metric == "ventas_mes" or period == "mes":
             datos = consultas_service.consultar_ventas_periodo(empresa_id, db, "mes")
             resp = response_formatter.formatear_consulta_ventas(datos)
+            await self._guardar_contexto_negocio(
+                conv_id, session, empresa_id, current_user.id,
+                domain="VENTAS", period="mes",
+            )
         elif metric == "recaudo_actual":
             datos = consultas_service.consultar_recaudo_actual(empresa_id, db)
             resp = response_formatter.formatear_consulta_recaudo(datos)
+            await self._guardar_contexto_negocio(
+                conv_id, session, empresa_id, current_user.id,
+                domain="VENTAS", action="recaudo",
+            )
         elif metric == "cantidad_ventas":
-            datos = consultas_service.consultar_ventas_periodo(empresa_id, db, "hoy")
+            per = period or "hoy"
+            datos = consultas_service.consultar_ventas_periodo(empresa_id, db, per)
             resp = response_formatter.formatear_consulta_ventas(datos)
+            await self._guardar_contexto_negocio(
+                conv_id, session, empresa_id, current_user.id,
+                domain="VENTAS", period=per, action="cantidad_ventas",
+            )
         elif metric == "total_inventario":
             datos = consultas_service.consultar_total_inventario(empresa_id, db)
             resp = response_formatter.formatear_consulta_inventario(datos)
+            await self._guardar_contexto_negocio(
+                conv_id, session, empresa_id, current_user.id,
+                domain="INVENTARIO", action="valor_total",
+            )
         elif metric == "resumen_actual":
             datos = consultas_service.consultar_resumen_actual(empresa_id, db)
             resp = response_formatter.formatear_resumen_actual(datos)
+            await self._guardar_contexto_negocio(
+                conv_id, session, empresa_id, current_user.id,
+                domain="REPORTES", action="resumen_actual",
+            )
         elif metric == "recuperacion_inversion":
             datos = consultas_service.consultar_recuperacion_inversion(empresa_id, db)
             resp = response_formatter.formatear_recuperacion_inversion(datos)
+            await self._guardar_contexto_negocio(
+                conv_id, session, empresa_id, current_user.id,
+                domain="REPORTES", action="recuperacion_inversion",
+            )
         else:
             datos = consultas_service.consultar_ventas_periodo(empresa_id, db, "hoy")
             resp = response_formatter.formatear_consulta_ventas(datos)
+            await self._guardar_contexto_negocio(
+                conv_id, session, empresa_id, current_user.id,
+                domain="VENTAS", period="hoy",
+            )
 
         return {
             "conversation_id": conv_id,
@@ -250,8 +367,14 @@ class AgentOrchestrator:
             "datos": datos,
         }
 
-    def _procesar_consultar_stock(
-        self, interp: AgentInterpretation, conv_id: str, empresa_id: UUID, db: Session
+    async def _procesar_consultar_stock(
+        self,
+        interp: AgentInterpretation,
+        conv_id: str,
+        empresa_id: UUID,
+        db: Session,
+        session: dict[str, Any] | None = None,
+        current_user: models.Usuario | None = None,
     ) -> dict[str, Any]:
         query = interp.slots.get("product_query")
         if not query:
@@ -271,6 +394,11 @@ class AgentOrchestrator:
         if match_status == MATCH_AUTO_RESOLVED:
             prod = match_data
             datos = consultas_service.consultar_stock_producto(prod.id, empresa_id, db)
+            if current_user:
+                await self._guardar_contexto_negocio(
+                    conv_id, session, empresa_id, current_user.id,
+                    domain="INVENTARIO", product=prod.nombre, product_id=str(prod.id),
+                )
             return {
                 "conversation_id": conv_id,
                 "estado": AgentState.IDLE.value,
@@ -295,6 +423,183 @@ class AgentOrchestrator:
                 "estado": AgentState.IDLE.value,
                 "respuesta": f"No encontré el producto '{query}' en el inventario de tu tienda.",
             }
+
+    async def _procesar_consulta_productos(
+        self,
+        interp: AgentInterpretation,
+        conv_id: str,
+        empresa_id: UUID,
+        db: Session,
+        session: dict[str, Any] | None = None,
+        current_user: models.Usuario | None = None,
+    ) -> dict[str, Any]:
+        action = interp.slots.get("action")
+        query = interp.slots.get("product_query")
+
+        if action == "conteo" or not query:
+            datos = consultas_service.consultar_conteo_productos_activos(empresa_id, db)
+            if current_user:
+                await self._guardar_contexto_negocio(
+                    conv_id, session, empresa_id, current_user.id,
+                    domain="PRODUCTOS", action="conteo",
+                )
+            return {
+                "conversation_id": conv_id,
+                "estado": AgentState.IDLE.value,
+                "respuesta": response_formatter.formatear_conteo_productos(datos),
+                "datos": datos,
+            }
+
+        # Búsqueda por código de barras o nombre
+        productos = db.query(models.Producto).filter(
+            models.Producto.empresa_id == empresa_id,
+            models.Producto.is_active.is_(True),
+        ).all()
+
+        prod_encontrado = None
+        for p in productos:
+            if p.codigo_barras and p.codigo_barras.strip() == query.strip():
+                prod_encontrado = p
+                break
+
+        if not prod_encontrado:
+            match_status, match_data = match_producto(query, productos)
+            if match_status == MATCH_AUTO_RESOLVED:
+                prod_encontrado = match_data
+            elif match_status == MATCH_NEEDS_CLARIFICATION:
+                clar_id = f"clar_{uuid.uuid4().hex[:6]}"
+                options = [
+                    {"id": str(p.id), "label": f"{p.nombre} ({response_formatter.fmt_moneda(p.precio_venta)})"}
+                    for p in match_data
+                ]
+                labels = ", ".join([f"'{p.nombre}'" for p in match_data])
+                return {
+                    "conversation_id": conv_id,
+                    "estado": AgentState.NEEDS_CLARIFICATION.value,
+                    "respuesta": f"Encontré varias opciones para '{query}': {labels}. ¿Cuál deseas consultar?",
+                    "clarification": {"clarification_id": clar_id, "options": options},
+                }
+
+        if prod_encontrado:
+            datos = consultas_service.consultar_stock_producto(prod_encontrado.id, empresa_id, db)
+            if current_user:
+                await self._guardar_contexto_negocio(
+                    conv_id, session, empresa_id, current_user.id,
+                    domain="PRODUCTOS", product=prod_encontrado.nombre, product_id=str(prod_encontrado.id),
+                )
+            return {
+                "conversation_id": conv_id,
+                "estado": AgentState.IDLE.value,
+                "respuesta": response_formatter.formatear_consulta_precio(datos),
+                "datos": datos,
+            }
+
+        return {
+            "conversation_id": conv_id,
+            "estado": AgentState.IDLE.value,
+            "respuesta": f"No encontré el producto o código '{query}' en el catálogo de tu tienda.",
+        }
+
+    async def _procesar_inventario_critico(
+        self,
+        interp: AgentInterpretation,
+        conv_id: str,
+        empresa_id: UUID,
+        db: Session,
+        session: dict[str, Any] | None = None,
+        current_user: models.Usuario | None = None,
+    ) -> dict[str, Any]:
+        action = interp.slots.get("action", "agotados")
+
+        if action == "stock_bajo":
+            datos = consultas_service.consultar_productos_stock_bajo(empresa_id, db, umbral=5.0)
+            resp = response_formatter.formatear_productos_stock_bajo(datos)
+        else:
+            datos = consultas_service.consultar_productos_agotados(empresa_id, db)
+            resp = response_formatter.formatear_productos_agotados(datos)
+
+        if current_user:
+            await self._guardar_contexto_negocio(
+                conv_id, session, empresa_id, current_user.id,
+                domain="INVENTARIO", action=action,
+            )
+
+        return {
+            "conversation_id": conv_id,
+            "estado": AgentState.IDLE.value,
+            "respuesta": resp,
+            "datos": datos,
+        }
+
+    async def _procesar_top_ventas(
+        self,
+        interp: AgentInterpretation,
+        conv_id: str,
+        empresa_id: UUID,
+        db: Session,
+        session: dict[str, Any] | None = None,
+        current_user: models.Usuario | None = None,
+    ) -> dict[str, Any]:
+        action = interp.slots.get("action", "top_ventas")
+        period = interp.slots.get("period", "hoy")
+
+        if action == "menor_rotacion":
+            resp = response_formatter.formatear_menor_rotacion({})
+            datos = {}
+        else:
+            datos = consultas_service.consultar_productos_mas_vendidos(empresa_id, db, periodo=period)
+            resp = response_formatter.formatear_top_ventas(datos)
+
+        if current_user:
+            await self._guardar_contexto_negocio(
+                conv_id, session, empresa_id, current_user.id,
+                domain="REPORTES", action=action, period=period,
+            )
+
+        return {
+            "conversation_id": conv_id,
+            "estado": AgentState.IDLE.value,
+            "respuesta": resp,
+            "datos": datos,
+        }
+
+    async def _procesar_comparacion(
+        self,
+        interp: AgentInterpretation,
+        conv_id: str,
+        empresa_id: UUID,
+        db: Session,
+        session: dict[str, Any] | None = None,
+        current_user: models.Usuario | None = None,
+    ) -> dict[str, Any]:
+        comp_type = interp.slots.get("comparison_type", "hoy_vs_ayer")
+
+        if comp_type == "hoy_vs_ayer":
+            datos = consultas_service.consultar_comparacion_ventas_periodo(empresa_id, db, "hoy", "ayer")
+            resp = response_formatter.formatear_comparacion_ventas(datos)
+        elif comp_type == "vendedores":
+            datos = consultas_service.consultar_comparacion_vendedores(empresa_id, db, periodo="hoy")
+            resp = response_formatter.formatear_comparacion_vendedores(datos)
+        else:
+            datos = {}
+            resp = response_formatter.formatear_comparacion_productos(
+                interp.slots.get("target_a", "Producto A"),
+                interp.slots.get("target_b", "Producto B"),
+                datos,
+            )
+
+        if current_user:
+            await self._guardar_contexto_negocio(
+                conv_id, session, empresa_id, current_user.id,
+                domain="COMPARACION", action=comp_type,
+            )
+
+        return {
+            "conversation_id": conv_id,
+            "estado": AgentState.IDLE.value,
+            "respuesta": resp,
+            "datos": datos,
+        }
 
     async def _procesar_escritura(
         self,

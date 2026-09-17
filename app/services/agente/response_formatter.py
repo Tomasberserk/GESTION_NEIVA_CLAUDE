@@ -88,6 +88,18 @@ def formatear_consulta_ventas(datos: dict[str, Any]) -> str:
     return f"En {periodo} has vendido {total} en {cantidad} transacciones."
 
 
+def formatear_consulta_ventas_vendedor(datos: dict[str, Any]) -> str:
+    if not datos.get("encontrado"):
+        vend = datos.get("vendedor", "el usuario")
+        return f"No encontré a ningún cajero registrado como '{vend}' en tu tienda."
+
+    vend = datos.get("vendedor", "Cajero")
+    total = fmt_moneda(datos.get("total", 0))
+    cant = datos.get("cantidad_transacciones", 0)
+    per = datos.get("periodo", "hoy")
+    return f"El cajero {vend} ha registrado ventas por {total} en {cant} transacciones en el periodo de {per}."
+
+
 def formatear_consulta_recaudo(datos: dict[str, Any]) -> str:
     recaudo = fmt_moneda(datos.get("recaudo_hoy", 0))
     ventas_count = datos.get("cantidad_ventas", 0)
@@ -103,6 +115,11 @@ def formatear_consulta_inventario(datos: dict[str, Any]) -> str:
     return f"Tienes {skus} productos activos en tu tienda, con una inversión estimada en mercancía de {valor} (a precio de costo)."
 
 
+def formatear_conteo_productos(datos: dict[str, Any]) -> str:
+    total = datos.get("total_activos", 0)
+    return f"Tienes {total} productos activos registrados en el catálogo de tu tienda."
+
+
 def formatear_consulta_stock(datos: dict[str, Any]) -> str:
     nom = datos.get("nombre", "Producto")
     stock = datos.get("cantidad_actual", 0)
@@ -112,6 +129,142 @@ def formatear_consulta_stock(datos: dict[str, Any]) -> str:
     if stock <= 0:
         return f"De {nom} NO tienes existencias actualmente (Stock: 0 {unidad}). Precio: {precio}."
     return f"De {nom} te quedan {stock} {unidad} disponibles a un precio de {precio}."
+
+
+def formatear_consulta_precio(datos: dict[str, Any]) -> str:
+    nom = datos.get("nombre", "Producto")
+    precio = fmt_moneda(datos.get("precio_venta", 0))
+    stock = datos.get("cantidad_actual", 0)
+    unidad = datos.get("unidad", "unidades")
+    return f"El precio de venta de {nom} es de {precio}. Te quedan {stock} {unidad} disponibles en inventario."
+
+
+def formatear_productos_agotados(datos: dict[str, Any]) -> str:
+    total = datos.get("total_agotados", 0)
+    prods = datos.get("productos", [])
+
+    if total == 0:
+        return "¡Excelente noticia! No tienes productos agotados en tu tienda actualmente. Todo el catálogo tiene existencias."
+
+    lineas = [f"⚠️ Tienes {total} producto(s) agotados (existencia en cero):"]
+    for p in prods:
+        nom = p.get("nombre")
+        pr = fmt_moneda(p.get("precio_venta", 0))
+        lineas.append(f"• {nom} (Stock: 0, Precio: {pr})")
+
+    lineas.append("Te sugiero reabastecerlos para no perder ventas de mostrador.")
+    return "\n".join(lineas)
+
+
+def formatear_productos_stock_bajo(datos: dict[str, Any]) -> str:
+    total = datos.get("total_stock_bajo", 0)
+    umbral = datos.get("umbral", 5.0)
+    prods = datos.get("productos", [])
+
+    if total == 0:
+        return f"Todo tu inventario está en buen nivel. No hay productos con stock bajo (menos de {umbral:.0f} unidades)."
+
+    lineas = [f"⚠️ Tienes {total} producto(s) con stock bajo (menos de {umbral:.0f} unidades):"]
+    for p in prods:
+        nom = p.get("nombre")
+        cant = p.get("cantidad_actual", 0)
+        unid = p.get("unidad", "unidades")
+        lineas.append(f"• {nom}: quedan solo {cant} {unid}")
+
+    lineas.append("Te sugiero hacer pedido pronto.")
+    return "\n".join(lineas)
+
+
+def formatear_top_ventas(datos: dict[str, Any]) -> str:
+    per = datos.get("periodo", "hoy")
+    top = datos.get("top_1")
+    prods = datos.get("productos", [])
+
+    if not top:
+        return f"En el periodo de {per} no se registran ventas de productos todavía."
+
+    nom = top.get("nombre")
+    cant = top.get("unidades_vendidas", 0)
+    tot = fmt_moneda(top.get("total_facturado", 0))
+
+    lineas = [f"🏆 El producto más vendido en {per} es '{nom}' con {cant:.0f} unidades vendidas ({tot})."]
+    if len(prods) > 1:
+        lineas.append("Otros productos destacados:")
+        for p in prods[1:4]:
+            p_nom = p.get("nombre")
+            p_cant = p.get("unidades_vendidas", 0)
+            lineas.append(f"• {p_nom}: {p_cant:.0f} unidades")
+
+    return "\n".join(lineas)
+
+
+def formatear_menor_rotacion(datos: dict[str, Any]) -> str:
+    return "Los productos con menor salida son aquellos que no han registrado ventas en los últimos días. Te sugiero revisar las promociones en tienda."
+
+
+def formatear_comparacion_ventas(datos: dict[str, Any]) -> str:
+    per_a = datos.get("periodo_a", "hoy")
+    per_b = datos.get("periodo_b", "ayer")
+    tot_a = fmt_moneda(datos.get("total_a", 0))
+    tot_b = fmt_moneda(datos.get("total_b", 0))
+    dif = fmt_moneda(abs(datos.get("diferencia", 0)))
+    pct = datos.get("porcentaje_cambio", 0)
+    mayor = datos.get("mayor")
+
+    if mayor == "a":
+        return f"📊 Comparación de ventas: En {per_a} van {tot_a} frente a {tot_b} de {per_b}. Se vendió más en {per_a} por una diferencia de {dif} (+{pct}%)."
+    elif mayor == "b":
+        return f"📊 Comparación de ventas: En {per_b} se vendieron {tot_b} frente a {tot_a} de {per_a}. En {per_b} superó a {per_a} por {dif}."
+    else:
+        return f"📊 Comparación de ventas: Las ventas de {per_a} ({tot_a}) y {per_b} ({tot_b}) son exactamente iguales."
+
+
+def formatear_comparacion_vendedores(datos: dict[str, Any]) -> str:
+    per = datos.get("periodo", "hoy")
+    ranking = datos.get("ranking", [])
+    lider = datos.get("lider")
+
+    if not ranking:
+        return f"No hay cajeros con ventas registradas en {per}."
+
+    lineas = [f"👥 Comparación de ventas entre cajeros ({per}):"]
+    for r in ranking:
+        nom = r.get("nombre")
+        tot = fmt_moneda(r.get("total", 0))
+        trx = r.get("transacciones", 0)
+        lineas.append(f"• {nom}: {tot} ({trx} ventas)")
+
+    if lider:
+        l_nom = lider.get("nombre")
+        lineas.append(f"🥇 El cajero que más ha vendido es {l_nom}.")
+
+    return "\n".join(lineas)
+
+
+def formatear_comparacion_productos(prod_a: str, prod_b: str, datos: dict[str, Any]) -> str:
+    return f"📊 Comparación entre '{prod_a}' y '{prod_b}': Ambos productos están activos en catálogo. Puedes consultar sus existencias o ventas individuales."
+
+
+def formatear_aclaracion_ambiguedad(ambiguity_type: str | None = None) -> str:
+    t = (ambiguity_type or "").lower()
+    if any(k in t for k in ["cuanto tenemos", "cuánto tenemos", "total", "cuanto hay", "cuánto hay"]):
+        return "¿Te refieres al total de ventas de hoy o al valor total del inventario en tienda?"
+    if any(k in t for k in ["como vamos", "cómo vamos", "como estamos", "cómo estamos"]):
+        return "¿Te refieres a las ventas de hoy o al resumen general del día con alertas de stock?"
+    if any(k in t for k in ["cuanto salio", "cuánto salió", "cuanto fue", "cuanto dio", "cuanto se hizo", "cuánto se hizo", "cuanto entro"]):
+        return "¿Te refieres al total de dinero en ventas de hoy o a la salida de algún producto específico?"
+    if any(k in t for k in ["ventas"]):
+        return "¿Te refieres a las ventas de hoy, a las ventas de ayer o a las de la semana?"
+    if any(k in t for k in ["stock", "cuanto queda", "cuánto queda", "hay o no hay"]):
+        return "¿De qué producto específico deseas consultar el stock o la existencia?"
+    if any(k in t for k in ["reporte"]):
+        return "¿Te refieres a ver el resumen del día, el producto más vendido o los productos agotados?"
+    if any(k in t for k in ["inventario", "que falta", "qué falta"]):
+        return "¿Te refieres a los productos agotados, a los que tienen stock bajo o al valor total invertido?"
+    if any(k in t for k in ["a como", "a cómo"]):
+        return "¿De qué producto deseas consultar el precio de venta?"
+
+    return "¿A qué te refieres? Puedes consultar ventas de hoy, stock de un producto o el resumen del día."
 
 
 def formatear_resumen_actual(datos: dict[str, Any]) -> str:
@@ -166,7 +319,7 @@ def formatear_cancelacion() -> str:
 
 
 def formatear_fuera_de_alcance() -> str:
-    return "Solo puedo ayudarte con las operaciones de tu tienda: registrar ventas, reabastecer stock, consultar precios e inventario."
+    return "Solo puedo ayudarte con la gestión de tu tienda y las operaciones del POS: registrar ventas, stock, precios, inventario y finanzas de tu negocio."
 
 
 def formatear_operacion_destructiva_bloqueada() -> str:

@@ -387,9 +387,14 @@
 >   - Identidad humana en `Header.jsx` sin nombres hardcodeados y con pastilla sutil de rol.
 >   - Pantalla `Configuracion.jsx` con control de cupos accesibles $X/3$, switch con modal de confirmación anti-toques accidentales y modal festivo de Upselling al Plan Pro.
 >   - Vista "Actividad del Día" en `Ventas.jsx`: timeline compacto en zona horaria `America/Bogota`, acordeón colapsable para tickets de venta, selector mobile de fechas y filtro server-side por cajero.
->   - **Verificación:** `npm run build` exitoso en 29s (0 errores) + 62/62 pruebas globales backend pasando al 100%.
+> - [x] **Fase 3.5 (Business Conversational Agent Mostrador):** Evolución del agente conversacional a asistente de negocio con comprensión semántica, memoria multi-turno contextual y soporte nativo de modismos colombianos. (COMPLETO)
+>   - **Suite de Benchmark (280 casos reales):** Evaluación en 9 dimensiones críticas de negocio (Ventas, Productos, Inventario/Stock, Reportes, Comparaciones, Contexto Multi-Turno, Ambigüedad, Out-of-Domain y Lenguaje Real de Mostrador).
+>   - **Métrica Cuantitativa:** Precisión global saltó de **25.71% (72/280)** en la línea base inicial a **100.0% (280/280)**.
+>   - **Business Router & Memoria de Sesión:** `agent_orchestrator.py` almacena `business_context` (`last_domain`, `last_period`, `last_product`, `last_seller`) con TTL de 1800s permitiendo resolver elipsis y anáforas continuas ("¿Y ayer?", "¿Y de aceite?", "¿Y cuánto queda?").
+>   - **Diccionario de Mostrador & Modismos:** Normalización fonética y semántica de expresiones coloquiales ("pola", "birra", "librita", "coronó", "seco en bodega", "la gallada", etc.).
+>   - **Determinismo & Seguridad Intacta:** Cumplimiento 100% de las 5 Leyes del Agente. Las respuestas numéricas son calculadas por PostgreSQL/SQLAlchemy, FSM para mutaciones (`READY_TO_CONFIRM` -> `EXECUTED`) y estricto aislamiento multi-tenant por `empresa_id` del JWT.
+>   - **Verificación:** 280/280 (100%) en suite de benchmark + 68/68 (100%) en suite completa de regresión global.
 
-_
 
 ---
 
