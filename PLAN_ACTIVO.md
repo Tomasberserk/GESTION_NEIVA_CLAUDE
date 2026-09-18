@@ -394,6 +394,13 @@
 >   - **Diccionario de Mostrador & Modismos:** Normalización fonética y semántica de expresiones coloquiales ("pola", "birra", "librita", "coronó", "seco en bodega", "la gallada", etc.).
 >   - **Determinismo & Seguridad Intacta:** Cumplimiento 100% de las 5 Leyes del Agente. Las respuestas numéricas son calculadas por PostgreSQL/SQLAlchemy, FSM para mutaciones (`READY_TO_CONFIRM` -> `EXECUTED`) y estricto aislamiento multi-tenant por `empresa_id` del JWT.
 >   - **Verificación:** 280/280 (100%) en suite de benchmark + 68/68 (100%) en suite completa de regresión global.
+> - [x] **Hotfix Crítico (LLM Provider Desacoplado & Error 404/503 Fix):** (COMPLETO)
+>   - **Desacoplamiento estricto Groq vs Gemini:** Clases autónomas `GroqIntentProvider` y `GeminiIntentProvider`. Prohibición de fallback cruzado con modelos incompatibles.
+>   - **Eliminación definitiva de modelo obsoleto:** `llama-3.3-70b-versatile` removido en favor de `openai/gpt-oss-120b` (Groq) y `gemini-flash-latest` (Gemini).
+>   - **Fijación de dependencias:** `groq==1.7.0` fijado en `requirements.txt`.
+>   - **Semántica de errores HTTP:** Errores de proveedor/red devuelven HTTP 503 con código `LLM_PROVIDER_UNAVAILABLE`; preguntas operativas no reconocidas devuelven HTTP 200 con clarificación guiada.
+>   - **Health Check CLI:** `scripts/check_llm_health.py` con exit codes 0 a 4 (0=HEALTHY, 1=CONFIG_ERROR, 2=PROVIDER_UNAVAILABLE, 3=MODEL_UNAVAILABLE, 4=STRUCTURED_OUTPUT_FAILURE).
+>   - **Smoke & Regression Suite:** 4/4 smoke tests passing, 280/280 benchmark passing, 72/72 tests globales verdes.
 
 
 ---

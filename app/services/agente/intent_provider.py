@@ -188,6 +188,35 @@ class IntentProvider(Protocol):
         ...
 
 
+class LLMProviderUnavailableError(Exception):
+    """Excepción lanzada cuando el proveedor LLM sufre una falla técnica de infraestructura."""
+
+    def __init__(self, provider: str, reason: str, status_code: int = 503):
+        self.provider = provider
+        self.reason = reason
+        self.status_code = status_code
+        super().__init__(f"LLM Provider '{provider}' unavailable: {reason}")
+
+
+AGENT_TELEMETRY: dict[str, int] = {
+    "llm_provider_success": 0,
+    "llm_provider_failure": 0,
+    "intent_parse_success": 0,
+    "intent_parse_failure": 0,
+    "business_service_success": 0,
+    "business_service_failure": 0,
+}
+
+
+def get_agent_telemetry() -> dict[str, int]:
+    return dict(AGENT_TELEMETRY)
+
+
+def reset_agent_telemetry() -> None:
+    for k in AGENT_TELEMETRY:
+        AGENT_TELEMETRY[k] = 0
+
+
 # ---------------------------------------------------------------------------
 # Normalización de texto y diccionarios coloquiales de Colombia
 # ---------------------------------------------------------------------------
@@ -466,7 +495,8 @@ def quick_parse_intent(text: str, context: dict[str, Any] | None = None) -> Agen
         "se vendió más hoy", "se vendio mas hoy", "top 1 de ventas", "producto estrella",
         "lidera las ventas", "más compra la gente", "mas compra la gente", "pide la gallada",
         "más vendido de la semana", "lideró ventas ayer", "top de ventas", "más salida", "mas salida",
-        "el más vendido", "el mas vendido"
+        "el más vendido", "el mas vendido", "lo que más vendimos", "lo que mas vendimos",
+        "que más vendimos", "que mas vendimos", "más vendido", "mas vendido"
     ]):
         per = "ayer" if "ayer" in t else ("semana" if "semana" in t else "hoy")
         return AgentInterpretation(
@@ -752,9 +782,13 @@ def quick_parse_intent(text: str, context: dict[str, Any] | None = None) -> Agen
         t_num = re.sub(rf"\b{word_num}\b", digit_val, t_num)
 
     # 13. Venta explícita
-    m_venta = re.search(r"(?:vendi|vendí|venta de|facturé|facture)\s+(\d+(?:\.\d+)?)\s+(?:de\s+)?([\w\s\.\-_]+)", t_num)
+    m_venta = re.search(r"(?:vendi|vendí|venta de|facturé|facture)\s+([-\w\.\+]+)\s+(?:de\s+)?([\w\s\.\-_]+)", t_num)
     if m_venta:
-        qty = float(m_venta.group(1))
+        raw_q = m_venta.group(1)
+        try:
+            qty = float(raw_q)
+        except (ValueError, TypeError):
+            qty = None
         prod_q = m_venta.group(2).strip()
         for col_term, clean_term in SINONIMOS_PRODUCTOS_COL.items():
             if col_term in prod_q:
@@ -767,9 +801,13 @@ def quick_parse_intent(text: str, context: dict[str, Any] | None = None) -> Agen
         )
 
     # 14. Reabastecimiento explícito
-    m_reab = re.search(r"(?:llegaron|llegó|llego|compre|compré|recibí|recibi|entran|entraron)\s+(\d+(?:\.\d+)?)\s+(?:de\s+)?([\w\s\.\-_]+)", t_num)
+    m_reab = re.search(r"(?:llegaron|llegó|llego|compre|compré|recibí|recibi|entran|entraron)\s+([-\w\.\+]+)\s+(?:de\s+)?([\w\s\.\-_]+)", t_num)
     if m_reab:
-        qty = float(m_reab.group(1))
+        raw_q = m_reab.group(1)
+        try:
+            qty = float(raw_q)
+        except (ValueError, TypeError):
+            qty = None
         prod_q = m_reab.group(2).strip()
         for col_term, clean_term in SINONIMOS_PRODUCTOS_COL.items():
             if col_term in prod_q:
@@ -824,13 +862,155 @@ ESTRUCTURA DE RESPUESTA JSON:
 }"""
 
 
+def _build_context_prompt(context: dict[str, Any] | None) -> str:
+    if not context:
+        return ""
+    b_ctx = context.get("business_context", {})
+    if not b_ctx:
+        return ""
+    return (
+        f"\nCONTEXTO PREVIO DEL DIÁLOGO:\n"
+        f"- Último dominio: {b_ctx.get('last_domain')}\n"
+        f"- Último período: {b_ctx.get('last_period')}\n"
+        f"- Último producto: {b_ctx.get('last_product')}\n"
+        f"- Último vendedor: {b_ctx.get('last_seller')}\n"
+    )
+
+
+class GroqIntentProvider:
+    """Proveedor oficial para Groq Cloud utilizando API compatible con OpenAI."""
+
+    def __init__(self, model: str | None = None):
+        self.provider = "groq"
+        # Prioridad: LLM_MODEL -> AI_MODEL -> 'openai/gpt-oss-120b'
+        self.model = model or os.getenv("LLM_MODEL") or os.getenv("AI_MODEL") or "openai/gpt-oss-120b"
+
+    def parse(self, text: str, context: dict[str, Any] | None = None) -> AgentInterpretation:
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            AGENT_TELEMETRY["llm_provider_failure"] += 1
+            logger.error("Error al invocar LLM IntentProvider (groq): GROQ_API_KEY no está configurada")
+            raise LLMProviderUnavailableError(
+                provider="groq",
+                reason="GROQ_API_KEY no está configurada en las variables de entorno.",
+            )
+
+        try:
+            from groq import Groq
+            client = Groq(api_key=api_key)
+            ctx_prompt = _build_context_prompt(context)
+            prompt = f"{ctx_prompt}\nMENSAJE DEL TENDERO:\n{text}"
+            response = client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": _SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.0,
+                response_format={"type": "json_object"},
+            )
+            content = response.choices[0].message.content or "{}"
+            AGENT_TELEMETRY["llm_provider_success"] += 1
+        except Exception as exc:
+            AGENT_TELEMETRY["llm_provider_failure"] += 1
+            logger.error("Error al invocar LLM IntentProvider (groq): %s", exc)
+            raise LLMProviderUnavailableError(
+                provider="groq",
+                reason=f"Falla de comunicación con Groq ({type(exc).__name__}): {exc}",
+            ) from exc
+
+        try:
+            data = json.loads(content)
+        except Exception as json_err:
+            AGENT_TELEMETRY["intent_parse_failure"] += 1
+            logger.warning("Groq retornó JSON inválido: %s", content)
+            return AgentInterpretation(intent="unknown", raw_text=text, confidence=0.0)
+
+        interp = validate_agent_output(
+            raw_intent=data.get("intent", "unknown"),
+            raw_slots=data.get("slots", {}),
+            raw_missing=data.get("missing_slots", []),
+            confidence=float(data.get("confidence", 0.8)),
+            raw_text=text,
+        )
+        if interp.intent == "unknown":
+            AGENT_TELEMETRY["intent_parse_failure"] += 1
+        else:
+            AGENT_TELEMETRY["intent_parse_success"] += 1
+
+        return interp
+
+
+class GeminiIntentProvider:
+    """Proveedor aislado para Google Gemini (sin mezclar modelos ni fallback cruzado)."""
+
+    def __init__(self, model: str | None = None):
+        self.provider = "gemini"
+        # Prioridad: LLM_MODEL -> AI_MODEL -> GEMINI_MODEL -> 'gemini-2.5-flash'
+        self.model = model or os.getenv("LLM_MODEL") or os.getenv("AI_MODEL") or os.getenv("GEMINI_MODEL") or "gemini-2.5-flash"
+
+    def parse(self, text: str, context: dict[str, Any] | None = None) -> AgentInterpretation:
+        api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            AGENT_TELEMETRY["llm_provider_failure"] += 1
+            logger.error("Error al invocar LLM IntentProvider (gemini): GOOGLE_API_KEY/GEMINI_API_KEY no configurada")
+            raise LLMProviderUnavailableError(
+                provider="gemini",
+                reason="GOOGLE_API_KEY o GEMINI_API_KEY no está configurada en las variables de entorno.",
+            )
+
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=api_key)
+            model_inst = genai.GenerativeModel(self.model)
+            ctx_prompt = _build_context_prompt(context)
+            full_prompt = f"{_SYSTEM_PROMPT}\n{ctx_prompt}\nMENSAJE DEL TENDERO:\n{text}"
+            response = model_inst.generate_content(full_prompt)
+            content = response.text.strip()
+            if content.startswith("```"):
+                lines = [l for l in content.split("\n") if not l.strip().startswith("```")]
+                content = "\n".join(lines).strip()
+            AGENT_TELEMETRY["llm_provider_success"] += 1
+        except Exception as exc:
+            AGENT_TELEMETRY["llm_provider_failure"] += 1
+            logger.error("Error al invocar LLM IntentProvider (gemini): %s", exc)
+            raise LLMProviderUnavailableError(
+                provider="gemini",
+                reason=f"Falla de comunicación con Gemini ({type(exc).__name__}): {exc}",
+            ) from exc
+
+        try:
+            data = json.loads(content)
+        except Exception as json_err:
+            AGENT_TELEMETRY["intent_parse_failure"] += 1
+            logger.warning("Gemini retornó JSON inválido: %s", content)
+            return AgentInterpretation(intent="unknown", raw_text=text, confidence=0.0)
+
+        interp = validate_agent_output(
+            raw_intent=data.get("intent", "unknown"),
+            raw_slots=data.get("slots", {}),
+            raw_missing=data.get("missing_slots", []),
+            confidence=float(data.get("confidence", 0.8)),
+            raw_text=text,
+        )
+        if interp.intent == "unknown":
+            AGENT_TELEMETRY["intent_parse_failure"] += 1
+        else:
+            AGENT_TELEMETRY["intent_parse_success"] += 1
+
+        return interp
+
+
 class LLMIntentProvider:
-    """Proveedor que delega la interpretación al LLM si el parser determinístico no coincide."""
+    """Proveedor orquestador de intenciones: determinístico rápido + LLM aislado."""
 
     def __init__(self, provider: str = "groq", model: str | None = None):
-        self.provider = provider
-        default_gemini = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
-        self.model = model or ("llama-3.3-70b-versatile" if self.provider == "groq" else default_gemini)
+        self.provider = (provider or "groq").lower().strip()
+        self.model = model
+        if self.provider == "gemini":
+            self._llm: Any = GeminiIntentProvider(model=model)
+        else:
+            self._llm = GroqIntentProvider(model=model)
 
     def parse(self, text: str, context: dict[str, Any] | None = None) -> AgentInterpretation:
         # 1. Intentar el parser semántico determinístico primero
@@ -838,9 +1018,12 @@ class LLMIntentProvider:
         if quick:
             return quick
 
-        # 2. Si hay contexto de aclaración pendiente de cantidad
+        # 2. Si hay contexto de aclaración pendiente
         if context and context.get("estado") == "NEEDS_CLARIFICATION":
             missing = context.get("missing_slots", [])
+            clar_opts = context.get("clarification_options", {})
+
+            # A. Si falta cantidad y el usuario envía un número
             if "cantidad" in missing:
                 m_num = re.search(r"^(\d+(?:\.\d+)?)$", text.strip())
                 if m_num:
@@ -851,81 +1034,39 @@ class LLMIntentProvider:
                         raw_text=text,
                     )
 
-        # 3. Invocar API de IA según proveedor
-        try:
-            if self.provider == "groq":
-                return self._parse_groq(text, context)
-            elif self.provider == "gemini":
-                return self._parse_gemini(text, context)
-            else:
-                return self._parse_gemini(text, context)
-        except Exception as exc:
-            logger.error("Error al invocar LLM IntentProvider (%s): %s", self.provider, exc)
-            return AgentInterpretation(intent="unknown", raw_text=text, confidence=0.0)
+            # B. Si hay opciones de desambiguación activas (botones/lista) o falta producto
+            if clar_opts or "clarification" in missing or "product_query" in missing:
+                t_clean = text.strip().lower()
+                m_opt = re.search(r"^\[?(\d+)\]?$", t_clean)
+                if m_opt:
+                    return AgentInterpretation(
+                        intent="proveer_slot",
+                        slots={"product_query": text.strip()},
+                        confidence=0.99,
+                        raw_text=text,
+                    )
+                return AgentInterpretation(
+                    intent="proveer_slot",
+                    slots={"product_query": text.strip()},
+                    confidence=0.95,
+                    raw_text=text,
+                )
 
-    def _build_context_prompt(self, context: dict[str, Any] | None) -> str:
-        if not context:
-            return ""
-        b_ctx = context.get("business_context", {})
-        if not b_ctx:
-            return ""
-        return f"\nCONTEXTO PREVIO DEL DIÁLOGO:\n- Último dominio: {b_ctx.get('last_domain')}\n- Último período: {b_ctx.get('last_period')}\n- Último producto: {b_ctx.get('last_product')}\n- Último vendedor: {b_ctx.get('last_seller')}\n"
+            # C. Para cualquier otro slot pendiente en NEEDS_CLARIFICATION (ej: precio_venta, nombre)
+            return AgentInterpretation(
+                intent="proveer_slot",
+                slots={"text": text.strip()},
+                confidence=0.9,
+                raw_text=text,
+            )
 
-    def _parse_groq(self, text: str, context: dict[str, Any] | None = None) -> AgentInterpretation:
-        api_key = os.getenv("GROQ_API_KEY")
-        if not api_key:
-            return self._parse_gemini(text, context)
-
-        from groq import Groq
-        client = Groq(api_key=api_key)
-        ctx_prompt = self._build_context_prompt(context)
-        prompt = f"{ctx_prompt}\nMENSAJE DEL TENDERO:\n{text}"
-        response = client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": _SYSTEM_PROMPT},
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.0,
-            response_format={"type": "json_object"},
-        )
-        content = response.choices[0].message.content or "{}"
-        data = json.loads(content)
-        return validate_agent_output(
-            raw_intent=data.get("intent", "unknown"),
-            raw_slots=data.get("slots", {}),
-            raw_missing=data.get("missing_slots", []),
-            confidence=float(data.get("confidence", 0.8)),
-            raw_text=text,
-        )
-
-    def _parse_gemini(self, text: str, context: dict[str, Any] | None = None) -> AgentInterpretation:
-        api_key = os.getenv("GOOGLE_API_KEY")
-        if not api_key:
-            return AgentInterpretation(intent="unknown", raw_text=text, confidence=0.0)
-
-        import google.generativeai as genai
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel(self.model)
-        ctx_prompt = self._build_context_prompt(context)
-        full_prompt = f"{_SYSTEM_PROMPT}\n{ctx_prompt}\nMENSAJE DEL TENDERO:\n{text}"
-        response = model.generate_content(full_prompt)
-        content = response.text.strip()
-        if content.startswith("```"):
-            lines = [l for l in content.split("\n") if not l.strip().startswith("```")]
-            content = "\n".join(lines).strip()
-        data = json.loads(content)
-        return validate_agent_output(
-            raw_intent=data.get("intent", "unknown"),
-            raw_slots=data.get("slots", {}),
-            raw_missing=data.get("missing_slots", []),
-            confidence=float(data.get("confidence", 0.8)),
-            raw_text=text,
-        )
+        # 3. Invocar al LLM del proveedor configurado (sin fallback cruzado)
+        return self._llm.parse(text, context=context)
 
 
 def get_intent_provider() -> IntentProvider:
     """Factory para instanciar el proveedor configurado."""
     prov = os.getenv("AI_PROVIDER", "groq")
-    mod = os.getenv("AI_MODEL")
+    mod = os.getenv("LLM_MODEL") or os.getenv("AI_MODEL")
     return LLMIntentProvider(provider=prov, model=mod)
+

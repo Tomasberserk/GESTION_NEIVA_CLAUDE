@@ -30,6 +30,7 @@ httpx==0.25.2
 locust==2.24.1
 
 # IA & WhatsApp
+groq==1.7.0
 google-generativeai>=0.8.0
 
 # Async DB (Opcional, comentar en Windows para evitar error de compilación C)

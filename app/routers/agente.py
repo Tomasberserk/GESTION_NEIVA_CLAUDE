@@ -14,6 +14,7 @@ from app import models
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.services.agente.agent_orchestrator import AgentOrchestrator
+from app.services.agente.intent_provider import LLMProviderUnavailableError
 from app.services.agente.session_store import SessionStoreUnavailableError
 
 router = APIRouter(prefix="/agente", tags=["Agente IA"])
@@ -63,6 +64,15 @@ async def enviar_mensaje(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="El servicio de sesiones del agente está temporalmente no disponible. Intente de nuevo en unos segundos.",
+        ) from exc
+    except LLMProviderUnavailableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "LLM_PROVIDER_UNAVAILABLE",
+                "message": "El servicio de inteligencia artificial no se encuentra disponible en este momento. Por favor intente nuevamente.",
+                "provider": exc.provider,
+            },
         ) from exc
 
 

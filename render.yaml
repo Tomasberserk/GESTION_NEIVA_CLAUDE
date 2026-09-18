@@ -18,3 +18,9 @@ services:
         value: 480
       - key: CORS_ORIGINS
         value: https://gestion-neiva-claude.vercel.app,http://localhost:5173
+      - key: AI_PROVIDER
+        value: groq
+      - key: LLM_MODEL
+        value: openai/gpt-oss-120b
+      - key: GROQ_API_KEY
+        sync: false

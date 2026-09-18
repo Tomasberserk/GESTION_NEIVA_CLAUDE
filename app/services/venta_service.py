@@ -35,6 +35,7 @@ def registrar_venta(
     nueva_venta = models.Venta(
         empresa_id=empresa_id,
         total=Decimal("0.00"),
+        fecha_venta=datetime.now(COLOMBIA_TZ),
         is_active=True,
         usuario_id=current_user.id,
         vendedor_nombre_snapshot=current_user.nombre or current_user.email,

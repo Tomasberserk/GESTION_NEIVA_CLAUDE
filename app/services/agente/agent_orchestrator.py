@@ -34,7 +34,11 @@ from app.services.agente.catalog_matcher import (
     match_producto,
 )
 from app.services.agente.fsm import AgentState, validate_transition
-from app.services.agente.intent_provider import AgentInterpretation, get_intent_provider
+from app.services.agente.intent_provider import (
+    AGENT_TELEMETRY,
+    AgentInterpretation,
+    get_intent_provider,
+)
 from app.services.agente.session_store import SessionStore, get_session_store
 
 logger = logging.getLogger(__name__)
@@ -195,33 +199,51 @@ class AgentOrchestrator:
                 "respuesta": resp_amb,
             }
 
-        # 3.6. Consultas financieras directas (ventas hoy, ayer, semana, mes, recaudo, vendedor)
-        if interp.intent == "consulta_financiera":
-            return await self._procesar_consulta_financiera(interp, conv_id, empresa_id, db, current_user, session)
+        try:
+            # 3.6. Consultas financieras directas (ventas hoy, ayer, semana, mes, recaudo, vendedor)
+            if interp.intent == "consulta_financiera":
+                res = await self._procesar_consulta_financiera(interp, conv_id, empresa_id, db, current_user, session)
+                AGENT_TELEMETRY["business_service_success"] += 1
+                return res
 
-        # 3.7. Consultar stock de producto específico
-        if interp.intent == "consultar_stock":
-            return await self._procesar_consultar_stock(interp, conv_id, empresa_id, db, session, current_user)
+            # 3.7. Consultar stock de producto específico
+            if interp.intent == "consultar_stock":
+                res = await self._procesar_consultar_stock(interp, conv_id, empresa_id, db, session, current_user)
+                AGENT_TELEMETRY["business_service_success"] += 1
+                return res
 
-        # 3.8. Consulta de catálogo / precios / conteo de productos
-        if interp.intent == "consulta_productos":
-            return await self._procesar_consulta_productos(interp, conv_id, empresa_id, db, session, current_user)
+            # 3.8. Consulta de catálogo / precios / conteo de productos
+            if interp.intent == "consulta_productos":
+                res = await self._procesar_consulta_productos(interp, conv_id, empresa_id, db, session, current_user)
+                AGENT_TELEMETRY["business_service_success"] += 1
+                return res
 
-        # 3.9. Inventario crítico (productos agotados, stock bajo)
-        if interp.intent == "consulta_inventario_critico":
-            return await self._procesar_inventario_critico(interp, conv_id, empresa_id, db, session, current_user)
+            # 3.9. Inventario crítico (productos agotados, stock bajo)
+            if interp.intent == "consulta_inventario_critico":
+                res = await self._procesar_inventario_critico(interp, conv_id, empresa_id, db, session, current_user)
+                AGENT_TELEMETRY["business_service_success"] += 1
+                return res
 
-        # 3.10. Reportes (top más vendidos, menor rotación)
-        if interp.intent == "consulta_top_ventas":
-            return await self._procesar_top_ventas(interp, conv_id, empresa_id, db, session, current_user)
+            # 3.10. Reportes (top más vendidos, menor rotación)
+            if interp.intent == "consulta_top_ventas":
+                res = await self._procesar_top_ventas(interp, conv_id, empresa_id, db, session, current_user)
+                AGENT_TELEMETRY["business_service_success"] += 1
+                return res
 
-        # 3.11. Comparaciones de negocio (hoy vs ayer, productos, vendedores)
-        if interp.intent == "comparacion":
-            return await self._procesar_comparacion(interp, conv_id, empresa_id, db, session, current_user)
+            # 3.11. Comparaciones de negocio (hoy vs ayer, productos, vendedores)
+            if interp.intent == "comparacion":
+                res = await self._procesar_comparacion(interp, conv_id, empresa_id, db, session, current_user)
+                AGENT_TELEMETRY["business_service_success"] += 1
+                return res
 
-        # 3.12. Operaciones de escritura (registrar_venta, reabastecer, crear_producto)
-        if interp.intent in ["registrar_venta", "reabastecer", "crear_producto"] or estado_actual == AgentState.NEEDS_CLARIFICATION.value:
-            return await self._procesar_escritura(interp, session, conv_id, current_user, db, mensaje=mensaje)
+            # 3.12. Operaciones de escritura (registrar_venta, reabastecer, crear_producto)
+            if interp.intent in ["registrar_venta", "reabastecer", "crear_producto"] or estado_actual == AgentState.NEEDS_CLARIFICATION.value:
+                res = await self._procesar_escritura(interp, session, conv_id, current_user, db, mensaje=mensaje)
+                AGENT_TELEMETRY["business_service_success"] += 1
+                return res
+        except Exception as exc:
+            AGENT_TELEMETRY["business_service_failure"] += 1
+            raise exc
 
         # 3.13. Desconocido / No entendido
         return {
@@ -833,9 +855,9 @@ class AgentOrchestrator:
         except (ValueError, TypeError):
             cantidad_valida = False
 
-        # Si falta cantidad y el usuario acaba de responder con un número
-        if not cantidad_valida and mensaje:
-            m_qty = re.search(r"\b(\d+(?:\.\d+)?)\b", mensaje.strip())
+        # Si falta cantidad y el usuario acaba de responder a una aclaración de cantidad
+        if not cantidad_valida and mensaje and session and session.get("estado") == AgentState.NEEDS_CLARIFICATION.value and "cantidad" in session.get("missing_slots", []):
+            m_qty = re.search(r"^\s*(\d+(?:\.\d+)?)\s*(?:unidades?|unds?|paquetes?|cajas?)?\s*$", mensaje.strip().lower())
             if m_qty:
                 try:
                     val_num = float(m_qty.group(1))
