@@ -136,6 +136,22 @@ class AgentOrchestrator:
         interp = self.intent_provider.parse(mensaje, context=session)
 
         # 3. Flujo según la intención detectada
+        # 3.0. Saludos y capacidades del asistente
+        if interp.intent == "saludo":
+            return {
+                "conversation_id": conv_id,
+                "estado": AgentState.IDLE.value,
+                "respuesta": (
+                    "¡Hola! 👋 Soy tu asistente de Gestión Neiva.\n\n"
+                    "Puedo ayudarte a:\n"
+                    "• 💰 **Consultar ventas:** '¿Cuánto hemos vendido hoy?', '¿Cómo vamos?'\n"
+                    "• 📦 **Revisar inventario:** '¿Cuánto arroz queda?', '¿Qué está agotado?'\n"
+                    "• ⚡ **Registrar operaciones:** 'Vendí 2 gaseosas', 'Llegaron 10 aceites'\n"
+                    "• 📊 **Ver reportes:** '¿Cuál es el producto más vendido?'\n\n"
+                    "¿En qué te puedo colaborar hoy?"
+                ),
+            }
+
         # 3.1. Cancelación explícita
         if interp.intent == "cancelar":
             if session:

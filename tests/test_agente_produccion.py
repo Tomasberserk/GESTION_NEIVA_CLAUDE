@@ -549,3 +549,19 @@ def test_t14_resolucion_bucle_clarificacion_por_texto_boton(client):
     assert d2["estado"] == "READY_TO_CONFIRM"
     assert "aceite gourmet" in d2["respuesta"].lower()
     assert d2.get("command_id") is not None
+
+
+def test_saludos_y_capacidades_asistente(client):
+    headers, empresa_id = _registrar_tienda(client, "saludos")
+    for msg in ["hola", "hola que puedes hacer", "buenas tardes", "ayuda"]:
+        resp = client.post(
+            "/api/agente/mensaje",
+            headers=headers,
+            json={"mensaje": msg},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["estado"] == "IDLE"
+        assert "Gestión Neiva" in data["respuesta"] or "asistente" in data["respuesta"].lower()
+        assert "ventas" in data["respuesta"].lower()
+

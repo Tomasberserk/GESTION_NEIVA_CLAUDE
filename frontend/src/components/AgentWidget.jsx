@@ -139,11 +139,14 @@ export default function AgentWidget() {
         window.dispatchEvent(new Event('venta-completada'))
       }
     } catch (err) {
+      const msg = typeof err?.message === 'string' && err.message !== '[object Object]'
+        ? err.message
+        : (typeof err === 'string' ? err : 'No pude procesar tu solicitud. Intenta nuevamente.')
       setMensajes((prev) => [
         ...prev,
         {
           remitente: 'agente',
-          texto: `⚠️ ${err.message || 'No pude procesar tu solicitud. Intenta nuevamente.'}`,
+          texto: `⚠️ ${msg}`,
           esError: true,
           timestamp: new Date(),
         },

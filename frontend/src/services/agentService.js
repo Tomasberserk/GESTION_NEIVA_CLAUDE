@@ -52,7 +52,13 @@ export const agentService = {
       let errorMsg = 'Error al comunicarse con el asistente'
       try {
         const errJson = await res.json()
-        errorMsg = errJson.detail || errorMsg
+        if (typeof errJson.detail === 'string') {
+          errorMsg = errJson.detail
+        } else if (errJson.detail && typeof errJson.detail === 'object') {
+          errorMsg = errJson.detail.message || JSON.stringify(errJson.detail)
+        } else if (errJson.message) {
+          errorMsg = errJson.message
+        }
       } catch {
         // Ignorar error al parsear json
       }

@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 logger = logging.getLogger(__name__)
 
 ALLOWED_INTENTS = {
+    "saludo",
     "registrar_venta",
     "reabastecer",
     "consultar_stock",
@@ -258,6 +259,35 @@ def quick_parse_intent(text: str, context: dict[str, Any] | None = None) -> Agen
 
     t = _normalizar_frase(text)
     b_ctx = (context or {}).get("business_context", {})
+
+    # 0. Saludos y bienvenida / capacidades (0ms determinístico de mostrador)
+    t_clean = " ".join(re.sub(r"[^\w\s]", " ", text.lower()).split())
+    t_norm = (
+        t_clean.replace("á", "a")
+        .replace("é", "e")
+        .replace("í", "i")
+        .replace("ó", "o")
+        .replace("ú", "u")
+    )
+    if (
+        t_norm in [
+            "hola", "buenas", "buenos dias", "buenas tardes", "buenas noches",
+            "hola bro", "hola buenas", "hola que tal", "ey", "alo", "quiubo",
+            "que mas", "ayuda", "info", "menu"
+        ]
+        or any(k in t_norm for k in [
+            "que puedes hacer", "que haces", "para que sirves",
+            "como me puedes ayudar", "quien eres", "como te llamas"
+        ])
+        or (
+            t_norm.startswith("hola")
+            and len(t_norm.split()) <= 4
+            and not any(k in t_norm for k in [
+                "vendi", "facture", "compre", "llegaron", "stock", "precio", "cuanto", "arroz", "aceite", "cerveza"
+            ])
+        )
+    ):
+        return AgentInterpretation(intent="saludo", slots={}, confidence=0.99, raw_text=text)
 
     # 1. Confirmaciones determinísticas inequívocas
     if t in ["si", "sí", "confirmar", "confirmo", "dale", "de una", "ok", "correcto", "exacto", "hágale", "hagale", "yes", "listo"]:
@@ -1060,13 +1090,40 @@ class LLMIntentProvider:
                 raw_text=text,
             )
 
-        # 3. Invocar al LLM del proveedor configurado (sin fallback cruzado)
-        return self._llm.parse(text, context=context)
+        # 3. Invocar al LLM del proveedor configurado con fallback saludable usando el modelo nativo del alternativo
+        try:
+            return self._llm.parse(text, context=context)
+        except LLMProviderUnavailableError as exc:
+            gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+            groq_key = os.getenv("GROQ_API_KEY")
+            if self.provider == "groq" and gemini_key:
+                logger.warning(
+                    "Groq no disponible (%s). Usando fallback saludable a Gemini con modelo nativo gemini-flash-latest",
+                    exc.reason,
+                )
+                gemini_prov = GeminiIntentProvider(model=os.getenv("GEMINI_MODEL", "gemini-flash-latest"))
+                return gemini_prov.parse(text, context=context)
+            elif self.provider == "gemini" and groq_key:
+                logger.warning(
+                    "Gemini no disponible (%s). Usando fallback saludable a Groq con modelo nativo openai/gpt-oss-120b",
+                    exc.reason,
+                )
+                groq_prov = GroqIntentProvider(model=os.getenv("LLM_MODEL", "openai/gpt-oss-120b"))
+                return groq_prov.parse(text, context=context)
+            raise exc
 
 
 def get_intent_provider() -> IntentProvider:
-    """Factory para instanciar el proveedor configurado."""
-    prov = os.getenv("AI_PROVIDER", "groq")
-    mod = os.getenv("LLM_MODEL") or os.getenv("AI_MODEL")
-    return LLMIntentProvider(provider=prov, model=mod)
+    """Factory inteligente para instanciar el proveedor configurado o disponible en el entorno."""
+    prov = (os.getenv("AI_PROVIDER") or "").lower().strip()
+    groq_key = os.getenv("GROQ_API_KEY")
+    gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+
+    # Si se especificó gemini explícitamente o si falta groq_key pero sí hay gemini_key
+    if prov == "gemini" or (not groq_key and gemini_key):
+        model = os.getenv("GEMINI_MODEL") or (os.getenv("LLM_MODEL") if prov == "gemini" else None) or "gemini-flash-latest"
+        return LLMIntentProvider(provider="gemini", model=model)
+
+    model = os.getenv("LLM_MODEL") or os.getenv("AI_MODEL") or "openai/gpt-oss-120b"
+    return LLMIntentProvider(provider="groq", model=model)
 
