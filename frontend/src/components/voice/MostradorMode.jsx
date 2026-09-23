@@ -140,15 +140,25 @@ export default function MostradorMode({
             <div className="mt-4 grid grid-cols-2 gap-3">
               <button
                 onClick={confirmarOperacion}
-                className="py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-base flex items-center justify-center gap-1.5 shadow-lg active:scale-95 transition-all"
+                disabled={voiceState === VoiceTurnState.PROCESSING}
+                className={`py-3 px-4 rounded-xl font-bold text-base flex items-center justify-center gap-1.5 shadow-lg transition-all ${
+                  voiceState === VoiceTurnState.PROCESSING
+                    ? 'bg-emerald-800/60 text-emerald-200/70 cursor-not-allowed'
+                    : 'bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white active:scale-95'
+                }`}
               >
                 <Check className="w-5 h-5" />
-                <span>Confirmar</span>
+                <span>{voiceState === VoiceTurnState.PROCESSING ? 'Procesando...' : 'Confirmar'}</span>
               </button>
 
               <button
                 onClick={cancelarOperacion}
-                className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-slate-300 font-semibold text-base flex items-center justify-center gap-1.5 border border-slate-700 active:scale-95 transition-all"
+                disabled={voiceState === VoiceTurnState.PROCESSING}
+                className={`py-3 px-4 rounded-xl font-semibold text-base flex items-center justify-center gap-1.5 border border-slate-700 transition-all ${
+                  voiceState === VoiceTurnState.PROCESSING
+                    ? 'bg-slate-900/60 text-slate-500 cursor-not-allowed'
+                    : 'bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-slate-300 active:scale-95'
+                }`}
               >
                 <X className="w-5 h-5" />
                 <span>Cancelar</span>

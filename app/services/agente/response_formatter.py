@@ -60,21 +60,21 @@ def formatear_confirmacion_crear_producto(preview: dict[str, Any]) -> str:
 
 def formatear_exito_venta(result: dict[str, Any]) -> str:
     total_str = fmt_moneda(result.get("total", 0))
-    return f"✅ Venta registrada exitosamente por {total_str}."
+    return f"Venta registrada exitosamente por {total_str}."
 
 
 def formatear_exito_reabastecer(result: dict[str, Any]) -> str:
     nom = result.get("producto", "Producto")
     nuevo_stock = result.get("stock_nuevo", 0)
     unidad = result.get("unidad", "unidades")
-    return f"✅ Stock actualizado. Ahora tienes {nuevo_stock} {unidad} de {nom}."
+    return f"Stock actualizado. Ahora tienes {nuevo_stock} {unidad} de {nom}."
 
 
 def formatear_exito_crear_producto(result: dict[str, Any]) -> str:
     nom = result.get("nombre", "Producto")
     precio = fmt_moneda(result.get("precio_venta", 0))
     stock = result.get("stock_inicial", 0)
-    return f"✅ Producto {nom} registrado exitosamente con precio de {precio} y {stock} unidades."
+    return f"Producto {nom} registrado exitosamente con precio de {precio} y {stock} unidades."
 
 
 def formatear_consulta_ventas(datos: dict[str, Any]) -> str:
@@ -144,9 +144,9 @@ def formatear_productos_agotados(datos: dict[str, Any]) -> str:
     prods = datos.get("productos", [])
 
     if total == 0:
-        return "¡Excelente noticia! No tienes productos agotados en tu tienda actualmente. Todo el catálogo tiene existencias."
+        return "No tienes productos agotados en tu tienda actualmente. Todo el catálogo tiene existencias."
 
-    lineas = [f"⚠️ Tienes {total} producto(s) agotados (existencia en cero):"]
+    lineas = [f"Tienes {total} producto(s) agotados (existencia en cero):"]
     for p in prods:
         nom = p.get("nombre")
         pr = fmt_moneda(p.get("precio_venta", 0))
@@ -164,7 +164,7 @@ def formatear_productos_stock_bajo(datos: dict[str, Any]) -> str:
     if total == 0:
         return f"Todo tu inventario está en buen nivel. No hay productos con stock bajo (menos de {umbral:.0f} unidades)."
 
-    lineas = [f"⚠️ Tienes {total} producto(s) con stock bajo (menos de {umbral:.0f} unidades):"]
+    lineas = [f"Tienes {total} producto(s) con stock bajo (menos de {umbral:.0f} unidades):"]
     for p in prods:
         nom = p.get("nombre")
         cant = p.get("cantidad_actual", 0)
@@ -187,7 +187,7 @@ def formatear_top_ventas(datos: dict[str, Any]) -> str:
     cant = top.get("unidades_vendidas", 0)
     tot = fmt_moneda(top.get("total_facturado", 0))
 
-    lineas = [f"🏆 El producto más vendido en {per} es '{nom}' con {cant:.0f} unidades vendidas ({tot})."]
+    lineas = [f"El producto más vendido en {per} es '{nom}' con {cant:.0f} unidades vendidas ({tot})."]
     if len(prods) > 1:
         lineas.append("Otros productos destacados:")
         for p in prods[1:4]:
@@ -212,11 +212,11 @@ def formatear_comparacion_ventas(datos: dict[str, Any]) -> str:
     mayor = datos.get("mayor")
 
     if mayor == "a":
-        return f"📊 Comparación de ventas: En {per_a} van {tot_a} frente a {tot_b} de {per_b}. Se vendió más en {per_a} por una diferencia de {dif} (+{pct}%)."
+        return f"Comparación de ventas: En {per_a} van {tot_a} frente a {tot_b} de {per_b}. Se vendió más en {per_a} por una diferencia de {dif} (+{pct}%)."
     elif mayor == "b":
-        return f"📊 Comparación de ventas: En {per_b} se vendieron {tot_b} frente a {tot_a} de {per_a}. En {per_b} superó a {per_a} por {dif}."
+        return f"Comparación de ventas: En {per_b} se vendieron {tot_b} frente a {tot_a} de {per_a}. En {per_b} superó a {per_a} por {dif}."
     else:
-        return f"📊 Comparación de ventas: Las ventas de {per_a} ({tot_a}) y {per_b} ({tot_b}) son exactamente iguales."
+        return f"Comparación de ventas: Las ventas de {per_a} ({tot_a}) y {per_b} ({tot_b}) son exactamente iguales."
 
 
 def formatear_comparacion_vendedores(datos: dict[str, Any]) -> str:
@@ -227,7 +227,7 @@ def formatear_comparacion_vendedores(datos: dict[str, Any]) -> str:
     if not ranking:
         return f"No hay cajeros con ventas registradas en {per}."
 
-    lineas = [f"👥 Comparación de ventas entre cajeros ({per}):"]
+    lineas = [f"Comparación de ventas entre cajeros ({per}):"]
     for r in ranking:
         nom = r.get("nombre")
         tot = fmt_moneda(r.get("total", 0))
@@ -236,13 +236,13 @@ def formatear_comparacion_vendedores(datos: dict[str, Any]) -> str:
 
     if lider:
         l_nom = lider.get("nombre")
-        lineas.append(f"🥇 El cajero que más ha vendido es {l_nom}.")
+        lineas.append(f"El cajero que más ha vendido es {l_nom}.")
 
     return "\n".join(lineas)
 
 
 def formatear_comparacion_productos(prod_a: str, prod_b: str, datos: dict[str, Any]) -> str:
-    return f"📊 Comparación entre '{prod_a}' y '{prod_b}': Ambos productos están activos en catálogo. Puedes consultar sus existencias o ventas individuales."
+    return f"Comparación entre '{prod_a}' y '{prod_b}': Ambos productos están activos en catálogo. Puedes consultar sus existencias o ventas individuales."
 
 
 def formatear_aclaracion_ambiguedad(ambiguity_type: str | None = None) -> str:
@@ -274,7 +274,7 @@ def formatear_resumen_actual(datos: dict[str, Any]) -> str:
     por_vencer = datos.get("productos_por_vencer", 0)
 
     lineas = [
-        f"📊 Resumen del día:",
+        "Resumen del día:",
         f"• Ventas hoy: {ventas_hoy} ({count} transacciones)",
     ]
     if stock_bajo > 0:
@@ -299,7 +299,7 @@ def formatear_recuperacion_inversion(datos: dict[str, Any]) -> str:
 
 def formatear_stock_insuficiente(nombre: str, disponible: float, solicitado: float) -> str:
     return (
-        f"❌ No hay suficiente stock para '{nombre}'. "
+        f"No hay suficiente stock para '{nombre}'. "
         f"Tienes {disponible} disponibles e intentaste vender {solicitado}."
     )
 
@@ -309,7 +309,7 @@ def formatear_precio_cambiado(nombre: str, precio_anterior: float, precio_nuevo:
     p_nue = fmt_moneda(precio_nuevo)
     tot = fmt_moneda(total_nuevo)
     return (
-        f"⚠️ El precio de '{nombre}' cambió de {p_ant} a {p_nue} mientras confirmabas. "
+        f"El precio de '{nombre}' cambió de {p_ant} a {p_nue} mientras confirmabas. "
         f"El nuevo total es {tot}. ¿Deseas confirmar la venta con este nuevo precio?"
     )
 

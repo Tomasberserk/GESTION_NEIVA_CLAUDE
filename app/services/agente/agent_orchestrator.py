@@ -142,12 +142,9 @@ class AgentOrchestrator:
                 "conversation_id": conv_id,
                 "estado": AgentState.IDLE.value,
                 "respuesta": (
-                    "¡Hola! 👋 Soy tu asistente de Gestión Neiva.\n\n"
-                    "Puedo ayudarte a:\n"
-                    "• 💰 **Consultar ventas:** '¿Cuánto hemos vendido hoy?', '¿Cómo vamos?'\n"
-                    "• 📦 **Revisar inventario:** '¿Cuánto arroz queda?', '¿Qué está agotado?'\n"
-                    "• ⚡ **Registrar operaciones:** 'Vendí 2 gaseosas', 'Llegaron 10 aceites'\n"
-                    "• 📊 **Ver reportes:** '¿Cuál es el producto más vendido?'\n\n"
+                    "Hola, soy tu asistente de Gestión Neiva.\n\n"
+                    "Puedo ayudarte a consultar ventas del día, revisar existencias en inventario, "
+                    "registrar ventas o reabastecimientos, y consultar reportes de productos más vendidos.\n\n"
                     "¿En qué te puedo colaborar hoy?"
                 ),
             }

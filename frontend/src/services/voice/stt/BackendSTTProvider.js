@@ -135,15 +135,15 @@ export class BackendSTTProvider extends SpeechInputProvider {
       // Iniciar captura con chunks cada 250ms
       this.mediaRecorder.start(250)
 
-      // Hard cap de seguridad: 8 segundos máximo para no colgarse nunca
+      // Hard cap de seguridad: 5.5 segundos máximo para comandos de voz de mostrador
       this.maxTimer = setTimeout(() => {
-        console.info('[BackendSTTProvider] Límite máximo de turno (8s) alcanzado. Deteniendo...')
+        console.info('[BackendSTTProvider] Límite máximo de turno (5.5s) alcanzado. Deteniendo...')
         if (this.onRequestStop) {
           this.onRequestStop(this.turnId, this.sessionGeneration)
         } else {
           this.requestStop(this.turnId)
         }
-      }, 8000)
+      }, 5500)
 
     } catch (err) {
       this.isStarting = false
@@ -174,7 +174,7 @@ export class BackendSTTProvider extends SpeechInputProvider {
 
       const buffer = new Float32Array(this.analyser.fftSize)
       const UMBRAL_VOZ = 0.02
-      const TIEMPO_SILENCIO_MS = 1600
+      const TIEMPO_SILENCIO_MS = 950
 
       this.vadInterval = setInterval(() => {
         if (!this.isRecording || !this.analyser) return
@@ -203,7 +203,7 @@ export class BackendSTTProvider extends SpeechInputProvider {
         } else if (this.speechStarted && !this.silenceTimer) {
           // El tendero terminó de hablar y se mantiene silencio
           this.silenceTimer = setTimeout(() => {
-            console.log('[BackendSTTProvider] VAD: Silencio cómodo detectado (1.6s). Deteniendo...')
+            console.log('[BackendSTTProvider] VAD: Silencio natural detectado (950ms). Deteniendo...')
             if (this.onRequestStop) {
               this.onRequestStop(this.turnId, this.sessionGeneration)
             } else {

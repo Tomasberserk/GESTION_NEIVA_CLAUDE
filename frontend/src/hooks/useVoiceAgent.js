@@ -74,24 +74,44 @@ export function useVoiceAgent() {
     }
   }, [])
 
+  const isActionBusyRef = useRef(false)
+
   const confirmarOperacion = useCallback(async () => {
+    if (isActionBusyRef.current) return
+    isActionBusyRef.current = true
     console.log('[VOICE-DEBUG][useVoiceAgent] confirmarOperacion táctil disparado ("sí, dale")')
-    if (managerRef.current) {
-      await managerRef.current.enviarMensajeManual('sí, dale')
+    try {
+      if (managerRef.current) {
+        await managerRef.current.enviarMensajeManual('sí, dale')
+      }
+    } finally {
+      setTimeout(() => { isActionBusyRef.current = false }, 1000)
     }
   }, [])
 
   const cancelarOperacion = useCallback(async () => {
+    if (isActionBusyRef.current) return
+    isActionBusyRef.current = true
     console.log('[VOICE-DEBUG][useVoiceAgent] cancelarOperacion táctil disparado ("cancelar")')
-    if (managerRef.current) {
-      await managerRef.current.enviarMensajeManual('cancelar')
+    try {
+      if (managerRef.current) {
+        await managerRef.current.enviarMensajeManual('cancelar')
+      }
+    } finally {
+      setTimeout(() => { isActionBusyRef.current = false }, 1000)
     }
   }, [])
 
   const seleccionarOpcion = useCallback(async (opcionTexto) => {
+    if (isActionBusyRef.current) return
+    isActionBusyRef.current = true
     console.log(`[VOICE-DEBUG][useVoiceAgent] seleccionarOpcion táctil disparado ("${opcionTexto}")`)
-    if (managerRef.current) {
-      await managerRef.current.enviarMensajeManual(opcionTexto)
+    try {
+      if (managerRef.current) {
+        await managerRef.current.enviarMensajeManual(opcionTexto)
+      }
+    } finally {
+      setTimeout(() => { isActionBusyRef.current = false }, 1000)
     }
   }, [])
 

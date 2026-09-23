@@ -567,6 +567,10 @@ export class VoiceTurnManager {
    * Envía un mensaje manual (por ejemplo, al hacer clic en el botón de confirmación táctil).
    */
   async enviarMensajeManual(texto) {
+    if (this.state === VoiceTurnState.PROCESSING) {
+      console.warn('[VOICE-TURN] enviarMensajeManual ignorado: ya se está procesando un turno')
+      return
+    }
     const turnId = this.currentTurnId
     const sessionGen = this.sessionGeneration
     console.log(`[VOICE-DEBUG][VoiceTurnManager] enviarMensajeManual llamado turnId=${turnId} con:`, texto)
@@ -649,15 +653,15 @@ export class VoiceTurnManager {
       return
     }
 
-    // BackendSTT: marcar que la transcripción está pendiente y detener la grabación del micrófono
+    // BackendSTT: marcar transcripción pendiente, pasar de inmediato a PROCESSING para feedback visual en el orbe
     if (this.activeProviderType === 'backend') {
       this.isTranscribing = true
+      this._setState(VoiceTurnState.PROCESSING, { transcripcionEnVuelo: true })
       if (typeof this.currentSTT.requestStop === 'function') {
         this.currentSTT.requestStop(turnId)
       } else {
         this.currentSTT.stop(turnId)
       }
-      // NO cambiar a READY; permanecer esperando que BackendSTT complete y llame onTranscript
       return
     }
 

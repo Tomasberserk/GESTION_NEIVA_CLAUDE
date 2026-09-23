@@ -394,7 +394,7 @@ async function runTests() {
 
     // 3. Simular que el watchdog de 9s expira mientras la transcripción está pendiente
     manager._iniciarWatchdogSTT(turnId);
-    assert(manager.state === VoiceTurnState.SPEECH_DETECTED, 'Watchdog NO mata el turno a READY mientras isTranscribing sea true');
+    assert(manager.state === VoiceTurnState.PROCESSING, 'Watchdog NO mata el turno a READY mientras isTranscribing sea true (permanece en PROCESSING)');
 
     // 4. Servidor responde con la transcripción
     manager.currentSTT.onTranscript?.('un arroz y dos aceites', true);
