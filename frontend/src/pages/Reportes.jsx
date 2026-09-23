@@ -220,7 +220,7 @@ export default function Reportes() {
               </div>
               <p className="text-xs text-gray-500 mt-4 flex items-center gap-1">
                 <Info className="w-3.5 h-3.5" />
-                Recaudo bruto menos costo de lo vendido (COGS).
+                Recaudo de ventas menos lo que te costó comprar esa mercancía.
               </p>
             </div>
 
@@ -247,22 +247,22 @@ export default function Reportes() {
             </div>
           </div>
 
-          {/* Visualizador de ROI - Retorno de la Inversion */}
+          {/* Visualizador de Recuperación de Capital */}
           <div className="bg-white rounded-2xl border p-6 md:p-8 shadow-sm">
             <div className="space-y-4">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
                 <div>
                   <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                     <ArrowUpRight className="text-violet-600 w-5 h-5" />
-                    Estado de Recuperacion de Inversion (ROI)
+                    Estado de Recuperación de Capital
                   </h3>
                   <p className="text-sm text-gray-500">
-                    Mide que tanto de tu capital total invertido (inventario actual + lo vendido) ya has recuperado en la caja registradora.
+                    Mide qué tanto de tu capital total invertido (inventario actual + lo vendido) ya has recuperado en la caja registradora.
                   </p>
                 </div>
                 <div className="text-right">
                   <span className="text-2xl font-black text-violet-600">{porcentajeRecuperado}%</span>
-                  <span className="text-xs text-gray-400 block">de retorno de capital</span>
+                  <span className="text-xs text-gray-400 block">de capital recuperado</span>
                 </div>
               </div>
 

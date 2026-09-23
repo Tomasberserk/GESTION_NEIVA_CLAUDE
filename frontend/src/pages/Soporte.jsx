@@ -9,7 +9,9 @@ import {
   RefreshCw,
   AlertTriangle,
   InboxIcon,
-  ChevronRight
+  ChevronRight,
+  BookOpen,
+  Play,
 } from 'lucide-react'
 
 const BASE = import.meta.env.VITE_API_URL || '/api'
@@ -168,19 +170,60 @@ export default function Soporte() {
     }
   }
 
+  // Estado modal tutorial permanente
+  const [videoTutorialAbierto, setVideoTutorialAbierto] = useState(false)
+  const [guiaReiniciada, setGuiaReiniciada] = useState(false)
+
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
     <div className="flex flex-col h-full">
+      {/* Modal de Video Tutorial */}
+      {videoTutorialAbierto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-3xl w-full p-4 sm:p-6 relative shadow-2xl space-y-4">
+            <div className="flex items-center justify-between text-white pb-2 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <Play size={18} className="text-emerald-500" />
+                <h3 className="font-bold text-sm sm:text-base">Guía: ¿Cómo funciona Gestión Neiva?</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setVideoTutorialAbierto(false)}
+                className="text-slate-400 hover:text-white p-1"
+                aria-label="Cerrar video"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="rounded-2xl overflow-hidden bg-black aspect-video flex items-center justify-center">
+              <video
+                controls
+                autoPlay
+                className="w-full h-full object-contain"
+              >
+                <source src="/Grabación de pantalla 2026-06-03 115051.mp4" type="video/mp4" />
+                Tu navegador no soporta la reproducción de video HTML5.
+              </video>
+            </div>
+
+            <p className="text-xs text-slate-400 text-center">
+              Demostración guiada de productos, cobro en mostrador y consulta de ganancias.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Cabecera */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
             <MessageSquare className="text-indigo-600 w-7 h-7" />
-            Soporte Tecnico
+            Centro de Ayuda
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Crea y gestiona tus solicitudes de soporte.
+            Aprende a usar la plataforma o solicita acompañamiento del equipo.
           </p>
         </div>
         <button
@@ -193,8 +236,46 @@ export default function Soporte() {
         </button>
       </div>
 
+      {/* Tarjeta Educativa Permanente: Aprender a usar Gestión Neiva */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 p-4 mb-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold shrink-0">
+            <BookOpen size={20} />
+          </div>
+          <div>
+            <h2 className="font-bold text-slate-800 text-sm">
+              Aprender a usar Gestión Neiva
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Consulta en cualquier momento la demostración guiada en video o reactiva los pasos en tu inicio.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setVideoTutorialAbierto(true)}
+            className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition-all shadow-xs"
+          >
+            <Play size={14} className="fill-white" />
+            <span>Ver video tutorial</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              localStorage.removeItem('guia_primeros_pasos_oculta')
+              setGuiaReiniciada(true)
+              setTimeout(() => setGuiaReiniciada(false), 3000)
+            }}
+            className="text-xs font-semibold text-slate-600 hover:text-slate-900 border border-slate-200 px-3 py-2 rounded-xl hover:bg-slate-50 transition-colors"
+          >
+            {guiaReiniciada ? '✓ Guía visible en Inicio' : 'Reactivar guía de pasos'}
+          </button>
+        </div>
+      </div>
+
       {/* Layout de dos paneles */}
-      <div className="flex flex-1 gap-4 min-h-0" style={{ height: 'calc(100vh - 200px)' }}>
+      <div className="flex flex-1 gap-4 min-h-0" style={{ height: 'calc(100vh - 270px)' }}>
 
         {/* Panel izquierdo — lista de tickets */}
         <div className="w-full sm:w-72 lg:w-80 flex-shrink-0 flex flex-col bg-white border border-slate-200 rounded-xl overflow-hidden">

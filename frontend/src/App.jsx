@@ -1,6 +1,8 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute'
 import Layout from './components/layout/Layout'
+import LandingPage from './pages/LandingPage'
+import Registro from './pages/Registro'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Inventario from './pages/Inventario'
@@ -21,12 +23,15 @@ function RootRedirect() {
 export default function App() {
   return (
     <Routes>
+      {/* 🌐 Experiencia WEB: Conoce, Comprende y Confía */}
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/registro" element={<Registro />} />
       <Route path="/login" element={<Login />} />
 
-      {/* Rutas protegidas bajo el layout principal */}
+      {/* 📱 Experiencia APP: Gestiona tu Negocio (Protegida) */}
       <Route element={<ProtectedRoute />}>
         <Route element={<Layout />}>
-          <Route path="/" element={<RootRedirect />} />
+          <Route path="/app" element={<RootRedirect />} />
           <Route path="/inventario" element={<Inventario />} />
           <Route path="/ventas" element={<Ventas />} />
           <Route path="/soporte" element={<Soporte />} />
@@ -44,8 +49,9 @@ export default function App() {
 
       <Route path="/superadmin" element={<SuperAdmin />} />
 
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }
+
 

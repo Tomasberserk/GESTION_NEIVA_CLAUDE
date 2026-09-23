@@ -5,6 +5,9 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell,
 } from 'recharts'
+import { Play, X } from 'lucide-react'
+import OnboardingModal from '../components/onboarding/OnboardingModal'
+import GuiaPrimerosPasos from '../components/onboarding/GuiaPrimerosPasos'
 
 const BASE = import.meta.env.VITE_API_URL || '/api'
 
@@ -34,6 +37,30 @@ export default function Dashboard() {
   const [datos, setDatos] = useState(null)
   const [cargando, setCargando] = useState(true)
 
+  // Estado de Onboarding
+  const [mostrarBienvenida, setMostrarBienvenida] = useState(false)
+  const [videoModalAbierto, setVideoModalAbierto] = useState(false)
+
+  useEffect(() => {
+    // Detectar si es nuevo usuario registrado
+    const esBienvenidaUrl = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('bienvenida') === '1'
+    const esPendienteStorage = typeof window !== 'undefined' && localStorage.getItem('onboarding_pendiente') === 'true'
+
+    if (esBienvenidaUrl || esPendienteStorage) {
+      setMostrarBienvenida(true)
+    }
+  }, [])
+
+  const cerrarBienvenida = () => {
+    setMostrarBienvenida(false)
+    localStorage.removeItem('onboarding_pendiente')
+  }
+
+  const verVideoTutorial = () => {
+    cerrarBienvenida()
+    setVideoModalAbierto(true)
+  }
+
   useEffect(() => {
     if (!usuario?.empresa_id) return
     const cargar = async () => {
@@ -54,6 +81,50 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
 
+      {/* Modal de Bienvenida para primer ingreso */}
+      <OnboardingModal
+        isOpen={mostrarBienvenida}
+        onClose={cerrarBienvenida}
+        onVerVideo={verVideoTutorial}
+      />
+
+      {/* Modal de Video Tutorial */}
+      {videoModalAbierto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-3xl w-full p-4 sm:p-6 relative shadow-2xl space-y-4">
+            <div className="flex items-center justify-between text-white pb-2 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <Play size={18} className="text-emerald-500" />
+                <h3 className="font-bold text-sm sm:text-base">Guía: ¿Cómo funciona Gestión Neiva?</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setVideoModalAbierto(false)}
+                className="text-slate-400 hover:text-white p-1"
+                aria-label="Cerrar video"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="rounded-2xl overflow-hidden bg-black aspect-video flex items-center justify-center">
+              <video
+                controls
+                autoPlay
+                className="w-full h-full object-contain"
+              >
+                <source src="/Grabación de pantalla 2026-06-03 115051.mp4" type="video/mp4" />
+                Tu navegador no soporta la reproducción de video HTML5.
+              </video>
+            </div>
+
+            <p className="text-xs text-slate-400 text-center">
+              Demostración guiada de inventario, cobro en mostrador y revisión de tus ganancias.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Encabezado */}
       <div>
         <h1 className="text-2xl font-bold text-gray-800 mb-1">Dashboard</h1>
@@ -61,6 +132,13 @@ export default function Dashboard() {
           Bienvenido{usuario?.email ? `, ${usuario.email}` : ''} — resumen de hoy
         </p>
       </div>
+
+      {/* Checklist de primeros pasos no invasivo */}
+      <GuiaPrimerosPasos
+        totalProductos={datos?.total_productos ?? 0}
+        ventasHoy={datos?.ventas_hoy ?? 0}
+        onVerTutorial={() => setVideoModalAbierto(true)}
+      />
 
       {/* Banner trial */}
       {!cargando && datos?.dias_trial_restantes != null && (

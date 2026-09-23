@@ -23,7 +23,9 @@
 [✅] Sprint 7 — Template professional (Diseño & Especificaciones en factory/templates/professional/ COMPLETO)
 [✅] Sprint 7.8 — Fusión e Integración del ERP Distribuidora en el POS (COMPLETO)
 [✅] Sprint 7.9 — Agente IA In-App Orientado a Tareas para Tier Pro (COMPLETO)
-[ ] Sprint 8 — Despliegue y Activación de Hermes-3 + Landing Page (SIGUIENTE)
+[✅] Sprint 8.1 — RBAC (Dueño vs. Cajero), Actividad del Día y Límite de Cajeros por Plan (COMPLETO)
+[✅] Sprint 8.2 — Transformación Web Informativa + Onboarding Educativo No Bloqueante (COMPLETO)
+[ ] Sprint 9 — Despliegue y Activación de Hermes-3 en Producción (SIGUIENTE)
 ```
 
 ---
@@ -402,6 +404,27 @@
 >   - **Health Check CLI:** `scripts/check_llm_health.py` con exit codes 0 a 4 (0=HEALTHY, 1=CONFIG_ERROR, 2=PROVIDER_UNAVAILABLE, 3=MODEL_UNAVAILABLE, 4=STRUCTURED_OUTPUT_FAILURE).
 >   - **Smoke & Regression Suite:** 4/4 smoke tests passing, 280/280 benchmark passing, 72/72 tests globales verdes.
 
+> [GEMINI PROPONE → ✅ GEMINI IMPLEMENTA] Sprint 8.2 — Transformación Web Informativa + Onboarding Educativo No Bloqueante
+> **Objetivo:** Separación conceptual y de UX entre WEB ("Conoce, Comprende y Confía") y APP ("Gestiona tu Negocio"), con registro autónomo de comercios y onboarding guiado sin bloqueo operativo.
+>
+> **Estado de Implementación:**
+> - [x] **Web Informativa (`frontend/src/pages/LandingPage.jsx`):**
+>   - Estructura editorial de 13 secciones: Hero, Narrativa del Dolor, Propuesta de Valor, Audiencia Objetivo, Historias Documentales (`[HISTORIA REAL PENDIENTE]`), Alfabetización Digital, Economía Popular, 4 Pasos Reales, Modal Diferido de Video Tutorial (sin autoplay ni iframe bloqueante), Placeholders de Redes (`[URL INSTAGRAM]`, etc.), FAQ Humana sin absolutos, CTA y Footer institucional.
+>   - Cero lenguaje absoluto ("100% seguro", "gratis para siempre", "100% responsivo") ni jerga técnica ("multi-tenant").
+>   - Congelamiento comercial de IA: sin mención engañosa de funciones Pro en la landing hasta clarificación de límites de suscripción.
+> - [x] **Registro Autónomo de Comercios (`frontend/src/pages/Registro.jsx`):**
+>   - Integración directa con `POST /api/auth/registro-completo` respetando el schema Pydantic `UsuarioCrearConEmpresa` (`nombre_comercial`, `nit_o_cedula`, `email`, `password`, `rol: 'admin'`).
+>   - Comunicación neutral sin promesas no verificadas (*"Crea tu cuenta y comienza a configurar tu negocio"*).
+>   - Login actualizado con enlaces directos a `/registro` y retorno a la Web Informativa `/`.
+> - [x] **Onboarding Educativo No Bloqueante en APP:**
+>   - `OnboardingModal.jsx`: Modal de bienvenida que saluda por nombre al comerciante y ofrece opciones claras (`[Ver cómo funciona]`, `[Comenzar]`, `[Omitir]`), persistido en `localStorage` por usuario.
+>   - `GuiaPrimerosPasos.jsx`: Checklist de activación colapsable/descartable en `Dashboard.jsx` con 4 pasos reales (1. Agrega tu primer producto -> 2. Conoce el mostrador -> 3. Registra tu primera venta real -> 4. Consulta tu información). Sin ventas ficticias en BD de producción.
+>   - `Soporte.jsx`: Tarjeta permanente *"Aprender a usar Gestión Neiva"* para reactivar la guía o volver a ver el video tutorial en cualquier momento.
+>   - `Header.jsx`: Acceso directo y universal al mostrador/caja con badge de carrito para agilizar el flujo de venta desde cualquier módulo.
+>   - `Reportes.jsx`: Desmitificación de acrónimos técnicos (COGS, ROI) reemplazados por explicaciones cotidianas de finanzas de mostrador.
+> - [x] **Verificación:**
+>   - `npm run build`: compilación limpia y exitosa de Vite en 23.21s.
+>   - `pytest tests/test_auth.py tests/test_fase2_backend_rbac.py`: 14/14 tests passing sin regresiones.
 
 ---
 
