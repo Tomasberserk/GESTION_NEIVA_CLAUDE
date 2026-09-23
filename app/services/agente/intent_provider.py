@@ -617,7 +617,11 @@ def quick_parse_intent(text: str, context: dict[str, Any] | None = None) -> Agen
             confidence=0.98,
             raw_text=text,
         )
-    if any(k in t for k in ["cuánto vendí yo", "cuanto vendi yo", "mis ventas"]):
+    if any(k in t for k in [
+        "cuánto vendí yo", "cuanto vendi yo", "mis ventas", "cuántas ventas llevo",
+        "cuantas ventas llevo", "ventas llevo hoy", "llevo hoy", "he vendido yo",
+        "cuántas llevo", "cuantas llevo", "mi turno"
+    ]):
         return AgentInterpretation(
             intent="consulta_financiera",
             slots={"metric": "ventas_vendedor", "seller_name": "yo", "period": "hoy"},
@@ -676,7 +680,7 @@ def quick_parse_intent(text: str, context: dict[str, Any] | None = None) -> Agen
             raw_text=text,
         )
 
-    # 9.6 Ventas de hoy (incluye modismos colombianos)
+    # 9.6 Ventas de hoy (incluye modismos colombianos y ventas globales de tienda)
     if any(k in t for k in [
         "he vendido hoy", "hemos vendido", "cuánto llevamos", "cuanto llevamos",
         "qué tanto hemos vendido", "que tanto hemos vendido", "cuánto salió hoy", "cuanto salio hoy",
@@ -686,7 +690,9 @@ def quick_parse_intent(text: str, context: dict[str, Any] | None = None) -> Agen
         "se movio hoy la tienda", "cuánto coronamos hoy", "cuanto coronamos hoy",
         "se vendió harto hoy", "se vendio harto hoy", "cuánto vendimos hoy", "cuanto vendimos hoy",
         "cuánto vendimos", "cuanto vendimos", "cuánto hemos vendido", "cuanto hemos vendido",
-        "cómo vamos hoy", "como vamos hoy"
+        "cómo vamos hoy", "como vamos hoy", "vendió la tienda", "vendio la tienda",
+        "cuánto vendió la tienda", "cuanto vendio la tienda", "cuánto se vendió hoy",
+        "cuanto se vendio hoy", "cuánto vendió hoy", "cuanto vendio hoy"
     ]):
         return AgentInterpretation(
             intent="consulta_financiera",

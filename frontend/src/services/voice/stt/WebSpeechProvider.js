@@ -3,7 +3,8 @@ import { SPANISH_LANG_CHAIN } from '../voiceCapabilities.js'
 
 /**
  * Proveedor STT basado en la Web Speech API nativa del navegador.
- * Instrumentado con logs de diagnóstico para rastreo de eventos.
+ * Arquitectura aislada por instancia y generación con protección estricta contra
+ * callbacks huérfanos o desincronizados de reconocedores destruidos o abortados.
  */
 export class WebSpeechProvider extends SpeechInputProvider {
   constructor(preferredLang = 'es-ES') {
@@ -13,8 +14,12 @@ export class WebSpeechProvider extends SpeechInputProvider {
     this.isListening = false
     this.isStarting = false
     this.isStopping = false
+    this._abortRequested = false
     this.langIndex = 0
     this._endResolvers = []
+    this._instanceCounter = 0
+    this.instanceId = 'ws_0'
+
     console.log('[VOICE-DEBUG][WebSpeechProvider] constructor llamado con preferredLang:', preferredLang)
     this._initRecognition()
   }
@@ -55,57 +60,64 @@ export class WebSpeechProvider extends SpeechInputProvider {
       ? (window.SpeechRecognition || window.webkitSpeechRecognition)
       : null
 
-    console.log('[VOICE-DEBUG][WebSpeechProvider] SpeechRecognition constructor disponible:', !!SpeechRecognition)
-
     if (!SpeechRecognition) {
       console.warn('[VOICE-DEBUG][WebSpeechProvider] SpeechRecognition no soportado en este navegador')
+      this.recognition = null
       return
     }
 
-    this.recognition = new SpeechRecognition()
-    this.recognition.continuous = false
-    this.recognition.interimResults = true
-    this.recognition.maxAlternatives = 1
+    // Generar identificador único inmutable de esta instancia de recognition
+    const instanceId = 'ws_' + (++this._instanceCounter)
+    this.instanceId = instanceId
 
-    // Seleccionar idioma con fallback de la cadena (iniciando en es-ES)
-    this.recognition.lang = SPANISH_LANG_CHAIN[this.langIndex] || this.preferredLang
-    console.log('[VOICE-DEBUG][WebSpeechProvider] recognition configurado con lang:', this.recognition.lang)
+    const rec = new SpeechRecognition()
+    rec.continuous = false
+    rec.interimResults = true
+    rec.maxAlternatives = 1
+    rec.lang = SPANISH_LANG_CHAIN[this.langIndex] || this.preferredLang
 
-    this.recognition.onaudiostart = () => {
-      console.log('[VOICE-DEBUG][WebSpeechProvider] EVENTO: onaudiostart (captura de audio iniciada por hardware)')
+    rec.onaudiostart = () => {
+      if (this.instanceId !== instanceId) return
+      console.log(`[VOICE-DEBUG][WebSpeechProvider][${instanceId}] EVENTO: onaudiostart`)
     }
 
-    this.recognition.onsoundstart = () => {
-      console.log('[VOICE-DEBUG][WebSpeechProvider] EVENTO: onsoundstart (sonido detectado por el motor)')
+    rec.onsoundstart = () => {
+      if (this.instanceId !== instanceId) return
+      console.log(`[VOICE-DEBUG][WebSpeechProvider][${instanceId}] EVENTO: onsoundstart`)
     }
 
-    this.recognition.onspeechstart = () => {
-      console.log('[VOICE-DEBUG][WebSpeechProvider] EVENTO: onspeechstart (habla detectada)')
+    rec.onspeechstart = () => {
+      if (this.instanceId !== instanceId) return
+      console.log(`[VOICE-DEBUG][WebSpeechProvider][${instanceId}] EVENTO: onspeechstart turnId=${this.turnId}`)
       if (this.onSpeechStart) {
-        this.onSpeechStart(this.turnId, this.sessionGeneration)
+        this.onSpeechStart(this.turnId, this.sessionGeneration, this.generation, instanceId)
       }
     }
 
-    this.recognition.onspeechend = () => {
-      console.log('[VOICE-DEBUG][WebSpeechProvider] EVENTO: onspeechend (fin de habla detectado)')
+    rec.onspeechend = () => {
+      if (this.instanceId !== instanceId) return
+      console.log(`[VOICE-DEBUG][WebSpeechProvider][${instanceId}] EVENTO: onspeechend`)
     }
 
-    this.recognition.onsoundend = () => {
-      console.log('[VOICE-DEBUG][WebSpeechProvider] EVENTO: onsoundend (fin de sonido)')
+    rec.onsoundend = () => {
+      if (this.instanceId !== instanceId) return
+      console.log(`[VOICE-DEBUG][WebSpeechProvider][${instanceId}] EVENTO: onsoundend`)
     }
 
-    this.recognition.onaudioend = () => {
-      console.log('[VOICE-DEBUG][WebSpeechProvider] EVENTO: onaudioend (captura de audio finalizada)')
+    rec.onaudioend = () => {
+      if (this.instanceId !== instanceId) return
+      console.log(`[VOICE-DEBUG][WebSpeechProvider][${instanceId}] EVENTO: onaudioend`)
     }
 
-    this.recognition.onstart = () => {
-      console.log('[VOICE-DEBUG][WebSpeechProvider] EVENTO: onstart (reconocedor activado y escuchando)')
+    rec.onstart = () => {
+      if (this.instanceId !== instanceId) return
+      console.log(`[VOICE-DEBUG][WebSpeechProvider][${instanceId}] EVENTO: onstart`)
       this.isStarting = false
       this.isListening = true
     }
 
-    this.recognition.onresult = (event) => {
-      console.log('[VOICE-DEBUG][WebSpeechProvider] EVENTO: onresult recibido, results length:', event.results?.length)
+    rec.onresult = (event) => {
+      if (this.instanceId !== instanceId) return
       if (!event.results || event.results.length === 0) return
 
       const lastResult = event.results[event.results.length - 1]
@@ -113,22 +125,30 @@ export class WebSpeechProvider extends SpeechInputProvider {
       const isFinal = lastResult.isFinal
       const confidence = lastResult[0]?.confidence
 
-      console.log('[VOICE-DEBUG][WebSpeechProvider] onresult datos -> transcript:', transcript, 'isFinal:', isFinal, 'confidence:', confidence)
+      console.log(`[VOICE-DEBUG][WebSpeechProvider][${instanceId}] onresult -> "${transcript}" isFinal=${isFinal} conf=${confidence}`)
 
       if (transcript && this.onTranscript) {
-        this.onTranscript(transcript, isFinal, this.turnId, this.sessionGeneration)
+        this.onTranscript(transcript, isFinal, this.turnId, this.sessionGeneration, this.generation, instanceId)
       }
     }
 
-    this.recognition.onerror = (event) => {
+    rec.onerror = (event) => {
+      if (this.instanceId !== instanceId) return
       const errCode = event.error || 'unknown'
-      console.error('[VOICE-DEBUG][WebSpeechProvider] EVENTO: onerror:', errCode, 'mensaje:', event.message)
 
-      // Si el error es de lenguaje no soportado, intentar con el siguiente en la cadena
+      // Si fue abort intencional o durante detención/cancelación, absorberlo sin propagar error
+      if (errCode === 'aborted' && (this.isStopping || this._abortRequested)) {
+        console.log(`[VOICE-LIFECYCLE][WebSpeechProvider][${instanceId}] onerror: 'aborted' esperado (absorbido limpiamente)`)
+        return
+      }
+
+      console.error(`[VOICE-DEBUG][WebSpeechProvider][${instanceId}] EVENTO: onerror: ${errCode} - ${event.message}`)
+
+      // Fallback de idioma
       if (errCode === 'language-not-supported' && this.langIndex < SPANISH_LANG_CHAIN.length - 1) {
         this.langIndex++
-        this.recognition.lang = SPANISH_LANG_CHAIN[this.langIndex]
-        console.log('[VOICE-DEBUG][WebSpeechProvider] Fallback de idioma a:', this.recognition.lang)
+        rec.lang = SPANISH_LANG_CHAIN[this.langIndex]
+        console.log(`[VOICE-DEBUG][WebSpeechProvider][${instanceId}] Fallback de idioma a: ${rec.lang}`)
         return
       }
 
@@ -136,15 +156,17 @@ export class WebSpeechProvider extends SpeechInputProvider {
         this.onError({
           code: errCode,
           message: event.message || `Error de reconocimiento de voz: ${errCode}`,
-        }, this.turnId, this.sessionGeneration)
+        }, this.turnId, this.sessionGeneration, this.generation, instanceId)
       }
     }
 
-    this.recognition.onend = () => {
-      console.log('[VOICE-DEBUG][WebSpeechProvider] EVENTO: onend (reconocedor detenido, isListening era:', this.isListening, ')')
+    rec.onend = () => {
+      if (this.instanceId !== instanceId) return
+      console.log(`[VOICE-DEBUG][WebSpeechProvider][${instanceId}] EVENTO: onend (isListening era: ${this.isListening})`)
       this.isStarting = false
       this.isListening = false
       this.isStopping = false
+      this._abortRequested = false
 
       // Despertar promesas esperando el cierre asíncrono
       const resolvers = this._endResolvers
@@ -152,46 +174,69 @@ export class WebSpeechProvider extends SpeechInputProvider {
       resolvers.forEach((resolve) => resolve())
 
       if (this.onEnd) {
-        this.onEnd(this.turnId, this.sessionGeneration)
+        this.onEnd(this.turnId, this.sessionGeneration, this.generation, instanceId)
       }
     }
+
+    this.recognition = rec
+  }
+
+  _detachAndNeutralizeInstance(rec, instanceId) {
+    if (!rec) return
+    rec.onstart = null
+    rec.onspeechstart = null
+    rec.onspeechend = null
+    rec.onaudiostart = null
+    rec.onaudioend = null
+    rec.onsoundstart = null
+    rec.onsoundend = null
+    rec.onresult = null
+    rec.onerror = (e) => {
+      console.log(`[VOICE-LIFECYCLE][WebSpeechProvider][${instanceId}] onerror en instancia neutralizada (absorbido): ${e?.error}`)
+    }
+    rec.onend = () => {
+      console.log(`[VOICE-LIFECYCLE][WebSpeechProvider][${instanceId}] onend en instancia neutralizada (despertando waiters)`)
+      const resolvers = this._endResolvers
+      this._endResolvers = []
+      resolvers.forEach((resolve) => resolve())
+    }
+    try {
+      rec.abort()
+    } catch (_) {}
   }
 
   _forceResetRecognition() {
-    if (this.recognition) {
-      try {
-        this.recognition.onstart = null
-        this.recognition.onend = null
-        this.recognition.onerror = null
-        this.recognition.onresult = null
-        this.recognition.onspeechstart = null
-        this.recognition.onspeechend = null
-        this.recognition.onaudiostart = null
-        this.recognition.onaudioend = null
-        this.recognition.onsoundstart = null
-        this.recognition.onsoundend = null
-        this.recognition.abort()
-      } catch (_) {}
-    }
-    this._initRecognition()
+    const dyingRec = this.recognition
+    const dyingId = this.instanceId
+    this.recognition = null
+    this._detachAndNeutralizeInstance(dyingRec, dyingId)
+
     this.isStarting = false
     this.isListening = false
     this.isStopping = false
+    this._abortRequested = false
 
     const resolvers = this._endResolvers
     this._endResolvers = []
     resolvers.forEach((resolve) => resolve())
+
+    this._initRecognition()
   }
 
-  async start(turnId = null, sessionGeneration = 0) {
-    console.log('[VOICE-DEBUG][WebSpeechProvider] start() invocado. turnId:', turnId, 'isListening:', this.isListening, 'isStarting:', this.isStarting, 'isStopping:', this.isStopping)
+  async start(turnId = null, sessionGeneration = 0, providerGeneration = 0) {
+    console.log(`[VOICE-DEBUG][WebSpeechProvider] start() invocado. turnId=${turnId} gen=${providerGeneration} isListening=${this.isListening} isStarting=${this.isStarting} isStopping=${this.isStopping}`)
     this.turnId = turnId
     this.sessionGeneration = sessionGeneration
+    this.generation = providerGeneration
+    this._abortRequested = false
 
     if (!this.recognition) {
-      const err = new Error('Web Speech API no está soportada en este navegador.')
-      console.error('[VOICE-DEBUG][WebSpeechProvider]', err)
-      throw err
+      this._initRecognition()
+      if (!this.recognition) {
+        const err = new Error('Web Speech API no está soportada en este navegador.')
+        console.error('[VOICE-DEBUG][WebSpeechProvider]', err)
+        throw err
+      }
     }
 
     // Guard de lifecycle estricto contra reentrancia
@@ -215,22 +260,21 @@ export class WebSpeechProvider extends SpeechInputProvider {
     this.isStarting = true
 
     try {
-      console.log('[VOICE-DEBUG][WebSpeechProvider] Ejecutando recognition.start()...')
+      console.log(`[VOICE-DEBUG][WebSpeechProvider][${this.instanceId}] Ejecutando recognition.start()...`)
       this.recognition.start()
-      console.log('[VOICE-DEBUG][WebSpeechProvider] recognition.start() ejecutado sin lanzar excepción sincrónica.')
+      console.log(`[VOICE-DEBUG][WebSpeechProvider][${this.instanceId}] recognition.start() completado sin excepción sincrónica.`)
     } catch (err) {
       this.isStarting = false
       console.error('[VOICE-DEBUG][WebSpeechProvider] Excepción en recognition.start():', err.name, err.message)
       if (err.name === 'InvalidStateError') {
-        // Transición de recuperación controlada, NO dejar un WebSpeech fantasma
-        console.warn('[VOICE-STT] WebSpeech InvalidStateError: recognition already started en Chrome. Neutralizando instancia y reseteando sin dejar fantasma...')
+        console.warn('[VOICE-STT] WebSpeech InvalidStateError: neutralizando instancia y reseteando sin dejar fantasma...')
         this._forceResetRecognition()
 
         if (this.onError) {
           this.onError({
             code: 'invalid-state',
             message: 'SpeechRecognition ya había iniciado o estado desincronizado (InvalidStateError)',
-          }, this.turnId, this.sessionGeneration)
+          }, this.turnId, this.sessionGeneration, this.generation, this.instanceId)
         }
         return
       }
@@ -239,7 +283,7 @@ export class WebSpeechProvider extends SpeechInputProvider {
   }
 
   requestStop(turnId = null) {
-    console.log('[VOICE-STT] requestStop() invocado en WebSpeechProvider. turnId:', turnId ?? this.turnId, 'isListening:', this.isListening, 'isStopping:', this.isStopping)
+    console.log(`[VOICE-STT] requestStop() invocado en WebSpeechProvider. turnId=${turnId ?? this.turnId} isListening=${this.isListening} isStopping=${this.isStopping}`)
     if (this.recognition && this.isListening && !this.isStopping) {
       this.isStopping = true
       try {
@@ -248,7 +292,6 @@ export class WebSpeechProvider extends SpeechInputProvider {
         console.warn('[VOICE-STT] Error en recognition.stop():', err)
       }
     }
-    // isListening=false solamente en onend
   }
 
   stop(turnId = null) {
@@ -264,21 +307,24 @@ export class WebSpeechProvider extends SpeechInputProvider {
   }
 
   cancel(turnId = null) {
-    console.log('[VOICE-DEBUG][WebSpeechProvider] cancel() invocado. turnId:', turnId ?? this.turnId, 'isListening:', this.isListening, 'isStopping:', this.isStopping)
+    console.log(`[VOICE-DEBUG][WebSpeechProvider] cancel() invocado. turnId=${turnId ?? this.turnId} isListening=${this.isListening} isStopping=${this.isStopping}`)
+    this._abortRequested = true
     if (this.recognition && this.isActive()) {
       this.isStopping = true
-      try {
-        this.recognition.abort()
-      } catch (err) {
-        console.warn('[VOICE-DEBUG][WebSpeechProvider] Error en abort():', err)
-      }
+      const dyingRec = this.recognition
+      const dyingId = this.instanceId
+      this.recognition = null
+      this._detachAndNeutralizeInstance(dyingRec, dyingId)
+      this.isStarting = false
+      this.isListening = false
+      this.isStopping = false
+      this._initRecognition()
     }
-    // isListening=false solamente en onend
   }
 
   async abortAndWait(timeoutMs = 800) {
     console.log('[VOICE-DEBUG][WebSpeechProvider] abortAndWait() invocado. isActive:', this.isActive())
-    if (!this.isActive()) return
+    if (!this.isActive() && !this.recognition) return
     this.cancel(this.turnId)
     await this.waitForEnd(timeoutMs)
     if (this.isActive()) {

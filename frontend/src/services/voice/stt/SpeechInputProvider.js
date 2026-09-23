@@ -5,17 +5,18 @@
 
 export class SpeechInputProvider {
   constructor() {
-    this.onSpeechStart = null // (turnId?: number, sessionGen?: number) => void
-    this.onTranscript = null // (text: string, isFinal: boolean, turnId?: number, sessionGen?: number) => void
-    this.onError = null // (error: { code: string, message: string }, turnId?: number, sessionGen?: number) => void
-    this.onEnd = null // (turnId?: number, sessionGen?: number) => void
-    this.onRequestStop = null // (turnId?: number, sessionGen?: number) => void
+    this.onSpeechStart = null // (turnId?: number, sessionGen?: number, providerGen?: number, instanceId?: string) => void
+    this.onTranscript = null // (text: string, isFinal: boolean, turnId?: number, sessionGen?: number, providerGen?: number, instanceId?: string) => void
+    this.onError = null // (error: { code: string, message: string }, turnId?: number, sessionGen?: number, providerGen?: number, instanceId?: string) => void
+    this.onEnd = null // (turnId?: number, sessionGen?: number, providerGen?: number, instanceId?: string) => void
+    this.onRequestStop = null // (turnId?: number, sessionGen?: number, providerGen?: number, instanceId?: string) => void
     this.generation = 0
     this.turnId = null
     this.sessionGeneration = 0
+    this.instanceId = null
   }
 
-  async start(turnId = null, sessionGeneration = 0) {
+  async start(turnId = null, sessionGeneration = 0, providerGeneration = 0) {
     throw new Error('start() debe ser implementado por la subclase')
   }
 

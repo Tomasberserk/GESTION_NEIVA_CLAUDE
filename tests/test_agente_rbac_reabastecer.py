@@ -160,8 +160,9 @@ def test_tendero_puede_consultar_sus_propias_ventas(client: TestClient):
     res_mis = client.post("/api/agente/mensaje", json={"mensaje": "¿cuántas ventas llevo hoy?"}, headers=data["cajero_headers"])
     assert res_mis.status_code == 200
     txt = res_mis.json()["respuesta"]
-    assert "ventas registradas" in txt
-    assert "Total vendido" in txt
+    assert "ha registrado ventas por" in txt
+    assert "$9.000" in txt
+    assert "transacciones" in txt
 
 
 def test_admin_reabastece_con_nuevo_costo_y_alerta_margen(client: TestClient):

@@ -25,6 +25,7 @@
 [✅] Sprint 7.9 — Agente IA In-App Orientado a Tareas para Tier Pro (COMPLETO)
 [✅] Sprint 8.1 — RBAC (Dueño vs. Cajero), Actividad del Día y Límite de Cajeros por Plan (COMPLETO)
 [✅] Sprint 8.2 — Transformación Web Informativa + Onboarding Educativo No Bloqueante (COMPLETO)
+[✅] Sprint 8.3 — Gobernanza RBAC en Asistente IA, Reabastecimiento con Costo y Latencia Cero (COMPLETO)
 [ ] Sprint 9 — Despliegue y Activación de Hermes-3 en Producción (SIGUIENTE)
 ```
 
@@ -426,6 +427,31 @@
 > - [x] **Verificación:**
 >   - `npm run build`: compilación limpia y exitosa de Vite en 23.21s.
 >   - `pytest tests/test_auth.py tests/test_fase2_backend_rbac.py`: 14/14 tests passing sin regresiones.
+>
+> ---
+>
+> > [GEMINI PROPONE → ✅ GEMINI IMPLEMENTA] Sprint 8.3 — Gobernanza RBAC en Asistente IA, Reabastecimiento con Costo y Latencia Cero
+> > **Objetivo:** Blindaje de gobernanza y roles en el Asistente IA (Dueño vs Tendero), soporte completo de reabastecimiento con nuevo costo y alerta de margen, y optimización de latencia determinista (< 50ms) en comandos de entrada y vencimientos.
+> >
+> > **Estado de Implementación:**
+> > - [x] **Gobernanza RBAC del Asistente:**
+> >   - Saludo y desglose de capacidades (`formatear_menu_capacidades`) adaptado al rol: menú de control total para Administrador y menú de mostrador rápido para Tendero.
+> >   - Bloqueo pedagógico para el Tendero ante intentos de reabastecimiento o creación de productos (`formatear_bloqueo_rbac`).
+> >   - Bloqueo pedagógico para el Tendero ante métricas financieras globales de la tienda o comparativas.
+> >   - Consulta permitida de sus propias ventas para el Tendero del turno activo (`vendedor_query="yo"`).
+> >   - Bloqueo para el Tendero ante consultas de ventas de otros cajeros.
+> > - [x] **Reabastecimiento con Actualización de Costo y Venta:**
+> >   - Servicio `producto_service.reabastecer_producto` extendido con soporte atómico para `nuevo_precio_costo` y `nuevo_precio_venta` dentro del lock pesimista `SELECT ... FOR UPDATE`.
+> >   - Preview conversacional (`READY_TO_CONFIRM`) enriquecido: cálculo de stock proyectado, comparativa de costo anterior vs nuevo y alerta si el margen de ganancia baja del 15%.
+> >   - Ejecución transaccional e idempotente confirmada persistida en PostgreSQL (`agent_commands`).
+> > - [x] **Optimización de Latencia Determinista (< 50ms):**
+> >   - Parser rápido determinista en `intent_provider.py` ampliado para capturar frases compuestas de reabastecimiento (`"hoy me reabasteci de X [producto], pero el precio costo incremento y ahora vale Y"`) y triggers de ayuda/opciones.
+> >   - Detección inmediata de consultas de vencimiento (`"q esta proximo a vencer"`, `"que se vence pronto"`).
+> >   - Función determinística `consultas_service.consultar_productos_proximos_vencer` y formateador `formatear_productos_proximos_vencer`.
+> > - [x] **Verificación Automatizada:**
+> >   - `tests/test_agente_rbac_reabastecer.py`: 7/7 tests passing (menú RBAC, bloqueos pedagógicos, ventas propias, reabastecimiento con costo en BD y consulta de vencimientos).
+> >   - Suite de regresión global: 24/24 tests passing en `tests/test_agente_produccion.py` y `tests/test_fase2_backend_rbac.py`.
+> >   - Total de pruebas verificadas: 31/31 passing al 100%.
 
 ---
 

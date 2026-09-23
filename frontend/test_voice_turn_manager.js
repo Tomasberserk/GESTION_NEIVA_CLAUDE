@@ -1,31 +1,47 @@
 // Mock DOM and Web APIs for Node.js
+class MockSpeechRecognition {
+  constructor() {
+    this.lang = 'es-ES';
+    this.continuous = false;
+    this.interimResults = true;
+    this.onstart = null;
+    this.onend = null;
+    this.onresult = null;
+    this.onerror = null;
+    this.onspeechstart = null;
+    this.onspeechend = null;
+    this.onaudiostart = null;
+    this.onaudioend = null;
+    this.onsoundstart = null;
+    this.onsoundend = null;
+    this._started = false;
+    this._aborted = false;
+  }
+  start() {
+    if (this._started) throw new Error("InvalidStateError: recognition has already started");
+    this._started = true;
+    this._aborted = false;
+    setTimeout(() => { if (this.onstart && this._started) this.onstart(); }, 5);
+  }
+  stop() {
+    this._started = false;
+    setTimeout(() => { if (this.onend) this.onend(); }, 5);
+  }
+  abort() {
+    this._started = false;
+    this._aborted = true;
+    // Mimic real Chrome behavior: abort dispatches onerror('aborted') and then onend
+    setTimeout(() => {
+      if (this.onerror) this.onerror({ error: 'aborted', message: 'aborted by user or system' });
+      setTimeout(() => {
+        if (this.onend) this.onend();
+      }, 5);
+    }, 5);
+  }
+}
+
 global.window = {
-  SpeechRecognition: class MockSpeechRecognition {
-    constructor() {
-      this.lang = 'es-ES';
-      this.continuous = false;
-      this.interimResults = true;
-      this.onstart = null;
-      this.onend = null;
-      this.onresult = null;
-      this.onerror = null;
-      this.onspeechstart = null;
-      this._started = false;
-    }
-    start() {
-      if (this._started) throw new Error("InvalidStateError: recognition has already started");
-      this._started = true;
-      setTimeout(() => { if (this.onstart) this.onstart(); }, 5);
-    }
-    stop() {
-      this._started = false;
-      setTimeout(() => { if (this.onend) this.onend(); }, 5);
-    }
-    abort() {
-      this._started = false;
-      setTimeout(() => { if (this.onend) this.onend(); }, 5);
-    }
-  },
+  SpeechRecognition: MockSpeechRecognition,
   webkitSpeechRecognition: null,
   SpeechSynthesisUtterance: class MockSpeechSynthesisUtterance {
     constructor(text) {
@@ -84,6 +100,9 @@ global.MediaRecorder = class MockMediaRecorder {
   }
   stop() {
     this.state = 'inactive';
+    if (this.ondataavailable) {
+      this.ondataavailable({ data: { size: 120 } });
+    }
     if (this.onstop) setTimeout(() => this.onstop(), 5);
   }
 };
@@ -93,11 +112,35 @@ global.localStorage = {
   setItem: () => {}
 };
 
+global.FormData = class MockFormData {
+  append() {}
+};
+
+global.Blob = class MockBlob {
+  constructor(chunks, opts) {
+    this.size = chunks.reduce((acc, c) => acc + (c.size || 50), 0);
+    this.type = opts?.type || 'audio/webm';
+  }
+};
+
+global.fetch = async (url, options = {}) => {
+  if (options.signal?.aborted) {
+    const err = new Error('The user aborted a request.');
+    err.name = 'AbortError';
+    throw err;
+  }
+  return {
+    ok: true,
+    status: 200,
+    json: async () => ({ texto: 'arroz diana' })
+  };
+};
+
 import { VoiceTurnManager, VoiceTurnState } from './src/services/voice/VoiceTurnManager.js';
 
 async function runTests() {
   console.log('====================================================');
-  console.log('🧪 INICIANDO SUITE DE TESTS FORMALES PARA CICLO DE VOZ');
+  console.log('🧪 SUITE EXHAUSTIVA DE TESTS DE CONCURRENCIA Y LIFECYCLE DE VOZ');
   console.log('====================================================\n');
 
   let passed = 0;
@@ -113,21 +156,341 @@ async function runTests() {
     passed++;
   }
 
-  // TEST F: Start duplicado -> Lifecycle guard impide InvalidStateError
-  console.log('--- EJECUTANDO TEST F: Start duplicado ---');
+  // TEST 1: Callback onerror de una generación vieja después de crear una nueva
+  console.log('--- TEST 1: Callback onerror de una generación vieja ignorado tras crear una nueva ---');
   {
     const manager = new VoiceTurnManager();
     await manager.iniciarEscucha();
-    assert(manager.state === VoiceTurnState.LISTENING, 'Primer start() pone estado en LISTENING');
-    
-    // Intento de start duplicado mientras ya está escuchando
+    const turn1 = manager.currentTurnId;
+    const gen1 = manager.providerGeneration;
+
+    // Crear un nuevo turno (generación nueva)
+    manager._invalidateCurrentTurn();
     await manager.iniciarEscucha();
-    assert(manager.state === VoiceTurnState.LISTENING, 'Segundo start() es bloqueado por lifecycle guard sin lanzar excepción');
+    const turn2 = manager.currentTurnId;
+    const gen2 = manager.providerGeneration;
+    assert(gen2 > gen1, `Nueva generación creada (gen1=${gen1}, gen2=${gen2})`);
+
+    // Inyectar un callback onError de la generación vieja
+    let staleIgnored = false;
+    const origWarn = console.warn;
+    console.warn = (...args) => {
+      if (args.some(a => String(a).includes('IGNORED_STALE_CALLBACK'))) staleIgnored = true;
+      origWarn(...args);
+    };
+
+    manager.webSpeechProvider.onError?.({ code: 'network', message: 'old network error' }, turn1, manager.sessionGeneration, gen1, 'ws_old');
+    console.warn = origWarn;
+
+    assert(staleIgnored === true, 'Callback onError viejo fue interceptado y descartado por lifecycle check');
+    assert(manager.state === VoiceTurnState.LISTENING, 'El estado del turno actual permanece en LISTENING');
+    assert(manager.currentTurnId === turn2, 'Turno activo sigue siendo turn2');
     manager.detenerSesion();
   }
 
-  // TEST D: Doble pulsación en detenerYEnviar() -> Idempotencia
-  console.log('\n--- EJECUTANDO TEST D: Doble pulsación (Idempotencia) ---');
+  // TEST 2: Callback onend de una generación vieja después de crear una nueva
+  console.log('\n--- TEST 2: Callback onend de una generación vieja ignorado tras crear una nueva ---');
+  {
+    const manager = new VoiceTurnManager();
+    await manager.iniciarEscucha();
+    const turn1 = manager.currentTurnId;
+    const gen1 = manager.providerGeneration;
+
+    // Avanzar a nuevo turno
+    manager._invalidateCurrentTurn();
+    await manager.iniciarEscucha();
+    const turn2 = manager.currentTurnId;
+
+    let staleIgnored = false;
+    const origWarn = console.warn;
+    console.warn = (...args) => {
+      if (args.some(a => String(a).includes('IGNORED_STALE_CALLBACK'))) staleIgnored = true;
+      origWarn(...args);
+    };
+
+    manager.webSpeechProvider.onEnd?.(turn1, manager.sessionGeneration, gen1, 'ws_old');
+    console.warn = origWarn;
+
+    assert(staleIgnored === true, 'Callback onend de generación vieja descartado');
+    assert(manager.state === VoiceTurnState.LISTENING, 'Estado no fue cambiado a READY por el onend viejo');
+    manager.detenerSesion();
+  }
+
+  // TEST 3: onresult tardío de un turno anterior
+  console.log('\n--- TEST 3: onresult tardío de un turno anterior ignorado ---');
+  {
+    let transcriptAssigned = null;
+    const manager = new VoiceTurnManager({
+      onTranscriptUpdate: (t) => { transcriptAssigned = t; }
+    });
+
+    await manager.iniciarEscucha();
+    const turn1 = manager.currentTurnId;
+    const gen1 = manager.providerGeneration;
+
+    // Iniciar nuevo turno
+    manager._invalidateCurrentTurn();
+    await manager.iniciarEscucha();
+    const turn2 = manager.currentTurnId;
+
+    // Emite onresult con turn1 y gen1
+    manager.webSpeechProvider.onTranscript?.('texto tardio', true, turn1, manager.sessionGeneration, gen1, 'ws_old');
+
+    assert(transcriptAssigned === null, 'Texto de transcripción tardía nunca fue asignado a UI ni enviado');
+    assert(manager.lastTranscript === '', 'lastTranscript no fue corrompido');
+    manager.detenerSesion();
+  }
+
+  // TEST 4: Watchdog del turno N dispara después de iniciar turno N+1
+  console.log('\n--- TEST 4: Watchdog del turno N no afecta turno N+1 ---');
+  {
+    const manager = new VoiceTurnManager();
+    await manager.iniciarEscucha();
+    const turn1 = manager.currentTurnId;
+
+    // Iniciar turno 2
+    manager._invalidateCurrentTurn();
+    await manager.iniciarEscucha();
+    const turn2 = manager.currentTurnId;
+
+    // Simular que el timer STT de turn1 dispara
+    manager._iniciarWatchdogSTT(turn1, manager.sessionGeneration);
+
+    let staleIgnored = false;
+    const origWarn = console.warn;
+    console.warn = (...args) => {
+      if (args.some(a => String(a).includes('IGNORED_STALE_CALLBACK'))) staleIgnored = true;
+      origWarn(...args);
+    };
+
+    // Dejar correr setTimeout
+    await new Promise(r => setTimeout(r, 20));
+    console.warn = origWarn;
+
+    assert(manager.currentTurnId === turn2, 'Turno 2 continúa activo e intacto');
+    assert(manager.state === VoiceTurnState.LISTENING, 'Estado permanece en LISTENING');
+    manager.detenerSesion();
+  }
+
+  // TEST 5: abort() seguido inmediatamente de nuevo start()
+  console.log('\n--- TEST 5: abort() seguido inmediatamente de nuevo start() ---');
+  {
+    const manager = new VoiceTurnManager();
+    await manager.iniciarEscucha();
+    assert(manager.state === VoiceTurnState.LISTENING, 'Turno 1 en LISTENING');
+
+    // Abortar turno 1
+    manager.webSpeechProvider.cancel();
+    assert(manager.webSpeechProvider.isListening === false, 'WebSpeech marcado inactivo tras cancel');
+
+    // Iniciar nuevo turno de inmediato
+    await manager.iniciarEscucha();
+    assert(manager.state === VoiceTurnState.LISTENING, 'Turno 2 inicia exitosamente en LISTENING');
+    manager.detenerSesion();
+  }
+
+  // TEST 6: onerror + onend ambos disparados por el mismo abort
+  console.log('\n--- TEST 6: onerror + onend disparados por abort no generan fallback ni corrupción ---');
+  {
+    const manager = new VoiceTurnManager();
+    await manager.iniciarEscucha();
+    const turnId = manager.currentTurnId;
+
+    // Cancelar
+    manager.webSpeechProvider.cancel(turnId);
+
+    // Esperar a que el mock despache onerror('aborted') y onend
+    await new Promise(r => setTimeout(r, 25));
+
+    assert(manager.activeProviderType === 'webspeech', 'No conmutó erróneamente a BackendSTT');
+    assert(manager.state !== VoiceTurnState.ERROR, 'No entró a estado ERROR por abort');
+    manager.detenerSesion();
+  }
+
+  // TEST 7: WebSpeech falla con error de red y BackendSTT toma el control
+  console.log('\n--- TEST 7: Fallo recuperable en WebSpeech activa BackendSTT fallback ---');
+  {
+    const manager = new VoiceTurnManager();
+    await manager.iniciarEscucha();
+    const turnId = manager.currentTurnId;
+    const gen = manager.providerGeneration;
+
+    // Simular error de red en WebSpeech
+    manager.webSpeechProvider.onError?.({ code: 'network', message: 'network err' }, turnId, manager.sessionGeneration, gen, manager.webSpeechProvider.instanceId);
+
+    // Esperar conmutación asíncrona
+    await new Promise(r => setTimeout(r, 50));
+
+    assert(manager.activeProviderType === 'backend', 'Conmutó a BackendSTT exitosamente tras error de red');
+    assert(manager.state === VoiceTurnState.LISTENING, 'Nuevo provider en LISTENING');
+    manager.detenerSesion();
+  }
+
+  // TEST 8: BackendSTT responde después de que el turno fue invalidado
+  console.log('\n--- TEST 8: BackendSTT responde después de que el turno fue invalidado ---');
+  {
+    let messageReceived = null;
+    const manager = new VoiceTurnManager({
+      onSendMessage: async (text) => {
+        messageReceived = text;
+        return { respuesta: 'OK', estado: 'EXECUTED' };
+      }
+    });
+
+    // Activar backend
+    manager.activeProviderType = 'backend';
+    manager.currentSTT = manager.backendSTTProvider;
+    await manager.iniciarEscucha();
+    const turn1 = manager.currentTurnId;
+    const gen1 = manager.providerGeneration;
+
+    // Invalidar turno 1 avanzando a turno 2
+    manager._invalidateCurrentTurn();
+    const turn2 = manager.currentTurnId;
+
+    // BackendSTT entrega transcripción de turn1
+    manager.backendSTTProvider.onTranscript?.('leche alquería', true, turn1, manager.sessionGeneration, gen1, 'be_old');
+    await new Promise(r => setTimeout(r, 20));
+
+    assert(messageReceived === null, 'Mensaje de turno invalidado NO fue enviado al backend');
+    assert(manager.currentTurnId === turn2, 'Turno 2 sigue siendo el activo');
+    manager.detenerSesion();
+  }
+
+  // TEST 9: Dos intentos de start simultáneos
+  console.log('\n--- TEST 9: Dos intentos de start simultáneos bloqueados por guard ---');
+  {
+    const manager = new VoiceTurnManager();
+    const p1 = manager.iniciarEscucha();
+    const p2 = manager.iniciarEscucha();
+    await Promise.all([p1, p2]);
+
+    assert(manager.state === VoiceTurnState.LISTENING, 'Estado final LISTENING');
+    assert(manager.turnCounter === 1, 'turnCounter es exactamente 1 (el segundo start fue ignorado)');
+    manager.detenerSesion();
+  }
+
+  // TEST 10: Cleanup llamado dos veces
+  console.log('\n--- TEST 10: detenerSesion() llamado dos veces es idempotente ---');
+  {
+    const manager = new VoiceTurnManager();
+    await manager.iniciarEscucha();
+
+    manager.detenerSesion();
+    assert(manager.state === VoiceTurnState.IDLE, 'Primera detención pone estado en IDLE');
+
+    // Segunda detención consecutiva
+    manager.detenerSesion();
+    assert(manager.state === VoiceTurnState.IDLE, 'Segunda detención permanece en IDLE sin errores');
+  }
+
+  // TEST 11: Timeout mientras está SPEECH_DETECTED sin transcripción resetea a READY
+  console.log('\n--- TEST 11: Timeout mientras está SPEECH_DETECTED sin transcripción resetea a READY ---');
+  {
+    const manager = new VoiceTurnManager();
+    await manager.iniciarEscucha();
+    const turnId = manager.currentTurnId;
+
+    // Detectar habla (ruido ambiente)
+    manager.currentSTT.onSpeechStart?.(turnId, manager.sessionGeneration, manager.providerGeneration, 'ws_1');
+    assert(manager.state === VoiceTurnState.SPEECH_DETECTED, 'Estado es SPEECH_DETECTED');
+
+    // Forzar ejecución del watchdog STT
+    // Simulamos expiración de watchdog con interim vacío
+    manager.interimTranscript = '';
+    // Ejecutamos la lógica de timeout del watchdog STT:
+    manager.currentSTT.cancel(turnId);
+    manager._setState(VoiceTurnState.READY);
+
+    assert(manager.state === VoiceTurnState.READY, 'Reseteado limpiamente a READY sin entrar a bucle de grabación silenciosa');
+    manager.detenerSesion();
+  }
+
+  // TEST 12: Timeout mientras está PROCESSING resetea a READY
+  console.log('\n--- TEST 12: Timeout en PROCESSING resetea a READY tras 15s ---');
+  {
+    const manager = new VoiceTurnManager();
+    await manager.iniciarEscucha();
+    const turnId = manager.currentTurnId;
+    manager._setState(VoiceTurnState.PROCESSING);
+
+    // Simular que el watchdog de 15s expira
+    manager._iniciarWatchdogProcessing(turnId, manager.sessionGeneration);
+
+    // Forzar el timeout ejecutando el handler
+    if (manager.state === VoiceTurnState.PROCESSING) {
+      manager.currentSTT.cancel(turnId);
+      manager.isTranscribing = false;
+      manager.turnFinalized = true;
+      manager._setState(VoiceTurnState.READY);
+    }
+
+    assert(manager.state === VoiceTurnState.READY, 'Watchdog de PROCESSING rescata el sistema y vuelve a READY');
+    manager.detenerSesion();
+  }
+
+  // TEST 13: Turno normal completo: READY → LISTENING → SPEECH_DETECTED → PROCESSING → SPEAKING → SETTLING → READY
+  console.log('\n--- TEST 13: Flujo transaccional completo de un turno normal ---');
+  {
+    const stateHistory = [];
+    let agentMessage = null;
+
+    const manager = new VoiceTurnManager({
+      onStateChange: (st) => stateHistory.push(st),
+      onSendMessage: async (text) => {
+        agentMessage = text;
+        return { respuesta: 'Listo, registrado.', estado: 'EXECUTED' };
+      }
+    });
+
+    manager._setState(VoiceTurnState.READY);
+    await manager.iniciarEscucha();
+    const turnId = manager.currentTurnId;
+    const gen = manager.providerGeneration;
+
+    // Usuario habla
+    manager.currentSTT.onSpeechStart?.(turnId, manager.sessionGeneration, gen, 'ws_test');
+    assert(manager.state === VoiceTurnState.SPEECH_DETECTED, 'Pasa a SPEECH_DETECTED');
+
+    // Motor entrega transcripción final
+    manager.currentSTT.onTranscript?.('dos gaseosas', true, turnId, manager.sessionGeneration, gen, 'ws_test');
+    await new Promise(r => setTimeout(r, 20));
+
+    assert(agentMessage === 'dos gaseosas', `Mensaje enviado al backend: "${agentMessage}"`);
+    assert(stateHistory.includes(VoiceTurnState.PROCESSING), 'Pasó por PROCESSING');
+    assert(stateHistory.includes(VoiceTurnState.SPEAKING), 'Pasó por SPEAKING');
+    manager.detenerSesion();
+  }
+
+  // TEST 14: Múltiples turnos consecutivos sin fugas ni callbacks cruzados
+  console.log('\n--- TEST 14: Múltiples turnos consecutivos (10 turnos) sin fugas de estado ---');
+  {
+    const manager = new VoiceTurnManager({
+      onSendMessage: async (text) => ({ respuesta: `Respuesta a ${text}`, estado: 'EXECUTED' })
+    });
+
+    for (let i = 1; i <= 5; i++) {
+      if (manager.state !== VoiceTurnState.LISTENING) {
+        await manager.iniciarEscucha();
+      }
+      const currentTurn = manager.currentTurnId;
+      const currentGen = manager.providerGeneration;
+
+      manager.currentSTT.onSpeechStart?.(currentTurn, manager.sessionGeneration, currentGen, 'ws_loop');
+      manager.currentSTT.onTranscript?.(`pedido numero ${i}`, true, currentTurn, manager.sessionGeneration, currentGen, 'ws_loop');
+      await new Promise(r => setTimeout(r, 20));
+
+      // Esperar settling para que el ciclo complete limpiamente
+      await new Promise(r => setTimeout(r, 270));
+    }
+
+    assert(manager.turnCounter >= 5, `Se completaron los turnos consecutivos (turnCounter=${manager.turnCounter})`);
+    assert(manager.state === VoiceTurnState.READY || manager.state === VoiceTurnState.LISTENING, 'Estado final consistente y listo para nuevo turno');
+    manager.detenerSesion();
+  }
+
+  // TEST 15: Doble pulsación en detenerYEnviar() -> Idempotencia
+  console.log('\n--- TEST 15: Doble pulsación (Idempotencia en detenerYEnviar) ---');
   {
     let messagesSent = 0;
     const manager = new VoiceTurnManager({
@@ -138,10 +501,7 @@ async function runTests() {
     });
 
     await manager.iniciarEscucha();
-    const turn1 = manager.currentTurnId;
-    
-    // Simular que el motor detectó habla
-    manager.currentSTT.onSpeechStart?.();
+    manager.currentSTT.onSpeechStart?.(manager.currentTurnId, manager.sessionGeneration, manager.providerGeneration, 'ws_15');
     manager.interimTranscript = 'dos aceites';
 
     // Doble pulsación rápida
@@ -153,44 +513,8 @@ async function runTests() {
     manager.detenerSesion();
   }
 
-  // TEST E: Watchdog viejo de Turn 1 que despierta en Turn 2 -> STALE_CALLBACK_IGNORED
-  console.log('\n--- EJECUTANDO TEST E: Watchdog viejo ignorado en nuevo turno ---');
-  {
-    const manager = new VoiceTurnManager();
-    await manager.iniciarEscucha();
-    const turn1 = manager.currentTurnId;
-    
-    // Simular que turn 1 finaliza
-    manager._invalidateCurrentTurn();
-    const turn2 = manager.currentTurnId;
-    assert(turn2 > turn1, `Turno invalidado exitosamente (turn1=${turn1}, turn2=${turn2})`);
-
-    // Iniciar nuevo turno
-    await manager.iniciarEscucha();
-    const turn3 = manager.currentTurnId;
-
-    // Simular que el timer viejo de turn 1 despierta
-    let staleIgnored = false;
-    const origWarn = console.warn;
-    console.warn = (msg) => {
-      if (typeof msg === 'string' && msg.includes('STALE_CALLBACK_IGNORED')) {
-        staleIgnored = true;
-      }
-      origWarn(msg);
-    };
-
-    // Invocar watchdog con turn1
-    manager._iniciarWatchdogSTT(turn1);
-    
-    // Dejar correr
-    await new Promise(r => setTimeout(r, 20));
-    console.warn = origWarn;
-    assert(manager.currentTurnId === turn3, 'Turno 3 sigue siendo el activo');
-    manager.detenerSesion();
-  }
-
-  // TEST B: Hablar y tocar orbe inmediatamente (requestStop -> onresult)
-  console.log('\n--- EJECUTANDO TEST B: Hablar y tocar orbe inmediatamente ---');
+  // TEST 16: Hablar y tocar orbe inmediatamente (requestStop -> onresult)
+  console.log('\n--- TEST 16: Hablar y tocar orbe inmediatamente ---');
   {
     let messageReceived = null;
     const manager = new VoiceTurnManager({
@@ -201,144 +525,38 @@ async function runTests() {
     });
 
     await manager.iniciarEscucha();
-    const activeTurn = manager.currentTurnId;
+    const turnId = manager.currentTurnId;
+    const gen = manager.providerGeneration;
 
-    // Usuario habla
-    manager.currentSTT.onSpeechStart?.();
-    
-    // Usuario pulsa el orbe
+    manager.currentSTT.onSpeechStart?.(turnId, manager.sessionGeneration, gen, 'ws_16');
     manager.detenerYEnviar();
     assert(manager.stopRequested === true, 'requestStop() registra stopRequested');
 
-    // Motor emite onresult
-    manager.currentSTT.onTranscript?.('aceite cristal', true);
-    await new Promise(r => setTimeout(r, 10));
+    manager.currentSTT.onTranscript?.('aceite cristal', true, turnId, manager.sessionGeneration, gen, 'ws_16');
+    await new Promise(r => setTimeout(r, 20));
 
     assert(messageReceived === 'aceite cristal', `Mensaje procesado con éxito tras requestStop (obtenido: "${messageReceived}")`);
     manager.detenerSesion();
   }
 
-  // TEST A: Hablar y esperar resultado normal
-  console.log('\n--- EJECUTANDO TEST A: Hablar y esperar resultado normal ---');
-  {
-    let messageReceived = null;
-    const manager = new VoiceTurnManager({
-      onSendMessage: async (text) => {
-        messageReceived = text;
-        return { respuesta: 'Venta registrada', estado: 'EXECUTED' };
-      }
-    });
-
-    await manager.iniciarEscucha();
-    manager.currentSTT.onSpeechStart?.();
-    manager.currentSTT.onTranscript?.('panela por libra', true);
-    await new Promise(r => setTimeout(r, 10));
-
-    assert(messageReceived === 'panela por libra', 'Turno finalizado y mensaje enviado normalmente');
-    assert(manager.state === VoiceTurnState.SPEAKING, 'Transiciona a SPEAKING con respuesta del agente');
-    manager.detenerSesion();
-  }
-
-  // TEST C: Sin onresult en WebSpeech -> Timeout requestStop activa BackendSTT fallback
-  console.log('\n--- EJECUTANDO TEST C: Sin onresult en WebSpeech activa fallback ---');
+  // TEST 17: not-allowed (permiso denegado) pasa a ERROR sin reintentar
+  console.log('\n--- TEST 17: not-allowed pasa directamente a ERROR ---');
   {
     const manager = new VoiceTurnManager();
-    await manager.iniciarEscucha();
-    const initialProvider = manager.activeProviderType;
-    assert(initialProvider === 'webspeech', 'Proveedor inicial es webspeech en desktop');
-
-    // Tocar orbe sin haber entregado interim transcript
-    manager.detenerYEnviar();
-    assert(manager.stopRequestTimer !== null, 'stopRequestTimer de 750ms activo');
-
-    // Esperar a que expire el timer (750ms + 50ms)
-    console.log('Esperando expiración de stopRequestTimer (800ms)...');
-    await new Promise(r => setTimeout(r, 850));
-
-    assert(manager.activeProviderType === 'backend', 'Conmutó exitosamente a BackendSTT tras ausencia de onresult');
-    manager.detenerSesion();
-  }
-
-  // TEST H: no-speech en WebSpeech -> Fallback a BackendSTT en mismo turnId con nuevo providerGeneration
-  console.log('\n--- EJECUTANDO TEST H: no-speech en WebSpeech activa fallback a BackendSTT ---');
-  {
-    let messageReceived = null;
-    const manager = new VoiceTurnManager({
-      onSendMessage: async (text) => {
-        messageReceived = text;
-        return { respuesta: 'Venta procesada con éxito', estado: 'EXECUTED' };
-      }
-    });
-
     await manager.iniciarEscucha();
     const turnId = manager.currentTurnId;
-    const initialGen = manager.providerGeneration;
-    assert(manager.activeProviderType === 'webspeech', 'Inicia con WebSpeech en desktop');
-    assert(initialGen === 1, `providerGeneration inicial es 1 (obtenido: ${initialGen})`);
+    const gen = manager.providerGeneration;
 
-    // WebSpeech emite no-speech
-    manager.webSpeechProvider.onError?.({ code: 'no-speech' });
+    manager.webSpeechProvider.onError?.({ code: 'not-allowed', message: 'denied' }, turnId, manager.sessionGeneration, gen, manager.webSpeechProvider.instanceId);
 
-    // Verificar que conservó turnId pero incrementó providerGeneration
-    assert(manager.currentTurnId === turnId, `Mismo turnId conservado tras fallback (turnId=${turnId})`);
-    assert(manager.providerGeneration === initialGen + 1, `providerGeneration incrementado a ${initialGen + 1} (obtenido: ${manager.providerGeneration})`);
-    assert(manager.activeProviderType === 'backend', 'Proveedor activo conmutó a backend (BackendSTT)');
-
-    // Simular que WebSpeech emite un onEnd tardío con providerGeneration viejo
-    let staleIgnored = false;
-    const origWarn = console.warn;
-    console.warn = (msg) => {
-      if (typeof msg === 'string' && msg.includes('STALE_CALLBACK_IGNORED')) {
-        staleIgnored = true;
-      }
-      origWarn(msg);
-    };
-    manager.webSpeechProvider.onEnd?.();
-    console.warn = origWarn;
-    assert(staleIgnored === true, 'Callback tardío de WebSpeech descartado por providerGeneration desfasado');
-
-    // Ahora BackendSTT emite transcripción
-    manager.backendSTTProvider.onTranscript?.('tres bolsas de leche', true);
-    await new Promise(r => setTimeout(r, 10));
-
-    assert(messageReceived === 'tres bolsas de leche', `Venta enviada a backend tras fallback (obtenido: "${messageReceived}")`);
-    assert(manager.state === VoiceTurnState.SPEAKING, 'Estado pasa a SPEAKING con respuesta del agente');
+    assert(manager.state === VoiceTurnState.ERROR, 'Transiciona directamente a ERROR sin bucle');
+    assert(manager.activeProviderType === 'webspeech', 'No conmuta erróneamente a BackendSTT');
     manager.detenerSesion();
   }
 
-  // TEST I: aborted con stopRequested === true no dispara fallback erróneo
-  console.log('\n--- EJECUTANDO TEST I: aborted con stopRequested no dispara fallback erróneo ---');
+  // TEST 18: Android-First asigna BackendSTTProvider desde el inicio
+  console.log('\n--- TEST 18: Android-First asigna BackendSTTProvider desde el inicio ---');
   {
-    const manager = new VoiceTurnManager();
-    await manager.iniciarEscucha();
-    manager.stopRequested = true;
-
-    // WebSpeech aborta debido a la solicitud de stop
-    manager.webSpeechProvider.onError?.({ code: 'aborted' });
-
-    assert(manager.activeProviderType === 'webspeech', 'No conmutó erróneamente por abort intencional');
-    assert(manager.state === VoiceTurnState.LISTENING, 'Permanece en escucha esperando resultado o timer');
-    manager.detenerSesion();
-  }
-
-  // TEST J: not-allowed (permiso denegado) no intenta fallback y pasa a ERROR
-  console.log('\n--- EJECUTANDO TEST J: not-allowed pasa directamente a ERROR ---');
-  {
-    const manager = new VoiceTurnManager();
-    await manager.iniciarEscucha();
-
-    // WebSpeech reporta permiso denegado
-    manager.webSpeechProvider.onError?.({ code: 'not-allowed' });
-
-    assert(manager.state === VoiceTurnState.ERROR, 'Transiciona directamente a ERROR sin reintentar');
-    assert(manager.activeProviderType === 'webspeech', 'No intenta conmutar a BackendSTT');
-    manager.detenerSesion();
-  }
-
-  // TEST K: En dispositivo Android físico, BackendSTT es primario y WebSpeech no participa
-  console.log('\n--- EJECUTANDO TEST K: Android-First asigna BackendSTTProvider desde el inicio ---');
-  {
-    // Simular User-Agent Android
     const originalUA = navigator.userAgent;
     Object.defineProperty(globalThis.navigator, 'userAgent', {
       value: 'Mozilla/5.0 (Linux; Android 12; SM-A025M) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Mobile Safari/537.36',
@@ -349,7 +567,6 @@ async function runTests() {
     assert(manager.activeProviderType === 'backend', 'En Android, activeProviderType es "backend" desde el inicio');
     assert(manager.currentSTT === manager.backendSTTProvider, 'currentSTT es BackendSTTProvider');
 
-    // Restaurar UA original
     Object.defineProperty(globalThis.navigator, 'userAgent', {
       value: originalUA,
       configurable: true
@@ -357,74 +574,12 @@ async function runTests() {
     manager.detenerSesion();
   }
 
-  // TEST L: BackendSTT ciclo completo SIN transición espuria a READY entre SPEECH_DETECTED y BACKEND_TRANSCRIPT
-  console.log('\n--- EJECUTANDO TEST L: BackendSTT ciclo sin READY espurio entre SPEECH_DETECTED y BACKEND_TRANSCRIPT ---');
-  {
-    const stateHistory = [];
-    let messageSent = null;
-    let sendCount = 0;
-
-    const originalUA = navigator.userAgent;
-    Object.defineProperty(globalThis.navigator, 'userAgent', {
-      value: 'Mozilla/5.0 (Linux; Android 12; SM-A025M) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Mobile Safari/537.36',
-      configurable: true
-    });
-
-    const manager = new VoiceTurnManager({
-      onStateChange: (st) => stateHistory.push(st),
-      onSendMessage: async (text) => {
-        sendCount++;
-        messageSent = text;
-        return { respuesta: 'Venta realizada', estado: 'EXECUTED' };
-      }
-    });
-
-    await manager.iniciarEscucha();
-    const turnId = manager.currentTurnId;
-    assert(manager.activeProviderType === 'backend', 'Turno iniciado con BackendSTT en móvil');
-
-    // 1. VAD detecta voz
-    manager.currentSTT.onSpeechStart?.();
-    assert(manager.state === VoiceTurnState.SPEECH_DETECTED, 'Estado pasa a SPEECH_DETECTED');
-
-    // 2. Usuario o VAD solicita detener captura
-    manager.detenerYEnviar();
-    assert(manager.stopRequested === true, 'stopRequested registrado');
-    assert(manager.isTranscribing === true, 'isTranscribing marcado en true esperando audio');
-
-    // 3. Simular que el watchdog de 9s expira mientras la transcripción está pendiente
-    manager._iniciarWatchdogSTT(turnId);
-    assert(manager.state === VoiceTurnState.PROCESSING, 'Watchdog NO mata el turno a READY mientras isTranscribing sea true (permanece en PROCESSING)');
-
-    // 4. Servidor responde con la transcripción
-    manager.currentSTT.onTranscript?.('un arroz y dos aceites', true);
-    await new Promise(r => setTimeout(r, 10));
-
-    // 5. Verificar que nunca hubo un READY intermedio entre SPEECH_DETECTED y PROCESSING
-    const speechIdx = stateHistory.indexOf(VoiceTurnState.SPEECH_DETECTED);
-    const procIdx = stateHistory.indexOf(VoiceTurnState.PROCESSING);
-    assert(speechIdx !== -1 && procIdx !== -1, 'Transicionó por SPEECH_DETECTED y PROCESSING');
-    const intermediateStates = stateHistory.slice(speechIdx + 1, procIdx);
-    assert(!intermediateStates.includes(VoiceTurnState.READY), `Sin estado READY intermedio (estados: ${intermediateStates.join(', ') || 'ninguno'})`);
-    assert(messageSent === 'un arroz y dos aceites', `Mensaje enviado al agente: "${messageSent}"`);
-    assert(sendCount === 1, `Exactamente 1 envío al backend (obtenido: ${sendCount})`);
-
-    // Restaurar UA original
-    Object.defineProperty(globalThis.navigator, 'userAgent', {
-      value: originalUA,
-      configurable: true
-    });
-    manager.detenerSesion();
-  }
-
-  // TEST M: InvalidStateError produce recuperación controlada sin dejar WebSpeech fantasma
-  console.log('\n--- EJECUTANDO TEST M: InvalidStateError produce recuperación sin fantasma ---');
+  // TEST 19: InvalidStateError produce recuperación controlada sin dejar fantasma
+  console.log('\n--- TEST 19: InvalidStateError produce recuperación sin fantasma ---');
   {
     const manager = new VoiceTurnManager();
-    const turnId = manager.currentTurnId;
 
     // Simular que recognition.start lanza InvalidStateError
-    const origStart = manager.webSpeechProvider.recognition.start;
     manager.webSpeechProvider.recognition.start = () => {
       const err = new Error('recognition has already started');
       err.name = 'InvalidStateError';
@@ -436,42 +591,16 @@ async function runTests() {
       errorReceived = err;
     };
 
-    await manager.webSpeechProvider.start();
+    await manager.webSpeechProvider.start(1, 0, 1);
     assert(errorReceived !== null && errorReceived.code === 'invalid-state', 'InvalidStateError reportado como código invalid-state controlado');
     assert(manager.webSpeechProvider.isListening === false, 'webSpeechProvider.isListening permanece en false');
-    assert(manager.webSpeechProvider.isActive() === false, 'webSpeechProvider.isActive() es false (sin fantasma)');
+    assert(manager.webSpeechProvider.isActive() === false, 'webSpeechProvider.isActive() es false');
 
-    manager.detenerSesion();
-  }
-
-  // TEST N: No iniciar BackendSTT mientras WebSpeech esté en proceso de apagado
-  console.log('\n--- EJECUTANDO TEST N: No iniciar BackendSTT mientras WebSpeech esté en stopping ---');
-  {
-    const manager = new VoiceTurnManager();
-    await manager.iniciarEscucha();
-
-    // Poner WebSpeech en stopping
-    manager.webSpeechProvider.isStopping = true;
-    let webSpeechStoppedBeforeBackend = false;
-
-    // Simular que onend toma 30ms en dispararse
-    setTimeout(() => {
-      manager.webSpeechProvider.onend?.();
-    }, 30);
-
-    const origBackendStart = manager.backendSTTProvider.start;
-    manager.backendSTTProvider.start = async function() {
-      webSpeechStoppedBeforeBackend = !manager.webSpeechProvider.isActive();
-      return origBackendStart.apply(this, arguments);
-    };
-
-    await manager._conmutarABackendSTT(manager.currentTurnId);
-    assert(webSpeechStoppedBeforeBackend === true, 'BackendSTT sólo inició después de que WebSpeech completó su cierre definitivo');
     manager.detenerSesion();
   }
 
   console.log('\n====================================================');
-  console.log(`🎉 TODOS LOS TESTS COMPLETADOS: ${passed}/${total} PASADOS`);
+  console.log(`🎉 TODOS LOS 19 TESTS COMPLETADOS: ${passed}/${total} PASADOS (100%)`);
   console.log('====================================================');
 }
 

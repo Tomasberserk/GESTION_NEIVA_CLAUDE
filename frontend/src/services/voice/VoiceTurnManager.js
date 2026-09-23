@@ -20,8 +20,9 @@ export const VoiceTurnState = {
 }
 
 /**
- * VoiceTurnManager: Gestor desacoplado de turnos de audio y anti-eco.
- * Instrumentado con logs de diagnóstico paso a paso.
+ * VoiceTurnManager: Gestor desacoplado de turnos de audio, concurrencia y anti-eco.
+ * Arquitectura transaccional de turno único con validación estricta de lifecycle y
+ * aislamiento total contra callbacks desfasados o reentrantes.
  */
 export class VoiceTurnManager {
   constructor(options = {}) {
@@ -69,25 +70,48 @@ export class VoiceTurnManager {
       this.currentSTT = this.webSpeechProvider
     }
 
-    // Timers
+    // Timers de seguridad
     this.speechEndTimer = null
     this.settlingTimer = null
     this.operationalTimer = null
     this.watchdogTimer = null
     this.stopRequestTimer = null
+    this.processingWatchdogTimer = null
 
     this._bindProviders()
     console.log('[VOICE-DEBUG][VoiceTurnManager] Instanciación completa. Estado inicial:', this.state, 'Proveedor activo:', this.activeProviderType)
   }
 
+  _isTurnActive(turnId, sessionGen = null, providerGen = null) {
+    if (turnId !== this.currentTurnId) return false
+    if (sessionGen !== null && sessionGen !== this.sessionGeneration) return false
+    if (providerGen !== null && providerGen !== this.providerGeneration) return false
+    return true
+  }
+
+  _logLifecycle(event, details = {}) {
+    const timestamp = new Date().toISOString()
+    console.log(`[VOICE-LIFECYCLE] ${timestamp} turn=${this.currentTurnId} gen=${this.providerGeneration} session=${this.sessionGeneration} provider=${this.activeProviderType} state=${this.state} event=${event}`, details)
+  }
+
+  _logStaleCallback(event, context = {}) {
+    console.warn(`[VOICE-LIFECYCLE] IGNORED_STALE_CALLBACK event=${event} callbackTurn=${context.turnId} callbackGen=${context.providerGen} activeTurn=${this.currentTurnId} activeGen=${this.providerGeneration} state=${this.state}`)
+  }
+
   _invalidateCurrentTurn() {
     this.currentTurnId = ++this.turnCounter
     this.providerGeneration = ++this.providerCounter
+    this.currentSTT.generation = this.providerGeneration
     this.stopRequested = false
     this.fallbackInProgress = false
     this.turnFinalized = false
     this.isTranscribing = false
+    this.interimTranscript = ''
     this._limpiarTimers()
+    if (this.currentSTT) {
+      try { this.currentSTT.cancel(this.currentTurnId) } catch (_) {}
+    }
+    this._setState(VoiceTurnState.READY)
   }
 
   _setState(newState, data = {}) {
@@ -105,35 +129,38 @@ export class VoiceTurnManager {
 
   _bindProviders() {
     console.log('[VOICE-DEBUG][VoiceTurnManager] _bindProviders() configurando callbacks de STT y TTS...')
+
     const setupSTT = (provider, name) => {
-      provider.onRequestStop = (turnId, sessionGen) => {
+      provider.onRequestStop = (turnId, sessionGen, providerGen) => {
         const resolvedTurnId = turnId ?? this.currentTurnId
         const resolvedSessionGen = sessionGen ?? this.sessionGeneration
+        const resolvedProviderGen = providerGen ?? provider.generation
+
         if (
           provider !== this.currentSTT ||
-          provider.generation !== this.providerGeneration ||
-          resolvedTurnId !== this.currentTurnId ||
-          resolvedSessionGen !== this.sessionGeneration
+          !this._isTurnActive(resolvedTurnId, resolvedSessionGen, resolvedProviderGen)
         ) {
-          console.warn(`[VOICE-STT] STALE_CALLBACK_IGNORED onRequestStop [${name}] turnId=${resolvedTurnId} providerGen=${provider.generation}`)
+          this._logStaleCallback(`onRequestStop [${name}]`, { turnId: resolvedTurnId, providerGen: resolvedProviderGen })
           return
         }
+
         console.log(`[VOICE-TURN] onRequestStop recibido desde provider [${name}] turnId=${resolvedTurnId}`)
         this.detenerYEnviar()
       }
 
-      provider.onSpeechStart = (turnId, sessionGen) => {
+      provider.onSpeechStart = (turnId, sessionGen, providerGen) => {
         const resolvedTurnId = turnId ?? this.currentTurnId
         const resolvedSessionGen = sessionGen ?? this.sessionGeneration
+        const resolvedProviderGen = providerGen ?? provider.generation
+
         if (
           provider !== this.currentSTT ||
-          provider.generation !== this.providerGeneration ||
-          resolvedTurnId !== this.currentTurnId ||
-          resolvedSessionGen !== this.sessionGeneration
+          !this._isTurnActive(resolvedTurnId, resolvedSessionGen, resolvedProviderGen)
         ) {
-          console.warn(`[VOICE-STT] STALE_CALLBACK_IGNORED onSpeechStart [${name}] turnId=${resolvedTurnId} providerGen=${provider.generation} (activo: turnId=${this.currentTurnId} gen=${this.providerGeneration})`)
+          this._logStaleCallback(`onSpeechStart [${name}]`, { turnId: resolvedTurnId, providerGen: resolvedProviderGen })
           return
         }
+
         console.log(`[VOICE-STT] onstart turnId=${resolvedTurnId}`)
         console.log(`[VOICE-TURN] SPEECH_DETECTED turnId=${resolvedTurnId}`)
         if (this.state === VoiceTurnState.LISTENING) {
@@ -142,18 +169,19 @@ export class VoiceTurnManager {
         }
       }
 
-      provider.onTranscript = (transcript, isFinal, turnId, sessionGen) => {
+      provider.onTranscript = (transcript, isFinal, turnId, sessionGen, providerGen) => {
         const resolvedTurnId = turnId ?? this.currentTurnId
         const resolvedSessionGen = sessionGen ?? this.sessionGeneration
+        const resolvedProviderGen = providerGen ?? provider.generation
+
         if (
           provider !== this.currentSTT ||
-          provider.generation !== this.providerGeneration ||
-          resolvedTurnId !== this.currentTurnId ||
-          resolvedSessionGen !== this.sessionGeneration
+          !this._isTurnActive(resolvedTurnId, resolvedSessionGen, resolvedProviderGen)
         ) {
-          console.warn(`[VOICE-STT] STALE_CALLBACK_IGNORED onTranscript [${name}] turnId=${resolvedTurnId} providerGen=${provider.generation} (activo: turnId=${this.currentTurnId} gen=${this.providerGeneration})`)
+          this._logStaleCallback(`onTranscript [${name}]`, { turnId: resolvedTurnId, providerGen: resolvedProviderGen })
           return
         }
+
         console.log(`[VOICE-STT] onresult turnId=${resolvedTurnId} transcript="${transcript}" isFinal=${isFinal}`)
         this.interimTranscript = transcript
         if (this.onTranscriptUpdate) {
@@ -173,38 +201,40 @@ export class VoiceTurnManager {
         }
       }
 
-      provider.onError = (err, turnId, sessionGen) => {
+      provider.onError = (err, turnId, sessionGen, providerGen) => {
         const resolvedTurnId = turnId ?? this.currentTurnId
         const resolvedSessionGen = sessionGen ?? this.sessionGeneration
+        const resolvedProviderGen = providerGen ?? provider.generation
+
         if (
           provider !== this.currentSTT ||
-          provider.generation !== this.providerGeneration ||
-          resolvedTurnId !== this.currentTurnId ||
-          resolvedSessionGen !== this.sessionGeneration
+          !this._isTurnActive(resolvedTurnId, resolvedSessionGen, resolvedProviderGen)
         ) {
-          console.warn(`[VOICE-STT] STALE_CALLBACK_IGNORED onError [${name}] turnId=${resolvedTurnId} providerGen=${provider.generation}`)
+          this._logStaleCallback(`onError [${name}]`, { turnId: resolvedTurnId, providerGen: resolvedProviderGen })
           return
         }
+
         console.error(`[VOICE-DEBUG][VoiceTurnManager][${name}] onError turnId=${resolvedTurnId}:`, err)
-        this._handleSTTError(err, resolvedTurnId, provider.generation, name, resolvedSessionGen)
+        this._handleSTTError(err, resolvedTurnId, resolvedProviderGen, name, resolvedSessionGen)
       }
 
-      provider.onEnd = (turnId, sessionGen) => {
+      provider.onEnd = (turnId, sessionGen, providerGen) => {
         const resolvedTurnId = turnId ?? this.currentTurnId
         const resolvedSessionGen = sessionGen ?? this.sessionGeneration
+        const resolvedProviderGen = providerGen ?? provider.generation
+
         if (
           provider !== this.currentSTT ||
-          provider.generation !== this.providerGeneration ||
-          resolvedTurnId !== this.currentTurnId ||
-          resolvedSessionGen !== this.sessionGeneration
+          !this._isTurnActive(resolvedTurnId, resolvedSessionGen, resolvedProviderGen)
         ) {
-          console.warn(`[VOICE-STT] STALE_CALLBACK_IGNORED onEnd [${name}] turnId=${resolvedTurnId} providerGen=${provider.generation} (activo: turnId=${this.currentTurnId} gen=${this.providerGeneration})`)
+          this._logStaleCallback(`onEnd [${name}]`, { turnId: resolvedTurnId, providerGen: resolvedProviderGen })
           return
         }
+
         console.log(`[VOICE-STT] onend turnId=${resolvedTurnId} interim="${this.interimTranscript}" stopRequested=${this.stopRequested}`)
 
         // Si hay una transcripción pendiente (ej: BackendSTT subiendo audio), NO volver a READY
-        if (this.isTranscribing || this.currentSTT.isPendingTranscription) {
+        if (this.isTranscribing || this.currentSTT?.isPendingTranscription) {
           console.log(`[VOICE-STT] onend diferido: transcripción en progreso turnId=${resolvedTurnId}, esperando resultado`)
           return
         }
@@ -220,7 +250,7 @@ export class VoiceTurnManager {
           return
         }
 
-        // Si estamos en SPEECH_DETECTED, NUNCA pasar a READY desde onEnd sin transcripción
+        // Si estamos en SPEECH_DETECTED
         if (this.state === VoiceTurnState.SPEECH_DETECTED) {
           if (this.interimTranscript && this.interimTranscript.trim()) {
             console.log(`[VOICE-TURN] TRANSCRIPT_FINAL turnId=${resolvedTurnId} texto="${this.interimTranscript}"`)
@@ -231,7 +261,7 @@ export class VoiceTurnManager {
           return
         }
 
-        // Solo si estaba en LISTENING puro (sin que se detectara voz en ningún momento)
+        // Si estaba en LISTENING puro
         if (this.state === VoiceTurnState.LISTENING) {
           console.warn(`[VOICE-TURN] onEnd sin transcripción turnId=${resolvedTurnId} -> regresando a READY`)
           this._setState(VoiceTurnState.READY)
@@ -268,8 +298,8 @@ export class VoiceTurnManager {
     }
     const resolvedSessionGen = sessionGen ?? this.sessionGeneration
     this.speechEndTimer = setTimeout(() => {
-      if (turnId !== this.currentTurnId || resolvedSessionGen !== this.sessionGeneration) {
-        console.warn(`[VOICE-TURN] STALE_CALLBACK_IGNORED speechEndTimer turnId=${turnId} currentTurnId=${this.currentTurnId}`)
+      if (!this._isTurnActive(turnId, resolvedSessionGen)) {
+        this._logStaleCallback('speechEndTimer', { turnId })
         return
       }
       if (this.state === VoiceTurnState.SPEECH_DETECTED && currentText.trim()) {
@@ -282,22 +312,13 @@ export class VoiceTurnManager {
 
   _handleSTTError(err, turnId, providerGen, name, sessionGen = null) {
     const resolvedSessionGen = sessionGen ?? this.sessionGeneration
-    if (
-      turnId !== this.currentTurnId ||
-      providerGen !== this.providerGeneration ||
-      resolvedSessionGen !== this.sessionGeneration
-    ) {
-      console.warn(`[VOICE-STT] STALE_CALLBACK_IGNORED _handleSTTError turnId=${turnId} providerGen=${providerGen}`)
+    if (!this._isTurnActive(turnId, resolvedSessionGen, providerGen)) {
+      this._logStaleCallback(`_handleSTTError [${name}]`, { turnId, providerGen })
       return
     }
+
     console.warn(`[VOICE-DEBUG][VoiceTurnManager] _handleSTTError procesando turnId=${turnId}:`, err)
     voiceTelemetry.recordSTTFailure(err.code)
-
-    if (name === 'WebSpeech' || this.activeProviderType === 'webspeech') {
-      console.warn(`[VOICE-STT] WEB_SPEECH_ERROR code=${err.code} turnId=${turnId}`)
-    } else {
-      console.warn(`[VOICE-STT] STT_ERROR [${name}] code=${err.code} turnId=${turnId}`)
-    }
 
     // Caso A: Error no recuperable (permiso denegado)
     if (err.code === 'not-allowed' || err.code === 'permission-denied') {
@@ -306,30 +327,27 @@ export class VoiceTurnManager {
       return
     }
 
-    // Caso B: aborted por acción intencional de stop del usuario
-    if (err.code === 'aborted' && this.stopRequested) {
-      console.log(`[VOICE-STT] aborted esperado por stopRequested turnId=${turnId} -> ignorando como fallo`)
+    // Caso B: 'aborted' es el resultado normal de detener o cancelar el reconocedor
+    if (err.code === 'aborted') {
+      console.log(`[VOICE-LIFECYCLE] aborted recibido e ignorado limpiamente turnId=${turnId}`)
       return
     }
 
-    // Caso C: Fallback a BackendSTT para errores recuperables desde WebSpeech
+    // Caso C: Fallback a BackendSTT para fallos de red o hardware en WebSpeech
     const esRecuperableWebSpeech = (
       this.activeProviderType === 'webspeech' &&
       (err.code === 'no-speech' ||
        err.code === 'network' ||
        err.code === 'audio-capture' ||
        err.code === 'start-error' ||
-       err.code === 'aborted' ||
        err.code === 'invalid-state')
     )
 
     if (esRecuperableWebSpeech) {
-      if (!this.stopRequested && !this.fallbackInProgress) {
+      if (!this.stopRequested && !this.fallbackInProgress && !this.turnFinalized) {
         console.info(`[VOICE-STT] FALLBACK_DECISION turnId=${turnId} provider=BackendSTT motivo=${err.code}`)
         this._conmutarABackendSTT(turnId, resolvedSessionGen)
         return
-      } else {
-        console.warn(`[VOICE-STT] Fallback omitido: stopRequested=${this.stopRequested} fallbackInProgress=${this.fallbackInProgress} turnId=${turnId}`)
       }
     }
 
@@ -340,7 +358,7 @@ export class VoiceTurnManager {
 
   async _conmutarABackendSTT(turnId, sessionGen = null) {
     const resolvedSessionGen = sessionGen ?? this.sessionGeneration
-    if (turnId !== this.currentTurnId || resolvedSessionGen !== this.sessionGeneration || this.fallbackInProgress) {
+    if (!this._isTurnActive(turnId, resolvedSessionGen) || this.fallbackInProgress) {
       console.warn(`[VOICE-TURN] Fallback ignorado turnId=${turnId} (activo: ${this.currentTurnId}, en progreso: ${this.fallbackInProgress})`)
       return
     }
@@ -357,7 +375,7 @@ export class VoiceTurnManager {
     this.interimTranscript = ''
     this._setState(VoiceTurnState.LISTENING)
 
-    // 2. Limpiar/abortar WebSpeech esperando su cierre definitivo para no dejar un SpeechRecognition fantasma
+    // 2. Limpiar WebSpeech
     if (typeof this.webSpeechProvider.abortAndWait === 'function') {
       console.log(`[VOICE-TURN] Esperando cierre definitivo de WebSpeech antes de iniciar BackendSTT turnId=${turnId}...`)
       await this.webSpeechProvider.abortAndWait(800)
@@ -365,7 +383,7 @@ export class VoiceTurnManager {
       this.webSpeechProvider.cancel()
     }
 
-    if (turnId !== this.currentTurnId || resolvedSessionGen !== this.sessionGeneration) {
+    if (!this._isTurnActive(turnId, resolvedSessionGen)) {
       this.fallbackInProgress = false
       return
     }
@@ -377,11 +395,11 @@ export class VoiceTurnManager {
     this._iniciarWatchdogSTT(turnId, resolvedSessionGen)
 
     try {
-      await this.backendSTTProvider.start(turnId, resolvedSessionGen)
+      await this.backendSTTProvider.start(turnId, resolvedSessionGen, this.providerGeneration)
       this.fallbackInProgress = false
     } catch (err) {
       this.fallbackInProgress = false
-      if (turnId !== this.currentTurnId || resolvedSessionGen !== this.sessionGeneration) return
+      if (!this._isTurnActive(turnId, resolvedSessionGen)) return
       console.error(`[VOICE-STT] Falló arranque de BackendSTT fallback turnId=${turnId}:`, err)
       this._setState(VoiceTurnState.READY)
     }
@@ -469,7 +487,6 @@ export class VoiceTurnManager {
     this.interimTranscript = ''
     this._setState(VoiceTurnState.LISTENING)
 
-    // Log exacto del trace de éxito mandatorio:
     console.log(`[VOICE-TURN] START_TURN turnId=${turnId}`)
     console.log(`[VOICE-STT] ACTIVE_PROVIDER=${this.activeProviderType} (${this.currentSTT?.constructor?.name})`)
     console.log('[VOICE-CAPABILITIES] iniciarEscucha', {
@@ -488,11 +505,11 @@ export class VoiceTurnManager {
     this._iniciarWatchdogSTT(turnId, sessionGen)
 
     try {
-      await this.currentSTT.start(turnId, sessionGen)
+      await this.currentSTT.start(turnId, sessionGen, this.providerGeneration)
       console.log(`[VOICE-DEBUG][VoiceTurnManager] currentSTT.start() completado turnId=${turnId}`)
     } catch (err) {
-      if (turnId !== this.currentTurnId || sessionGen !== this.sessionGeneration) {
-        console.warn(`[VOICE-TURN] STALE_CALLBACK_IGNORED en start() exception turnId=${turnId}`)
+      if (!this._isTurnActive(turnId, sessionGen)) {
+        this._logStaleCallback('currentSTT.start() exception', { turnId })
         return
       }
       console.error(`[VOICE-DEBUG][VoiceTurnManager] Excepción en currentSTT.start() turnId=${turnId}:`, err)
@@ -504,12 +521,8 @@ export class VoiceTurnManager {
    * Procesa la transcripción final y la envía al backend (Única ruta transaccional).
    */
   async _finalizarTurnoVocal(texto, turnId, sessionGen = null) {
-    if (turnId && turnId !== this.currentTurnId) {
-      console.warn(`[VOICE-TURN] STALE_CALLBACK_IGNORED _finalizarTurnoVocal turnId=${turnId} currentTurnId=${this.currentTurnId}`)
-      return
-    }
-    if (sessionGen !== null && sessionGen !== this.sessionGeneration) {
-      console.warn(`[VOICE-TURN] STALE_CALLBACK_IGNORED _finalizarTurnoVocal sessionGen=${sessionGen} currentSessionGen=${this.sessionGeneration}`)
+    if (!this._isTurnActive(turnId, sessionGen)) {
+      this._logStaleCallback('_finalizarTurnoVocal', { turnId, sessionGen })
       return
     }
 
@@ -531,6 +544,7 @@ export class VoiceTurnManager {
     this._limpiarTimers()
     this.currentSTT.stop(turnId)
     this._setState(VoiceTurnState.PROCESSING, { texto })
+    this._iniciarWatchdogProcessing(turnId, sessionGen)
 
     console.log(`[VOICE-TURN] SEND_MESSAGE turnId=${this.currentTurnId} texto="${texto.trim()}"`)
     const t0 = Date.now()
@@ -541,6 +555,18 @@ export class VoiceTurnManager {
       }
 
       const res = await this.onSendMessage(texto.trim())
+
+      // Guard post-asíncrono obligatorio: si el turno fue invalidado o cambiado mientras se esperaba la respuesta
+      if (!this._isTurnActive(turnId, sessionGen) || this.state !== VoiceTurnState.PROCESSING) {
+        this._logStaleCallback('onSendMessage_resolved_after_invalidation', { turnId, sessionGen })
+        return
+      }
+
+      if (this.processingWatchdogTimer) {
+        clearTimeout(this.processingWatchdogTimer)
+        this.processingWatchdogTimer = null
+      }
+
       const latency = Date.now() - t0
       console.log(`[VOICE-TURN] AGENT_RESPONSE turnId=${this.currentTurnId} latency=${latency}ms:`, res)
       voiceTelemetry.recordBackendResponse(latency)
@@ -561,6 +587,13 @@ export class VoiceTurnManager {
       // Reproducir audio con la respuesta
       this.reproducirRespuesta(respuestaTexto, esConfirmacion ? VoiceTurnState.CONFIRMING : VoiceTurnState.READY)
     } catch (err) {
+      if (!this._isTurnActive(turnId, sessionGen) || this.state !== VoiceTurnState.PROCESSING) {
+        return
+      }
+      if (this.processingWatchdogTimer) {
+        clearTimeout(this.processingWatchdogTimer)
+        this.processingWatchdogTimer = null
+      }
       console.error('[VOICE-DEBUG][VoiceTurnManager] Error al procesar mensaje con backend:', err)
       this.reproducirRespuesta(`Hubo un error: ${err.message}`, VoiceTurnState.READY)
     }
@@ -588,7 +621,7 @@ export class VoiceTurnManager {
     const turnId = this.currentTurnId
     console.log(`[VOICE-TTS] START turnId=${turnId} texto="${texto}", siguienteEstado=${siguienteEstado}`)
     this._limpiarTimers()
-    this.currentSTT.cancel()
+    this.currentSTT.cancel(turnId)
     this._nextStateAfterSettling = siguienteEstado
     this._setState(VoiceTurnState.SPEAKING)
     this.tts.speak(texto)
@@ -603,7 +636,7 @@ export class VoiceTurnManager {
     this._setState(VoiceTurnState.SETTLING)
     this.settlingTimer = setTimeout(() => {
       if (turnId !== this.currentTurnId) {
-        console.warn(`[VOICE-TURN] STALE_CALLBACK_IGNORED settlingTimer turnId=${turnId} currentTurnId=${this.currentTurnId}`)
+        this._logStaleCallback('settlingTimer', { turnId })
         return
       }
       const targetState = this._nextStateAfterSettling || VoiceTurnState.READY
@@ -635,6 +668,12 @@ export class VoiceTurnManager {
     console.log(`[VOICE-TURN] detenerYEnviar() invocado en estado: ${this.state} turnId=${turnId} stopRequested=${this.stopRequested}`)
 
     if (!turnId) return
+
+    // Limpiar watchdog de captura STT para que no colisione con PROCESSING
+    if (this.watchdogTimer) {
+      clearTimeout(this.watchdogTimer)
+      this.watchdogTimer = null
+    }
 
     // Si ya se solicitó el stop y ya está en PROCESSING, asegurar parada física del STT y salir
     if (this.stopRequested) {
@@ -688,8 +727,8 @@ export class VoiceTurnManager {
     if (this.activeProviderType === 'webspeech') {
       if (this.stopRequestTimer) clearTimeout(this.stopRequestTimer)
       this.stopRequestTimer = setTimeout(() => {
-        if (turnId !== this.currentTurnId || sessionGen !== this.sessionGeneration) {
-          console.warn(`[VOICE-TURN] STALE_CALLBACK_IGNORED stopRequestTimer turnId=${turnId} currentTurnId=${this.currentTurnId}`)
+        if (!this._isTurnActive(turnId, sessionGen)) {
+          this._logStaleCallback('stopRequestTimer', { turnId })
           return
         }
         if (this.interimTranscript && this.interimTranscript.trim()) {
@@ -697,8 +736,9 @@ export class VoiceTurnManager {
           this._finalizarTurnoVocal(this.interimTranscript, turnId, sessionGen)
         } else {
           console.warn(`[VOICE-STT] NO_FINAL_RESULT turnId=${turnId}`)
-          console.info(`[VOICE-STT] FALLBACK_DECISION turnId=${turnId} provider=BackendSTT motivo=stopRequest-timeout`)
-          this._conmutarABackendSTT(turnId, sessionGen)
+          // Si el usuario intentó enviar pero nunca hubo audio ni transcripción: volver limpiamente a READY
+          this.currentSTT.cancel(turnId)
+          this._setState(VoiceTurnState.READY)
         }
       }, 750)
     }
@@ -706,7 +746,6 @@ export class VoiceTurnManager {
 
   /**
    * Watchdog STT de seguridad (9s) asociado exclusivamente al turnId y sessionGeneration activos.
-   * Limita la captura sin matar el VoiceTurn completo si hay transcripción pendiente.
    */
   _iniciarWatchdogSTT(turnId, sessionGen = null) {
     if (this.watchdogTimer) {
@@ -715,34 +754,40 @@ export class VoiceTurnManager {
     const targetSessionGen = sessionGen ?? this.sessionGeneration
     console.log(`[VOICE-DEBUG][VoiceTurnManager] Programando watchdog STT (9s) turnId=${turnId} sessionGen=${targetSessionGen}`)
     this.watchdogTimer = setTimeout(() => {
-      if (turnId !== this.currentTurnId || targetSessionGen !== this.sessionGeneration) {
-        console.warn(`[VOICE-TURN] STALE_CALLBACK_IGNORED watchdog expiró para turnId=${turnId} (currentTurnId=${this.currentTurnId})`)
+      if (!this._isTurnActive(turnId, targetSessionGen)) {
+        this._logStaleCallback('watchdogTimer STT', { turnId })
         return
       }
       console.warn(`[VOICE-DEBUG][VoiceTurnManager] Watchdog STT expiró (9s) turnId=${turnId}. Estado: ${this.state}`)
 
-      // Si el turno ya finalizó, ignorar
-      if (this.turnFinalized) {
+      // Si el turno ya finalizó o pasó a PROCESSING/SPEAKING, ignorar
+      if (this.turnFinalized || this.state === VoiceTurnState.PROCESSING || this.state === VoiceTurnState.SPEAKING) {
         return
       }
 
-      // Si hay una transcripción pendiente en progreso (BackendSTT subiendo audio), NO matar el turno ni ir a READY
+      // Si hay una transcripción pendiente en progreso (BackendSTT subiendo audio), permitir que finalice
       if (this.isTranscribing || this.currentSTT?.isPendingTranscription) {
         console.log(`[VOICE-TURN] Watchdog STT: transcripción en vuelo para turnId=${turnId}, permitiendo que finalice.`)
         return
       }
 
-      // El watchdog de 9s debe limitar la captura (detenerYEnviar()), NUNCA pasar a READY si hubo voz detectada
+      // Si hubo voz detectada
       if (this.state === VoiceTurnState.SPEECH_DETECTED) {
-        console.log(`[VOICE-TURN] Watchdog STT limitando captura tras detección de habla turnId=${turnId} -> detenerYEnviar()`)
-        this.detenerYEnviar()
+        if (this.interimTranscript && this.interimTranscript.trim()) {
+          this.detenerYEnviar()
+        } else {
+          // Si se detectó ruido o habla pero nunca hubo texto transcribible tras 9s, regresar a READY
+          console.warn(`[VOICE-TURN] Watchdog STT: habla detectada pero sin transcripción tras 9s. Reseteando a READY turnId=${turnId}`)
+          this.currentSTT.cancel(turnId)
+          this._setState(VoiceTurnState.READY)
+        }
         return
       }
 
-      // Si estaba en LISTENING (sin habla detectada tras 9s), regresar a READY
+      // Si estaba en LISTENING (silencio puro tras 9s)
       if (this.state === VoiceTurnState.LISTENING) {
         console.warn(`[VOICE-TURN] Watchdog reiniciando a READY por silencio turnId=${turnId}`)
-        this.currentSTT.stop(turnId)
+        this.currentSTT.cancel(turnId)
         this._setState(VoiceTurnState.READY)
       }
     }, 9000)
@@ -755,7 +800,7 @@ export class VoiceTurnManager {
     }
     const targetSessionGen = sessionGen ?? this.sessionGeneration
     this.processingWatchdogTimer = setTimeout(() => {
-      if (turnId !== this.currentTurnId || targetSessionGen !== this.sessionGeneration) {
+      if (!this._isTurnActive(turnId, targetSessionGen)) {
         return
       }
       if (this.state === VoiceTurnState.PROCESSING) {

@@ -6,6 +6,8 @@ const BASE = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_UR
 /**
  * Proveedor STT de contingencia que graba audio comprimido (Opus/WebM)
  * y lo envía al backend si la Web Speech API falla o no está disponible.
+ * Blindado con aislamiento estricto de streams, AbortController para HTTP y
+ * protección contra callbacks tardíos o destructivos de turnos anteriores.
  */
 export class BackendSTTProvider extends SpeechInputProvider {
   constructor() {
@@ -22,18 +24,25 @@ export class BackendSTTProvider extends SpeechInputProvider {
     this.vadInterval = null
     this.silenceTimer = null
     this.maxTimer = null
+    this.initialSilenceTimer = null
     this.speechStarted = false
     this.isStarting = false
     this.turnId = null
     this.sessionGeneration = 0
     this.isPendingTranscription = false
+    this._stopRequested = false
+
+    // Identidad de instancia y cancelación de red
+    this._instanceCounter = 0
+    this.instanceId = 'be_0'
+    this.abortController = null
   }
 
   isActive() {
     return !!(this.isStarting || this.isRecording || this.isPendingTranscription)
   }
 
-  async start(turnId = null, sessionGeneration = 0) {
+  async start(turnId = null, sessionGeneration = 0, providerGeneration = 0) {
     if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       throw new Error('La grabación de audio no está disponible en este dispositivo.')
     }
@@ -43,8 +52,11 @@ export class BackendSTTProvider extends SpeechInputProvider {
       return
     }
 
+    const instanceId = 'be_' + (++this._instanceCounter)
+    this.instanceId = instanceId
     this.turnId = turnId
     this.sessionGeneration = sessionGeneration
+    this.generation = providerGeneration
     this.isStarting = true
     this._stopRequested = false
     this.isPendingTranscription = false
@@ -52,10 +64,17 @@ export class BackendSTTProvider extends SpeechInputProvider {
     this.audioChunks = []
     this.speechStarted = false
 
-    console.log(`[VOICE-STT] BACKEND_START turnId=${this.turnId ?? ''}`)
+    // Abortar cualquier petición HTTP previa en vuelo
+    if (this.abortController) {
+      try { this.abortController.abort() } catch (_) {}
+    }
+    this.abortController = typeof AbortController !== 'undefined' ? new AbortController() : null
 
+    console.log(`[VOICE-STT] BACKEND_START turnId=${this.turnId ?? ''} gen=${providerGeneration} instance=${instanceId}`)
+
+    let stream = null
     try {
-      this.audioStream = await navigator.mediaDevices.getUserMedia({
+      stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
@@ -63,47 +82,75 @@ export class BackendSTTProvider extends SpeechInputProvider {
         },
       })
 
-      // Guard contra parada solicitada mientras getUserMedia resolvía
-      if (this._stopRequested || !this.isStarting) {
-        console.warn('[BackendSTTProvider] stop fue solicitado durante arranque de micrófono. Cancelando.')
+      // Guard contra turno cancelado o sustituido mientras el usuario otorgaba permiso o getUserMedia resolvía
+      if (this._stopRequested || this.instanceId !== instanceId || this.turnId !== turnId) {
+        console.warn(`[BackendSTTProvider][${instanceId}] start fue cancelado/sustituido durante getUserMedia. Liberando stream.`)
         this.isStarting = false
-        this._limpiarRecursos()
+        if (stream) {
+          stream.getTracks().forEach((t) => { try { t.stop() } catch (_) {} })
+        }
         return
       }
 
+      this.audioStream = stream
+      const localStream = stream
       const options = this.mimeType ? { mimeType: this.mimeType } : {}
-      this.mediaRecorder = new MediaRecorder(this.audioStream, options)
+      const recorder = new MediaRecorder(localStream, options)
+      this.mediaRecorder = recorder
 
-      this.mediaRecorder.ondataavailable = (event) => {
+      recorder.ondataavailable = (event) => {
+        if (this.instanceId !== instanceId) return
         if (event.data && event.data.size > 0) {
           this.audioChunks.push(event.data)
           console.log('[VOICE-STT] AUDIO_CHUNK', {
             turnId: this.turnId,
+            instanceId,
             size: event.data.size,
             totalChunks: this.audioChunks.length,
           })
         }
       }
 
-      this.mediaRecorder.onstart = () => {
+      recorder.onstart = () => {
+        if (this.instanceId !== instanceId) return
         this.isStarting = false
         this.isRecording = true
-        console.log(`[VOICE-STT] BACKEND_RECORDING turnId=${this.turnId ?? ''}`)
-        this._iniciarVAD()
+        console.log(`[VOICE-STT] BACKEND_RECORDING turnId=${this.turnId ?? ''} instance=${instanceId}`)
+        this._iniciarVAD(instanceId, localStream)
       }
 
-      this.mediaRecorder.onstop = async () => {
-        const turnId = this.turnId
-        const sessionGen = this.sessionGeneration
+      recorder.onstop = async () => {
+        const localTurnId = turnId
+        const localSessionGen = sessionGeneration
+        const localProviderGen = providerGeneration
+        const localInstanceId = instanceId
+
         this.isRecording = false
         this._limpiarTimers()
 
-        const chunksCount = this.audioChunks.length
-        if (chunksCount === 0) {
-          console.warn('[VOICE-STT] AUDIO_READY: 0 chunks disponibles', { turnId })
+        // Si fue cancelado antes de tiempo o la instancia ya fue sustituida
+        if (this._stopRequested && this.audioChunks.length === 0) {
+          console.log(`[VOICE-STT] onstop de instancia cancelada/vaciada ${localInstanceId}`)
           this.isPendingTranscription = false
-          this._limpiarRecursos()
-          if (this.onEnd) this.onEnd(turnId, sessionGen)
+          if (localStream === this.audioStream) this._limpiarRecursos()
+          else localStream.getTracks().forEach((t) => { try { t.stop() } catch (_) {} })
+          return
+        }
+
+        const chunksCount = this.audioChunks.length
+        if (chunksCount === 0 || this.instanceId !== localInstanceId) {
+          console.warn('[VOICE-STT] AUDIO_READY: 0 chunks disponibles o instancia desfasada', {
+            turnId: localTurnId,
+            instanceId: localInstanceId,
+            activeInstanceId: this.instanceId,
+          })
+          this.isPendingTranscription = false
+          if (localStream === this.audioStream) this._limpiarRecursos()
+          else localStream.getTracks().forEach((t) => { try { t.stop() } catch (_) {} })
+
+          if (this.instanceId === localInstanceId && this.onEnd) {
+            this.onEnd(localTurnId, localSessionGen, localProviderGen, localInstanceId)
+          }
           return
         }
 
@@ -112,91 +159,132 @@ export class BackendSTTProvider extends SpeechInputProvider {
         this.audioChunks = []
 
         console.log('[VOICE-STT] AUDIO_READY', {
-          turnId,
+          turnId: localTurnId,
+          instanceId: localInstanceId,
           chunks: chunksCount,
           blobSize: audioBlob.size,
           mimeType: audioBlob.type || this.mimeType,
         })
 
         try {
-          const transcript = await this._enviarAudioAlBackend(audioBlob, turnId)
-          console.log(`[VOICE-STT] BACKEND_TRANSCRIPT turnId=${turnId ?? ''} transcript="${transcript}"`)
+          const transcript = await this._enviarAudioAlBackend(audioBlob, localTurnId, this.abortController?.signal)
+
+          // Guard estricto contra turnos desfasados tras completar la petición HTTP
+          if (
+            this.instanceId !== localInstanceId ||
+            this.turnId !== localTurnId ||
+            this.sessionGeneration !== localSessionGen ||
+            this.generation !== localProviderGen
+          ) {
+            console.warn(`[VOICE-LIFECYCLE] Transcripción tardía de BackendSTT descartada (turno=${localTurnId}, activo=${this.turnId})`)
+            return
+          }
+
+          console.log(`[VOICE-STT] BACKEND_TRANSCRIPT turnId=${localTurnId ?? ''} transcript="${transcript}"`)
           this.isPendingTranscription = false
           if (this.onTranscript) {
-            this.onTranscript(transcript || '', true, turnId, sessionGen)
+            this.onTranscript(transcript || '', true, localTurnId, localSessionGen, localProviderGen, localInstanceId)
           }
         } catch (err) {
+          if (err.name === 'AbortError' || this.instanceId !== localInstanceId || this.turnId !== localTurnId) {
+            console.log(`[VOICE-LIFECYCLE] Petición de audio abortada o turno desfasado (${localTurnId}): ${err.message}`)
+            return
+          }
           this.isPendingTranscription = false
           console.error('[BackendSTTProvider] Error en transcripción:', err)
           if (this.onError) {
             this.onError({
               code: 'backend-stt-error',
               message: err.message || 'Error al transcribir audio en el servidor',
-            }, turnId, sessionGen)
+            }, localTurnId, localSessionGen, localProviderGen, localInstanceId)
           }
         } finally {
           this.isPendingTranscription = false
-          this._limpiarRecursos()
-          if (this.onEnd) this.onEnd(turnId, sessionGen)
+
+          // Cierre seguro: solo limpiar recursos globales si aún pertenecen a esta instancia
+          if (this.instanceId === localInstanceId) {
+            this._limpiarRecursos()
+          } else {
+            // Instancia posterior ya activa: solo silenciar el stream local cerrado
+            if (localStream && localStream !== this.audioStream) {
+              localStream.getTracks().forEach((t) => { try { t.stop() } catch (_) {} })
+            }
+          }
+
+          if (
+            this.instanceId === localInstanceId &&
+            this.turnId === localTurnId &&
+            this.sessionGeneration === localSessionGen &&
+            this.generation === localProviderGen
+          ) {
+            if (this.onEnd) this.onEnd(localTurnId, localSessionGen, localProviderGen, localInstanceId)
+          }
         }
       }
 
       // Iniciar captura con chunks cada 250ms
-      this.mediaRecorder.start(250)
+      recorder.start(250)
 
       // Hard cap de seguridad: 5.5 segundos máximo para comandos de voz de mostrador
       this.maxTimer = setTimeout(() => {
+        if (this.instanceId !== instanceId) return
         console.info('[BackendSTTProvider] Límite máximo de turno (5.5s) alcanzado. Deteniendo...')
         this.stop(this.turnId)
         if (this.onRequestStop) {
-          this.onRequestStop(this.turnId, this.sessionGeneration)
+          this.onRequestStop(this.turnId, this.sessionGeneration, this.generation, this.instanceId)
         }
       }, 5500)
 
       // Timer de seguridad si no hay habla en 4s
       this.initialSilenceTimer = setTimeout(() => {
+        if (this.instanceId !== instanceId) return
         if (!this.speechStarted && this.isRecording) {
           console.log('[BackendSTTProvider] Sin habla detectada tras 4s. Deteniendo...')
           this.stop(this.turnId)
           if (this.onRequestStop) {
-            this.onRequestStop(this.turnId, this.sessionGeneration)
+            this.onRequestStop(this.turnId, this.sessionGeneration, this.generation, this.instanceId)
           }
         }
       }, 4000)
 
     } catch (err) {
       this.isStarting = false
+      if (stream) {
+        stream.getTracks().forEach((t) => { try { t.stop() } catch (_) {} })
+      }
       this._limpiarRecursos()
       if (this.onError) {
         this.onError({
           code: err.name === 'NotAllowedError' ? 'not-allowed' : 'mic-init-error',
           message: err.message,
-        }, this.turnId, this.sessionGeneration)
+        }, this.turnId, this.sessionGeneration, this.generation, this.instanceId)
       }
     }
   }
 
-  _iniciarVAD() {
+  _iniciarVAD(instanceId, stream) {
     try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext
-      if (!AudioCtx || !this.audioStream) return
+      const AudioCtx = typeof window !== 'undefined' ? (window.AudioContext || window.webkitAudioContext) : null
+      if (!AudioCtx || !stream) return
 
-      this.audioContext = new AudioCtx()
-      if (this.audioContext.state === 'suspended') {
-        this.audioContext.resume().catch(() => {})
+      const ctx = new AudioCtx()
+      this.audioContext = ctx
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {})
       }
 
-      const source = this.audioContext.createMediaStreamSource(this.audioStream)
-      this.analyser = this.audioContext.createAnalyser()
-      this.analyser.fftSize = 512
-      source.connect(this.analyser)
+      const source = ctx.createMediaStreamSource(stream)
+      const analyser = ctx.createAnalyser()
+      analyser.fftSize = 512
+      source.connect(analyser)
+      this.analyser = analyser
 
-      const buffer = new Float32Array(this.analyser.fftSize)
+      const buffer = new Float32Array(analyser.fftSize)
       const UMBRAL_VOZ = 0.02
       const TIEMPO_SILENCIO_MS = 950
 
       this.vadInterval = setInterval(() => {
-        if (!this.isRecording || !this.analyser) return
+        if (this.instanceId !== instanceId || !this.isRecording || !this.analyser) return
 
         this.analyser.getFloatTimeDomainData(buffer)
         let sum = 0
@@ -211,7 +299,7 @@ export class BackendSTTProvider extends SpeechInputProvider {
             this.speechStarted = true
             console.log('[BackendSTTProvider] VAD: Habla detectada (RMS:', rms.toFixed(4), ')')
             if (this.onSpeechStart) {
-              this.onSpeechStart(this.turnId, this.sessionGeneration)
+              this.onSpeechStart(this.turnId, this.sessionGeneration, this.generation, instanceId)
             }
           }
           // Reiniciar timer de silencio si el tendero continúa hablando
@@ -222,10 +310,11 @@ export class BackendSTTProvider extends SpeechInputProvider {
         } else if (this.speechStarted && !this.silenceTimer) {
           // El tendero terminó de hablar y se mantiene silencio
           this.silenceTimer = setTimeout(() => {
+            if (this.instanceId !== instanceId) return
             console.log('[BackendSTTProvider] VAD: Silencio natural detectado (950ms). Deteniendo...')
             this.stop(this.turnId)
             if (this.onRequestStop) {
-              this.onRequestStop(this.turnId, this.sessionGeneration)
+              this.onRequestStop(this.turnId, this.sessionGeneration, this.generation, instanceId)
             }
           }, TIEMPO_SILENCIO_MS)
         }
@@ -261,12 +350,19 @@ export class BackendSTTProvider extends SpeechInputProvider {
     this.isPendingTranscription = false
     this._limpiarTimers()
     this.audioChunks = []
+
+    // Abortar cualquier petición de red pendiente
+    if (this.abortController) {
+      try { this.abortController.abort() } catch (_) {}
+      this.abortController = null
+    }
+
+    // Desconectar onstop del recorder para evitar que dispare peticiones HTTP al detenerlo
     if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+      this.mediaRecorder.onstop = null
       try {
         this.mediaRecorder.stop()
-      } catch {
-        // Ignorar
-      }
+      } catch (_) {}
     }
     this._limpiarRecursos()
   }
@@ -296,21 +392,21 @@ export class BackendSTTProvider extends SpeechInputProvider {
     if (this.audioContext) {
       try {
         this.audioContext.close().catch(() => {})
-      } catch {}
+      } catch (_) {}
       this.audioContext = null
       this.analyser = null
     }
 
     if (this.audioStream) {
       this.audioStream.getTracks().forEach((track) => {
-        try { track.stop() } catch {}
+        try { track.stop() } catch (_) {}
       })
       this.audioStream = null
     }
   }
 
-  async _enviarAudioAlBackend(blob, turnId = null) {
-    const token = localStorage.getItem('access_token')
+  async _enviarAudioAlBackend(blob, turnId = null, signal = null) {
+    const token = typeof localStorage !== 'undefined' ? localStorage.getItem('access_token') : null
     const formData = new FormData()
     formData.append('audio', blob, 'voz.webm')
 
@@ -319,11 +415,16 @@ export class BackendSTTProvider extends SpeechInputProvider {
       headers['Authorization'] = `Bearer ${token}`
     }
 
-    const res = await fetch(`${BASE}/agente/transcribir-audio`, {
+    const fetchOptions = {
       method: 'POST',
       headers,
       body: formData,
-    })
+    }
+    if (signal) {
+      fetchOptions.signal = signal
+    }
+
+    const res = await fetch(`${BASE}/agente/transcribir-audio`, fetchOptions)
 
     let data = null
     try {
