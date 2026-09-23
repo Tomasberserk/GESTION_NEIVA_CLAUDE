@@ -976,8 +976,11 @@ class GeminiIntentProvider:
 
     def __init__(self, model: str | None = None):
         self.provider = "gemini"
-        # Prioridad: LLM_MODEL -> AI_MODEL -> GEMINI_MODEL -> 'gemini-2.5-flash'
-        self.model = model or os.getenv("LLM_MODEL") or os.getenv("AI_MODEL") or os.getenv("GEMINI_MODEL") or "gemini-2.5-flash"
+        # Gemini SOLO debe usar modelos de Gemini (jamás modelos de OpenAI/Groq/Llama)
+        chosen = model or os.getenv("GEMINI_MODEL")
+        if not chosen or any(forbidden in chosen.lower() for forbidden in ["openai", "gpt", "llama", "qwen", "mistral"]):
+            chosen = "gemini-3.6-flash"
+        self.model = chosen
 
     def parse(self, text: str, context: dict[str, Any] | None = None) -> AgentInterpretation:
         api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
@@ -1098,10 +1101,10 @@ class LLMIntentProvider:
             groq_key = os.getenv("GROQ_API_KEY")
             if self.provider == "groq" and gemini_key:
                 logger.warning(
-                    "Groq no disponible (%s). Usando fallback saludable a Gemini con modelo nativo gemini-flash-latest",
+                    "Groq no disponible (%s). Usando fallback saludable a Gemini con modelo nativo gemini-3.6-flash",
                     exc.reason,
                 )
-                gemini_prov = GeminiIntentProvider(model=os.getenv("GEMINI_MODEL", "gemini-flash-latest"))
+                gemini_prov = GeminiIntentProvider(model=os.getenv("GEMINI_MODEL", "gemini-3.6-flash"))
                 return gemini_prov.parse(text, context=context)
             elif self.provider == "gemini" and groq_key:
                 logger.warning(
@@ -1121,9 +1124,9 @@ def get_intent_provider() -> IntentProvider:
 
     # Si se especificó gemini explícitamente o si falta groq_key pero sí hay gemini_key
     if prov == "gemini" or (not groq_key and gemini_key):
-        model = os.getenv("GEMINI_MODEL") or (os.getenv("LLM_MODEL") if prov == "gemini" else None) or "gemini-flash-latest"
+        model = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
         return LLMIntentProvider(provider="gemini", model=model)
 
-    model = os.getenv("LLM_MODEL") or os.getenv("AI_MODEL") or "openai/gpt-oss-120b"
+    model = os.getenv("GROQ_MODEL") or os.getenv("LLM_MODEL") or "openai/gpt-oss-120b"
     return LLMIntentProvider(provider="groq", model=model)
 

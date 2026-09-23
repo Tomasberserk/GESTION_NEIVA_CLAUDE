@@ -21,7 +21,7 @@ services:
       - key: AI_PROVIDER
         value: gemini
       - key: GEMINI_MODEL
-        value: gemini-flash-latest
+        value: gemini-3.6-flash
       - key: GEMINI_API_KEY
         sync: false
       - key: LLM_MODEL

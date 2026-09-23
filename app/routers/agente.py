@@ -128,7 +128,7 @@ async def transcribir_audio(
         try:
             import google.generativeai as genai
             genai.configure(api_key=google_key)
-            gemini_model_name = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
+            gemini_model_name = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
             model = genai.GenerativeModel(gemini_model_name)
             response = model.generate_content([
                 "Transcribe de forma literal y exacta en español este audio de un tendero colombiano. Devuelve ÚNICAMENTE el texto transcrito, sin explicaciones ni comillas.",

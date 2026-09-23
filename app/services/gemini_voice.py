@@ -47,7 +47,7 @@ def _get_gemini_model():
     try:
         import google.generativeai as genai
         genai.configure(api_key=api_key)
-        model_name = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
+        model_name = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
         _gemini_model = genai.GenerativeModel(model_name)
         logger.info("Modelo Gemini (%s) inicializado correctamente", model_name)
         return _gemini_model

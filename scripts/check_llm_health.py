@@ -163,7 +163,7 @@ def main() -> int:
         model = args.model or "openai/gpt-oss-120b"
         return check_groq(model)
     elif prov == "gemini":
-        model = args.model or os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+        model = args.model or os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
         return check_gemini(model)
     else:
         print(f"Proveedor desconocido: '{prov}'. Use 'groq' o 'gemini'.")
