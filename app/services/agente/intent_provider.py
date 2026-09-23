@@ -26,6 +26,7 @@ ALLOWED_INTENTS = {
     "consulta_productos",
     "consulta_inventario_critico",
     "consulta_top_ventas",
+    "consulta_vencimientos",
     "comparacion",
     "ambiguo",
     "confirmar",
@@ -273,11 +274,13 @@ def quick_parse_intent(text: str, context: dict[str, Any] | None = None) -> Agen
         t_norm in [
             "hola", "buenas", "buenos dias", "buenas tardes", "buenas noches",
             "hola bro", "hola buenas", "hola que tal", "ey", "alo", "quiubo",
-            "que mas", "ayuda", "info", "menu"
+            "que mas", "ayuda", "info", "menu", "opciones", "mis funciones", "comandos", "capacidades"
         ]
         or any(k in t_norm for k in [
             "que puedes hacer", "que haces", "para que sirves",
-            "como me puedes ayudar", "quien eres", "como te llamas"
+            "como me puedes ayudar", "quien eres", "como te llamas",
+            "que puedo hacer", "que opciones tengo", "cuales son mis opciones",
+            "cuales son tus funciones", "mis funciones"
         ])
         or (
             t_norm.startswith("hola")
@@ -288,6 +291,18 @@ def quick_parse_intent(text: str, context: dict[str, Any] | None = None) -> Agen
         )
     ):
         return AgentInterpretation(intent="saludo", slots={}, confidence=0.99, raw_text=text)
+
+    # 0.1. Consulta directa de productos por vencer (0ms determinístico)
+    t_venc_norm = re.sub(r"^q\s+", "que ", t_norm)
+    if (
+        any(k in t_venc_norm for k in [
+            "proximo a vencer", "proximos a vencer", "por vencer", "vence pronto",
+            "vencen pronto", "esta vencido", "estan vencidos", "vencimientos",
+            "fecha de vencimiento", "fechas de vencimiento", "que se vence"
+        ])
+        or re.search(r"\b(que|q)\s+(esta|estan|hay)\s+(proximo|proximos|por)\s+a?\s*vencer\b", t_venc_norm)
+    ):
+        return AgentInterpretation(intent="consulta_vencimientos", slots={}, confidence=0.99, raw_text=text)
 
     # 1. Confirmaciones determinísticas inequívocas
     if t in ["si", "sí", "confirmar", "confirmo", "dale", "de una", "ok", "correcto", "exacto", "hágale", "hagale", "yes", "listo"]:
@@ -830,24 +845,86 @@ def quick_parse_intent(text: str, context: dict[str, Any] | None = None) -> Agen
             raw_text=text,
         )
 
-    # 14. Reabastecimiento explícito
-    m_reab = re.search(r"(?:llegaron|llegó|llego|compre|compré|recibí|recibi|entran|entraron)\s+([-\w\.\+]+)\s+(?:de\s+)?([\w\s\.\-_]+)", t_num)
-    if m_reab:
-        raw_q = m_reab.group(1)
-        try:
-            qty = float(raw_q)
-        except (ValueError, TypeError):
-            qty = None
-        prod_q = m_reab.group(2).strip()
-        for col_term, clean_term in SINONIMOS_PRODUCTOS_COL.items():
-            if col_term in prod_q:
-                prod_q = prod_q.replace(col_term, clean_term)
-        return validate_agent_output(
-            raw_intent="reabastecer",
-            raw_slots={"product_query": prod_q, "quantity": qty},
-            confidence=0.98,
-            raw_text=text,
+    # 14. Reabastecimiento explícito con soporte de costos y precios
+    t_prices = re.sub(r"(\d+)[\.,](\d{3})\b", r"\1\2", t_num)
+    is_reab = bool(re.search(
+        r"\b(reabasteci|reabastecí|reabastecer|reabastecimos|reabastecimiento|llegaron|llegó|llego|compre|compré|recibí|recibi|entran|entraron|surtí|surti)\b",
+        t_prices
+    ))
+
+    if is_reab:
+        precio_costo = None
+        precio_venta = None
+
+        # Detectar precio de costo
+        m_costo = re.search(
+            r"(?:precio\s+costo|precio\s+de\s+costo|a\s+costo|costo\s+incremento\s+y\s+ahora\s+vale|incremento\s+y\s+ahora\s+vale|costo\s+subio\s+a|costo\s+subió\s+a|costo\s+ahora\s+vale|costo\s+es|costo)\s*(?:es\s+|en\s+|\$\s*)?(\d+(?:\.\d+)?)\b",
+            t_prices
         )
+        if not m_costo:
+            m_costo = re.search(r"(\d+(?:\.\d+)?)\s*(?:precio\s+costo|de\s+costo|costo)\b", t_prices)
+        if m_costo:
+            try:
+                precio_costo = float(m_costo.group(1))
+            except (ValueError, TypeError):
+                precio_costo = None
+
+        # Detectar precio de venta
+        m_venta_p = re.search(
+            r"(?:precio\s+venta|precio\s+de\s+venta|para\s+venta|para\s+la\s+venta|vender\s+a|venderlo\s+en|venta\s+a|venta)\s*(?:es\s+|en\s+|\$\s*)?(\d+(?:\.\d+)?)\b",
+            t_prices
+        )
+        if m_venta_p:
+            try:
+                precio_venta = float(m_venta_p.group(1))
+            except (ValueError, TypeError):
+                precio_venta = None
+
+        # Extraer cláusula de producto y cantidad
+        clausula = re.split(r"\b(pero|aunque|con\s+costo|a\s+costo|costo)\b", t_prices)[0].strip()
+
+        qty = None
+        prod_q = None
+
+        m_reab = re.search(
+            r"(?:reabasteci|reabastecí|reabastecer|reabastecimos|me\s+reabasteci|me\s+reabastecí|llegaron|llegó|llego|compre|compré|recibí|recibi|entran|entraron|surtí|surti)\s+(?:de\s+)?([-\w\.\+]+)\s+(?:de\s+)?([\w\s\.\-_]+)",
+            clausula
+        )
+        if m_reab:
+            raw_q = m_reab.group(1)
+            try:
+                qty = float(raw_q)
+            except (ValueError, TypeError):
+                qty = None
+            prod_q = m_reab.group(2).strip()
+        else:
+            m_simple = re.search(
+                r"(?:reabasteci|reabastecí|reabastecer|reabastecimos|me\s+reabasteci|me\s+reabastecí)\s+(?:de\s+)?([\w\s\.\-_]+)",
+                clausula
+            )
+            if m_simple:
+                prod_q = m_simple.group(1).strip()
+
+        if prod_q:
+            # Limpiar ruidos comunes ("hoy", comas, "pero", etc.)
+            prod_q = re.sub(r"\b(hoy|ayer|esta mañana|recien|ahora)\b", "", prod_q).strip()
+            prod_q = prod_q.strip(",.- ")
+            for col_term, clean_term in SINONIMOS_PRODUCTOS_COL.items():
+                if col_term in prod_q:
+                    prod_q = prod_q.replace(col_term, clean_term)
+
+            raw_slots = {"product_query": prod_q, "quantity": qty}
+            if precio_costo is not None:
+                raw_slots["precio_costo"] = precio_costo
+            if precio_venta is not None:
+                raw_slots["precio_venta"] = precio_venta
+
+            return validate_agent_output(
+                raw_intent="reabastecer",
+                raw_slots=raw_slots,
+                confidence=0.98,
+                raw_text=text,
+            )
 
     return None
 

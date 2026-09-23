@@ -136,17 +136,22 @@ class AgentOrchestrator:
         interp = self.intent_provider.parse(mensaje, context=session)
 
         # 3. Flujo según la intención detectada
-        # 3.0. Saludos y capacidades del asistente
+        # 3.0. Saludos y capacidades del asistente (diferenciado por rol)
         if interp.intent == "saludo":
             return {
                 "conversation_id": conv_id,
                 "estado": AgentState.IDLE.value,
-                "respuesta": (
-                    "Hola, soy tu asistente de Gestión Neiva.\n\n"
-                    "Puedo ayudarte a consultar ventas del día, revisar existencias en inventario, "
-                    "registrar ventas o reabastecimientos, y consultar reportes de productos más vendidos.\n\n"
-                    "¿En qué te puedo colaborar hoy?"
-                ),
+                "respuesta": response_formatter.formatear_menu_capacidades(current_user),
+            }
+
+        # 3.0.1. Consulta directa de productos próximos a vencer
+        if interp.intent == "consulta_vencimientos":
+            datos_venc = consultas_service.consultar_productos_proximos_vencer(empresa_id, db, dias=30)
+            return {
+                "conversation_id": conv_id,
+                "estado": AgentState.IDLE.value,
+                "respuesta": response_formatter.formatear_productos_proximos_vencer(datos_venc),
+                "datos": datos_venc,
             }
 
         # 3.1. Cancelación explícita
@@ -315,6 +320,48 @@ class AgentOrchestrator:
         metric = interp.slots.get("metric", "ventas_hoy")
         period = interp.slots.get("period", "hoy")
         seller_name = interp.slots.get("seller_name")
+
+        rol_usuario = getattr(current_user, "rol", "tendero")
+        if hasattr(rol_usuario, "value"):
+            rol_usuario = rol_usuario.value
+        es_admin = str(rol_usuario).lower() == "admin"
+
+        if not es_admin:
+            # El tendero SOLO puede consultar sus propias ventas del turno/período
+            if seller_name or metric == "ventas_vendedor":
+                vend_query = (seller_name or "yo").strip().lower()
+                nombre_u = (current_user.nombre or "").strip().lower()
+                if vend_query not in ["yo", "mis", "mi", nombre_u]:
+                    return {
+                        "conversation_id": conv_id,
+                        "estado": AgentState.IDLE.value,
+                        "respuesta": response_formatter.formatear_bloqueo_rbac("ventas_otro_vendedor", current_user),
+                    }
+                datos = consultas_service.consultar_ventas_vendedor(
+                    empresa_id=empresa_id,
+                    db=db,
+                    vendedor_query="yo",
+                    periodo=period or "hoy",
+                    current_user_id=current_user.id,
+                )
+                resp = response_formatter.formatear_consulta_ventas_vendedor(datos)
+                await self._guardar_contexto_negocio(
+                    conv_id, session, empresa_id, current_user.id,
+                    domain="VENTAS", period=period, seller="yo",
+                )
+                return {
+                    "conversation_id": conv_id,
+                    "estado": AgentState.IDLE.value,
+                    "respuesta": resp,
+                    "datos": datos,
+                }
+            else:
+                # Bloqueo pedagógico de métricas financieras globales para empleados
+                return {
+                    "conversation_id": conv_id,
+                    "estado": AgentState.IDLE.value,
+                    "respuesta": response_formatter.formatear_bloqueo_rbac("consulta_financiera_global", current_user),
+                }
 
         if seller_name or metric == "ventas_vendedor":
             vend_query = seller_name or "yo"
@@ -607,6 +654,18 @@ class AgentOrchestrator:
         session: dict[str, Any] | None = None,
         current_user: models.Usuario | None = None,
     ) -> dict[str, Any]:
+        rol_usuario = getattr(current_user, "rol", "tendero") if current_user else "tendero"
+        if hasattr(rol_usuario, "value"):
+            rol_usuario = rol_usuario.value
+        es_admin = str(rol_usuario).lower() == "admin"
+
+        if not es_admin:
+            return {
+                "conversation_id": conv_id,
+                "estado": AgentState.IDLE.value,
+                "respuesta": response_formatter.formatear_bloqueo_rbac("comparacion", current_user),
+            }
+
         comp_type = interp.slots.get("comparison_type", "hoy_vs_ayer")
 
         if comp_type == "hoy_vs_ayer":
@@ -647,6 +706,19 @@ class AgentOrchestrator:
     ) -> dict[str, Any]:
         empresa_id = current_user.empresa_id
         action = interp.intent if interp.intent in ["registrar_venta", "reabastecer", "crear_producto"] else (session.get("action") if session else "registrar_venta")
+
+        # Verificación RBAC para acciones administrativas de catálogo/inventario
+        rol_usuario = getattr(current_user, "rol", "tendero")
+        if hasattr(rol_usuario, "value"):
+            rol_usuario = rol_usuario.value
+        es_admin = str(rol_usuario).lower() == "admin"
+
+        if action in ["reabastecer", "crear_producto"] and not es_admin:
+            return {
+                "conversation_id": conv_id,
+                "estado": AgentState.IDLE.value,
+                "respuesta": response_formatter.formatear_bloqueo_rbac(action, current_user),
+            }
 
         slots = session.get("slots", {}) if session else {}
         # Actualizar slots con lo nuevo
@@ -941,15 +1013,27 @@ class AgentOrchestrator:
             }
             resp_texto = response_formatter.formatear_confirmacion_venta(preview)
         else:  # reabastecer
+            nuevo_costo = slots.get("precio_costo")
+            nuevo_venta = slots.get("precio_venta")
+            st_actual = float(producto_seleccionado.cantidad_actual)
+            cant_float = float(cantidad)
             preview = {
                 "producto_id": str(producto_seleccionado.id),
                 "producto": producto_seleccionado.nombre,
-                "cantidad": float(cantidad),
+                "cantidad": cant_float,
                 "unidad": producto_seleccionado.unidad_medida.value if producto_seleccionado.unidad_medida else "unidad",
+                "stock_actual": st_actual,
+                "stock_nuevo": st_actual + cant_float,
+                "nuevo_precio_costo": float(nuevo_costo) if nuevo_costo is not None else None,
+                "precio_costo_anterior": float(producto_seleccionado.precio_costo) if producto_seleccionado.precio_costo is not None else None,
+                "nuevo_precio_venta": float(nuevo_venta) if nuevo_venta is not None else None,
+                "precio_venta_actual": float(producto_seleccionado.precio_venta) if producto_seleccionado.precio_venta is not None else None,
             }
             payload = {
                 "producto_id": str(producto_seleccionado.id),
-                "cantidad": float(cantidad),
+                "cantidad": cant_float,
+                "nuevo_precio_costo": float(nuevo_costo) if nuevo_costo is not None else None,
+                "nuevo_precio_venta": float(nuevo_venta) if nuevo_venta is not None else None,
             }
             resp_texto = response_formatter.formatear_confirmacion_reabastecer(preview)
 
@@ -1118,21 +1202,29 @@ class AgentOrchestrator:
             elif action == "reabastecer":
                 p_id = UUID(payload["producto_id"])
                 cant = Decimal(str(payload["cantidad"]))
+                nuevo_c = payload.get("nuevo_precio_costo")
+                nuevo_v = payload.get("nuevo_precio_venta")
                 prod_actualizado = producto_service.reabastecer_producto(
                     producto_id=p_id,
                     empresa_id=empresa_id,
                     cantidad=cant,
                     db=db,
                     commit=False,
+                    nuevo_precio_costo=nuevo_c,
+                    nuevo_precio_venta=nuevo_v,
                 )
                 resp_texto = response_formatter.formatear_exito_reabastecer({
                     "producto": prod_actualizado.nombre,
                     "stock_nuevo": float(prod_actualizado.cantidad_actual),
                     "unidad": prod_actualizado.unidad_medida.value if prod_actualizado.unidad_medida else "unidad",
+                    "nuevo_precio_costo": float(prod_actualizado.precio_costo) if nuevo_c is not None else None,
+                    "nuevo_precio_venta": float(prod_actualizado.precio_venta) if nuevo_v is not None else None,
                 })
                 resultado_final = {
                     "producto_id": str(p_id),
                     "stock_nuevo": float(prod_actualizado.cantidad_actual),
+                    "nuevo_precio_costo": float(prod_actualizado.precio_costo) if nuevo_c is not None else None,
+                    "nuevo_precio_venta": float(prod_actualizado.precio_venta) if nuevo_v is not None else None,
                     "respuesta": resp_texto,
                 }
 

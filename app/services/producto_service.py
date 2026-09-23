@@ -96,8 +96,10 @@ def reabastecer_producto(
     cantidad: float | Decimal,
     db: Session,
     commit: bool = True,
+    nuevo_precio_costo: float | Decimal | None = None,
+    nuevo_precio_venta: float | Decimal | None = None,
 ) -> models.Producto:
-    """Incrementa el stock de un producto existente con lock pesimista."""
+    """Incrementa el stock de un producto existente con lock pesimista y actualiza costos/precios opcionalmente."""
     from decimal import Decimal
     producto = (
         db.query(models.Producto)
@@ -116,6 +118,11 @@ def reabastecer_producto(
         )
 
     producto.cantidad_actual += Decimal(str(cantidad))
+    if nuevo_precio_costo is not None:
+        producto.precio_costo = Decimal(str(nuevo_precio_costo))
+    if nuevo_precio_venta is not None:
+        producto.precio_venta = Decimal(str(nuevo_precio_venta))
+
     if commit:
         db.commit()
         db.refresh(producto)

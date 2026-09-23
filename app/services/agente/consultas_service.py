@@ -551,3 +551,47 @@ def consultar_recuperacion_inversion(empresa_id: UUID | str, db: Session) -> dic
         "ventas_hoy": ventas["total"],
         "tiene_capital_inicial": False,
     }
+
+
+def consultar_productos_proximos_vencer(
+    empresa_id: UUID | str,
+    db: Session,
+    dias: int = 30,
+    limite: int = 10,
+) -> dict[str, Any]:
+    """Consulta productos con fecha de vencimiento próxima o ya vencidos."""
+    empresa_id = _norm_uuid(empresa_id)
+    hoy_date = datetime.now(timezone.utc).date()
+    limite_fecha = hoy_date + timedelta(days=dias)
+
+    prods = (
+        db.query(models.Producto)
+        .filter(
+            models.Producto.empresa_id == empresa_id,
+            or_(models.Producto.is_active.is_(True), models.Producto.is_active == "true"),
+            models.Producto.fecha_vencimiento.isnot(None),
+            models.Producto.fecha_vencimiento <= limite_fecha,
+        )
+        .order_by(models.Producto.fecha_vencimiento.asc())
+        .limit(limite)
+        .all()
+    )
+
+    items = []
+    for p in prods:
+        dias_restantes = (p.fecha_vencimiento - hoy_date).days
+        items.append({
+            "id": str(p.id),
+            "nombre": p.nombre,
+            "cantidad_actual": float(p.cantidad_actual),
+            "unidad": p.unidad_medida.value if hasattr(p.unidad_medida, "value") else str(p.unidad_medida or "unidad"),
+            "fecha_vencimiento": str(p.fecha_vencimiento),
+            "dias_restantes": dias_restantes,
+            "esta_vencido": dias_restantes < 0,
+        })
+
+    return {
+        "total_proximos_vencer": len(items),
+        "dias_horizonte": dias,
+        "productos": items,
+    }

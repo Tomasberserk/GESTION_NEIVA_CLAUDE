@@ -46,6 +46,7 @@ export class BackendSTTProvider extends SpeechInputProvider {
     this.turnId = turnId
     this.sessionGeneration = sessionGeneration
     this.isStarting = true
+    this._stopRequested = false
     this.isPendingTranscription = false
     this._limpiarRecursos()
     this.audioChunks = []
@@ -61,6 +62,14 @@ export class BackendSTTProvider extends SpeechInputProvider {
           autoGainControl: true,
         },
       })
+
+      // Guard contra parada solicitada mientras getUserMedia resolvía
+      if (this._stopRequested || !this.isStarting) {
+        console.warn('[BackendSTTProvider] stop fue solicitado durante arranque de micrófono. Cancelando.')
+        this.isStarting = false
+        this._limpiarRecursos()
+        return
+      }
 
       const options = this.mimeType ? { mimeType: this.mimeType } : {}
       this.mediaRecorder = new MediaRecorder(this.audioStream, options)
@@ -138,12 +147,22 @@ export class BackendSTTProvider extends SpeechInputProvider {
       // Hard cap de seguridad: 5.5 segundos máximo para comandos de voz de mostrador
       this.maxTimer = setTimeout(() => {
         console.info('[BackendSTTProvider] Límite máximo de turno (5.5s) alcanzado. Deteniendo...')
+        this.stop(this.turnId)
         if (this.onRequestStop) {
           this.onRequestStop(this.turnId, this.sessionGeneration)
-        } else {
-          this.requestStop(this.turnId)
         }
       }, 5500)
+
+      // Timer de seguridad si no hay habla en 4s
+      this.initialSilenceTimer = setTimeout(() => {
+        if (!this.speechStarted && this.isRecording) {
+          console.log('[BackendSTTProvider] Sin habla detectada tras 4s. Deteniendo...')
+          this.stop(this.turnId)
+          if (this.onRequestStop) {
+            this.onRequestStop(this.turnId, this.sessionGeneration)
+          }
+        }
+      }, 4000)
 
     } catch (err) {
       this.isStarting = false
@@ -204,10 +223,9 @@ export class BackendSTTProvider extends SpeechInputProvider {
           // El tendero terminó de hablar y se mantiene silencio
           this.silenceTimer = setTimeout(() => {
             console.log('[BackendSTTProvider] VAD: Silencio natural detectado (950ms). Deteniendo...')
+            this.stop(this.turnId)
             if (this.onRequestStop) {
               this.onRequestStop(this.turnId, this.sessionGeneration)
-            } else {
-              this.requestStop(this.turnId)
             }
           }, TIEMPO_SILENCIO_MS)
         }
@@ -220,22 +238,25 @@ export class BackendSTTProvider extends SpeechInputProvider {
 
   requestStop(turnId = null) {
     console.log(`[VOICE-STT] requestStop() invocado en BackendSTTProvider. turnId=${turnId ?? this.turnId ?? ''} isRecording=${this.isRecording}`)
+    this._stopRequested = true
     this.stop(turnId)
   }
 
   stop(turnId = null) {
+    this._stopRequested = true
     this.isStarting = false
     this._limpiarTimers()
     if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
       try {
         this.mediaRecorder.stop()
-      } catch {
-        // Ignorar
+      } catch (err) {
+        console.warn('[BackendSTTProvider] Error al detener mediaRecorder:', err)
       }
     }
   }
 
   cancel(turnId = null) {
+    this._stopRequested = true
     this.isStarting = false
     this.isPendingTranscription = false
     this._limpiarTimers()
@@ -262,6 +283,10 @@ export class BackendSTTProvider extends SpeechInputProvider {
     if (this.maxTimer) {
       clearTimeout(this.maxTimer)
       this.maxTimer = null
+    }
+    if (this.initialSilenceTimer) {
+      clearTimeout(this.initialSilenceTimer)
+      this.initialSilenceTimer = null
     }
   }
 

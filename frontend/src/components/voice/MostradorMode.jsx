@@ -37,6 +37,10 @@ export default function MostradorMode({
       detenerYEnviar()
     } else if (voiceState === VoiceTurnState.READY) {
       activarModoVoz(false)
+    } else if (voiceState === VoiceTurnState.PROCESSING) {
+      console.log('[MostradorMode] Usuario tocó el orbe durante PROCESSING: reseteando sesión...')
+      desactivarModoVoz()
+      setTimeout(() => activarModoVoz(false), 200)
     }
   }
 

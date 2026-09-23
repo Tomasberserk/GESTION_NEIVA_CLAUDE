@@ -38,7 +38,38 @@ def formatear_confirmacion_reabastecer(preview: dict[str, Any]) -> str:
     nom = preview.get("producto", "Producto")
     cant = preview.get("cantidad", 0)
     unidad = preview.get("unidad", "unidades")
-    return f"Voy a agregar {cant} {unidad} a {nom}.\n\n¿Confirmar?"
+    stock_actual = preview.get("stock_actual", 0)
+    nuevo_stock = preview.get("stock_nuevo", stock_actual + cant)
+    nuevo_costo = preview.get("nuevo_precio_costo")
+    costo_anterior = preview.get("precio_costo_anterior")
+    nuevo_venta = preview.get("nuevo_precio_venta")
+    venta_actual = preview.get("precio_venta_actual")
+
+    lineas = [
+        f"Voy a registrar el siguiente reabastecimiento:",
+        f"• Producto: {nom}",
+        f"• Entrada: +{cant} {unidad} (Stock pasará de {stock_actual} a {nuevo_stock} {unidad})",
+    ]
+
+    if nuevo_costo is not None:
+        costo_str = fmt_moneda(nuevo_costo)
+        if costo_anterior is not None:
+            lineas.append(f"• Nuevo costo: {costo_str} (antes {fmt_moneda(costo_anterior)})")
+        else:
+            lineas.append(f"• Nuevo costo: {costo_str}")
+
+        ref_venta = nuevo_venta if nuevo_venta is not None else venta_actual
+        if ref_venta and ref_venta > 0:
+            margen = round(((float(ref_venta) - float(nuevo_costo)) / float(ref_venta)) * 100, 1)
+            lineas.append(f"• Precio de venta: {fmt_moneda(ref_venta)} (Margen: {margen}%)")
+            if margen < 15:
+                lineas.append(f"⚠️ Alerta: El margen con este nuevo costo es bajo ({margen}%).")
+
+    if nuevo_venta is not None:
+        lineas.append(f"• Nuevo precio de venta al público: {fmt_moneda(nuevo_venta)}")
+
+    lineas.append("\n¿Deseas confirmar la operación?")
+    return "\n".join(lineas)
 
 
 def formatear_confirmacion_crear_producto(preview: dict[str, Any]) -> str:
@@ -67,7 +98,12 @@ def formatear_exito_reabastecer(result: dict[str, Any]) -> str:
     nom = result.get("producto", "Producto")
     nuevo_stock = result.get("stock_nuevo", 0)
     unidad = result.get("unidad", "unidades")
-    return f"Stock actualizado. Ahora tienes {nuevo_stock} {unidad} de {nom}."
+    detalles = [f"Stock actualizado. Ahora tienes {nuevo_stock} {unidad} de {nom}."]
+    if result.get("nuevo_precio_costo"):
+        detalles.append(f"Nuevo precio de costo fijado en {fmt_moneda(result['nuevo_precio_costo'])}.")
+    if result.get("nuevo_precio_venta"):
+        detalles.append(f"Nuevo precio de venta fijado en {fmt_moneda(result['nuevo_precio_venta'])}.")
+    return " ".join(detalles)
 
 
 def formatear_exito_crear_producto(result: dict[str, Any]) -> str:
@@ -324,3 +360,111 @@ def formatear_fuera_de_alcance() -> str:
 
 def formatear_operacion_destructiva_bloqueada() -> str:
     return "Por motivos de seguridad, la eliminación de productos está deshabilitada mediante comandos de voz o texto. Puedes hacerlo desde el panel web de Inventario."
+
+
+def formatear_menu_capacidades(usuario: Any = None) -> str:
+    """Devuelve el menú de capacidades y comandos de voz diferenciado por rol."""
+    nombre = getattr(usuario, "nombre", None) or "Usuario"
+    rol = getattr(usuario, "rol", "tendero")
+    if hasattr(rol, "value"):
+        rol = rol.value
+    rol_str = str(rol).lower()
+
+    if rol_str == "admin":
+        return (
+            f"👑 Asistente POS — Modo Administrador (Control Total)\n\n"
+            f"Hola {nombre}, tienes acceso a todas las funciones operativas, de inventario y financieras del negocio:\n\n"
+            f"1. 📦 Reabastecimiento y Precios:\n"
+            f"• Entrada con nuevo costo: 'Hoy me reabastecí de 10 aceites a 11.000 precio costo'\n"
+            f"• Entrada y cambio de venta: 'Llegaron 20 leches a 3.200 costo y venta a 4.000'\n"
+            f"• Modificar precios: 'Cambiar precio de venta de Coca-Cola a 5.000'\n\n"
+            f"2. 📊 Finanzas y Caja:\n"
+            f"• Resumen del día: '¿Cuánto hemos vendido hoy?' o '¿Cuál es el recaudo de hoy?'\n"
+            f"• Comparativas: 'Comparar ventas de hoy vs ayer'\n"
+            f"• Rendimiento por vendedor: '¿Cuánto ha vendido Pedro hoy?'\n"
+            f"• Arqueo y balance: 'Ventas de la semana' o 'Recuperación de inversión'\n\n"
+            f"3. 🔍 Inventario y Rotación:\n"
+            f"• Alertas críticas: '¿Qué productos están agotados o por acabarse?'\n"
+            f"• Vencimientos: '¿Qué está próximo a vencer este mes?'\n"
+            f"• Rotación: '¿Cuál es el producto más vendido de la semana?'\n\n"
+            f"4. 🛒 Operación de Mostrador:\n"
+            f"• Registrar ventas directamente: 'Vendí 2 arroces y 1 aceite'.\n\n"
+            f"¿Qué gestión deseas realizar ahora?"
+        )
+    else:
+        return (
+            f"👋 Asistente POS — Modo Mostrador (Atención al Cliente)\n\n"
+            f"Hola {nombre}, estas son tus herramientas disponibles para la atención rápida en caja:\n\n"
+            f"1. 🛒 Registrar Ventas Rápidas:\n"
+            f"• Por unidades: 'Vendí 2 Coca-Colas y un paquete de papas'\n"
+            f"• Por peso o granel: 'Libra y media de frijol y kilo de arroz'\n"
+            f"• Dictado continuo de tickets de clientes.\n\n"
+            f"2. 💲 Consulta de Precios al Público:\n"
+            f"• '¿Cuánto vale el Aceite Gourmet?'\n"
+            f"• '¿A cómo está la cubeta de huevos?'\n\n"
+            f"3. 📦 Consulta de Existencias (Stock):\n"
+            f"• '¿Cuánto Arroz Diana queda en bodega?'\n"
+            f"• '¿Hay existencias de leche entera?'\n\n"
+            f"4. ⏰ Vencimientos en Mostrador:\n"
+            f"• '¿Qué productos están próximos a vencer?' (para rotar primero en estante)\n\n"
+            f"5. 🧾 Tus Ventas del Turno:\n"
+            f"• '¿Cuántas ventas llevo registradas hoy?'\n"
+            f"• '¿Cuál fue mi última venta?'\n\n"
+            f"ℹ️ Nota: Para ingresar compras a proveedores, cambiar precios o consultar reportes financieros de la tienda, solicita apoyo a tu administrador.\n\n"
+            f"¿Qué producto deseas consultar o vender?"
+        )
+
+
+def formatear_bloqueo_rbac(accion: str, usuario: Any = None) -> str:
+    """Mensaje amigable y pedagógico cuando un empleado intenta una acción administrativa."""
+    nombre = getattr(usuario, "nombre", None) or "compañero"
+
+    if accion in ["reabastecer", "compras"]:
+        return (
+            f"🔒 {nombre}, como tendero tienes acceso al mostrador para ventas y consulta de existencias. "
+            f"El reabastecimiento de mercancía y actualización de costos de compra están reservados para el administrador."
+        )
+    elif accion in ["modificar_precio", "cambiar_precio"]:
+        return (
+            f"🔒 {nombre}, no tienes permisos para modificar precios. "
+            f"Los precios de costo y de venta al público solo pueden ser modificados por el administrador de la tienda."
+        )
+    elif accion in ["crear_producto"]:
+        return (
+            f"🔒 {nombre}, el alta de nuevos productos en el catálogo debe realizarse por el administrador de la tienda."
+        )
+    elif accion in ["consulta_financiera_global", "comparacion"]:
+        return (
+            f"🔒 {nombre}, las métricas financieras globales de la tienda y comparativas son confidenciales del administrador. "
+            f"Puedes consultarme cuántas ventas has registrado tú en tu turno diciendo: '¿Cuántas ventas llevo hoy?'."
+        )
+    elif accion in ["ventas_otro_vendedor"]:
+        return (
+            f"🔒 {nombre}, solo tienes acceso para consultar tus propias ventas registradas en el turno."
+        )
+
+    return f"🔒 {nombre}, esta acción requiere permisos de administrador."
+
+
+def formatear_productos_proximos_vencer(datos: dict[str, Any]) -> str:
+    """Formatea la lista de productos próximos a vencer o vencidos."""
+    prods = datos.get("productos", [])
+    if not prods:
+        dias = datos.get("dias_horizonte", 30)
+        return f"No tienes productos registrados próximos a vencer en los próximos {dias} días."
+
+    lineas = [f"Tienes {len(prods)} producto(s) en alerta de vencimiento:"]
+    for p in prods:
+        dias = p["dias_restantes"]
+        if dias < 0:
+            alerta = f"⚠️ VENCIDO (hace {abs(dias)} días - {p['fecha_vencimiento']})"
+        elif dias == 0:
+            alerta = f"🚨 VENCE HOY ({p['fecha_vencimiento']})"
+        elif dias == 1:
+            alerta = f"⚠️ Vence mañana ({p['fecha_vencimiento']})"
+        else:
+            alerta = f"vence en {dias} días ({p['fecha_vencimiento']})"
+        lineas.append(f"• {p['nombre']}: {alerta}, stock disponible: {p['cantidad_actual']} {p['unidad']}.")
+
+    return "\n".join(lineas)
+

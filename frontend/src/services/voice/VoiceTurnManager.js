@@ -353,6 +353,9 @@ export class VoiceTurnManager {
     this.backendSTTProvider.generation = this.providerGeneration
     this.stopRequested = false
     this.isTranscribing = false
+    this.turnFinalized = false
+    this.interimTranscript = ''
+    this._setState(VoiceTurnState.LISTENING)
 
     // 2. Limpiar/abortar WebSpeech esperando su cierre definitivo para no dejar un SpeechRecognition fantasma
     if (typeof this.webSpeechProvider.abortAndWait === 'function') {
@@ -631,13 +634,21 @@ export class VoiceTurnManager {
     const sessionGen = this.sessionGeneration
     console.log(`[VOICE-TURN] detenerYEnviar() invocado en estado: ${this.state} turnId=${turnId} stopRequested=${this.stopRequested}`)
 
-    // Idempotencia: si no hay turno activo, o no está escuchando/detectando habla, o ya fue solicitado el stop: ignorar
-    if (
-      !turnId ||
-      (this.state !== VoiceTurnState.LISTENING && this.state !== VoiceTurnState.SPEECH_DETECTED) ||
-      this.stopRequested
-    ) {
-      console.warn(`[VOICE-TURN] detenerYEnviar ignorado (no activo o ya solicitado stop) turnId=${turnId}`)
+    if (!turnId) return
+
+    // Si ya se solicitó el stop y ya está en PROCESSING, asegurar parada física del STT y salir
+    if (this.stopRequested) {
+      if (typeof this.currentSTT?.requestStop === 'function') {
+        try { this.currentSTT.requestStop(turnId) } catch (_) {}
+      }
+      return
+    }
+
+    // Si no está escuchando o detectando habla, asegurar parada de STT y salir
+    if (this.state !== VoiceTurnState.LISTENING && this.state !== VoiceTurnState.SPEECH_DETECTED) {
+      if (typeof this.currentSTT?.requestStop === 'function') {
+        try { this.currentSTT.requestStop(turnId) } catch (_) {}
+      }
       return
     }
 
@@ -657,6 +668,7 @@ export class VoiceTurnManager {
     if (this.activeProviderType === 'backend') {
       this.isTranscribing = true
       this._setState(VoiceTurnState.PROCESSING, { transcripcionEnVuelo: true })
+      this._iniciarWatchdogProcessing(turnId, sessionGen)
       if (typeof this.currentSTT.requestStop === 'function') {
         this.currentSTT.requestStop(turnId)
       } else {
@@ -736,6 +748,26 @@ export class VoiceTurnManager {
     }, 9000)
   }
 
+  _iniciarWatchdogProcessing(turnId, sessionGen = null) {
+    if (this.processingWatchdogTimer) {
+      clearTimeout(this.processingWatchdogTimer)
+      this.processingWatchdogTimer = null
+    }
+    const targetSessionGen = sessionGen ?? this.sessionGeneration
+    this.processingWatchdogTimer = setTimeout(() => {
+      if (turnId !== this.currentTurnId || targetSessionGen !== this.sessionGeneration) {
+        return
+      }
+      if (this.state === VoiceTurnState.PROCESSING) {
+        console.warn(`[VOICE-TURN] Watchdog PROCESSING expiró (15s) turnId=${turnId}. Reseteando a READY...`)
+        if (this.currentSTT) this.currentSTT.cancel(turnId)
+        this.isTranscribing = false
+        this.turnFinalized = true
+        this._setState(VoiceTurnState.READY)
+      }
+    }, 15000)
+  }
+
   _limpiarTimers() {
     if (this.speechEndTimer) {
       clearTimeout(this.speechEndTimer)
@@ -756,6 +788,10 @@ export class VoiceTurnManager {
     if (this.stopRequestTimer) {
       clearTimeout(this.stopRequestTimer)
       this.stopRequestTimer = null
+    }
+    if (this.processingWatchdogTimer) {
+      clearTimeout(this.processingWatchdogTimer)
+      this.processingWatchdogTimer = null
     }
   }
 }
