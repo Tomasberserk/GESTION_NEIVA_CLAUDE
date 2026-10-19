@@ -1,5 +1,8 @@
-import { useState } from 'react'
+import { useState, useLayoutEffect, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
+import './../styles/landing.css'
+import FrameSequence from './../components/landing/FrameSequence.jsx'
+import AmbientLayer from './../components/landing/AmbientLayer.jsx'
 import {
   Store,
   ChevronDown,
@@ -22,6 +25,51 @@ import {
 export default function LandingPage() {
   const [videoModalAbierto, setVideoModalAbierto] = useState(false)
   const [faqAbierta, setFaqAbierta] = useState(null)
+  const [scrolled, setScrolled] = useState(false)
+  const rootRef = useRef(null)
+
+  // Arma los reveals ANTES del primer paint (el contenido es visible sin JS:
+  // la clase .js-reveal-arm se pierde => CSS deja los elementos visibles).
+  useLayoutEffect(() => {
+    rootRef.current?.classList.add('lnd', 'js-reveal-arm')
+  }, [])
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > window.innerHeight * 0.6)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+
+    const obs = new IntersectionObserver(
+      (entries) =>
+        entries.forEach((e) => e.isIntersecting && e.target.classList.add('in-view')),
+      { threshold: 0.12 },
+    )
+    document.querySelectorAll('[data-reveal]').forEach((el) => obs.observe(el))
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      obs.disconnect()
+    }
+  }, [])
+
+  // Los 4 pasos reales, ahora como guion del scroll-telling
+  const pasosScrollTelling = [
+    {
+      title: 'Crea tu cuenta',
+      text: 'Ingresa el nombre de tu tienda y tus datos básicos para comenzar a configurar tu espacio.',
+    },
+    {
+      title: 'Agrega tus productos',
+      text: 'Escribe el nombre de tus artículos, su precio de compra, precio de venta y cantidad disponible.',
+    },
+    {
+      title: 'Registra tus ventas',
+      text: 'En el mostrador, selecciona los productos o pésalos si son a granel y confirma la venta en segundos.',
+    },
+    {
+      title: 'Consulta tus números',
+      text: 'Revisa cuánto vendiste hoy, qué productos están por agotarse y cuál es tu ganancia limpia.',
+    },
+  ]
 
   const toggleFaq = (idx) => {
     setFaqAbierta(faqAbierta === idx ? null : idx)
@@ -59,21 +107,27 @@ export default function LandingPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-[#fafaf9] text-slate-800 font-sans selection:bg-emerald-100 selection:text-emerald-900">
+    <div ref={rootRef} className="min-h-screen bg-[#fafaf9] text-slate-800 font-sans selection:bg-emerald-100 selection:text-emerald-900">
       {/* ─────────────────────────────────────────────────────────────
           1. NAVEGACIÓN PRINCIPAL
       ───────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 transition-all">
+      <header
+        className={`fixed top-0 z-40 transition-all duration-500 ${
+          scrolled
+            ? 'bg-white/95 backdrop-blur-md border-b border-slate-200/80'
+            : 'bg-transparent border-b border-transparent lnd-hd-float'
+        }`}
+      >
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-xl shadow-sm">
               <Store size={22} />
             </div>
             <div>
-              <span className="font-extrabold text-slate-900 text-lg tracking-tight block leading-tight">
+              <span className="lnd-hd-word font-extrabold text-slate-900 text-lg tracking-tight block leading-tight">
                 Gestión Neiva
               </span>
-              <span className="text-[11px] text-emerald-700 font-medium tracking-wide block">
+              <span className="lnd-hd-sub text-[11px] text-emerald-700 font-medium tracking-wide block">
                 Comercio local y popular
               </span>
             </div>
@@ -122,53 +176,87 @@ export default function LandingPage() {
         {/* ─────────────────────────────────────────────────────────────
             2. HERO SECTION
         ───────────────────────────────────────────────────────────── */}
-        <section className="relative pt-12 pb-16 md:pt-20 md:pb-24 overflow-hidden border-b border-slate-200/60 bg-gradient-to-b from-emerald-50/40 via-[#fafaf9] to-[#fafaf9]">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center space-y-6">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-100/80 border border-emerald-200 text-emerald-800 text-xs font-semibold">
-              <HeartHandshake size={15} />
-              <span>Para tenderos, micromercados y negocios familiares</span>
+        <section
+          className="relative pt-28 pb-20 md:pt-32 md:pb-28 overflow-hidden"
+          style={{ background: 'linear-gradient(180deg, var(--noche) 0%, var(--bosque) 100%)' }}
+        >
+          <AmbientLayer motes={18} />
+
+          <div className="relative max-w-6xl mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-[1.1fr_.9fr] gap-12 items-center" data-reveal>
+            <div className="space-y-6 text-center lg:text-left">
+              <div
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold"
+                style={{ background: 'rgba(216,154,61,.12)', border: '1px solid rgba(216,154,61,.35)', color: 'var(--ambar)' }}
+              >
+                <HeartHandshake size={15} />
+                <span>Para tenderos, micromercados y negocios familiares</span>
+              </div>
+
+              <h1
+                className="text-3xl sm:text-5xl font-black tracking-tight leading-[1.15]"
+                style={{ color: 'var(--crema)' }}
+              >
+                Ayudamos a los pequeños comerciantes a entender y controlar su negocio con
+                <span className="italic-rk" style={{ color: 'var(--ambar)' }}> tranquilidad</span>
+              </h1>
+
+              <p className="text-base sm:text-lg max-w-2xl mx-auto lg:mx-0 leading-relaxed" style={{ color: 'var(--tinta-suave)' }}>
+                Un comerciante no debería tener que depender de la memoria, revisar varios cuadernos o
+                hacer cuentas una y otra vez para saber cómo va su día. Gestión Neiva hace que
+                administrar tu tienda sea más claro, ordenado y cercano.
+              </p>
+
+              <div className="pt-2 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3">
+                <Link
+                  to="/registro"
+                  className="w-full sm:w-auto font-bold text-base px-7 py-3.5 rounded-2xl transition-all shadow-md hover:shadow-lg active:scale-95 flex items-center justify-center gap-2"
+                  style={{ background: 'var(--ambar)', color: 'var(--noche)' }}
+                >
+                  <span>Crea tu cuenta y comienza</span>
+                  <ArrowRight size={18} />
+                </Link>
+                <button
+                  onClick={() => setVideoModalAbierto(true)}
+                  className="w-full sm:w-auto font-semibold text-base px-6 py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2 border"
+                  style={{ color: 'var(--crema)', borderColor: 'var(--linea)', background: 'rgba(245,239,230,.05)' }}
+                >
+                  <Play size={18} style={{ color: 'var(--ambar)' }} />
+                  <span>Ver cómo funciona</span>
+                </button>
+              </div>
+
+              <div className="pt-4 flex flex-wrap items-center justify-center lg:justify-start gap-6 text-xs font-medium" style={{ color: 'var(--tinta-suave)' }}>
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle2 size={16} style={{ color: 'var(--ambar)' }} />
+                  Sin conocimientos técnicos requeridos
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle2 size={16} style={{ color: 'var(--ambar)' }} />
+                  Venta por unidades o por peso (libras/kilos)
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle2 size={16} style={{ color: 'var(--ambar)' }} />
+                  Diseñado para el comercio popular de Neiva
+                </span>
+              </div>
             </div>
 
-            <h1 className="text-3xl sm:text-5xl font-black text-slate-900 tracking-tight leading-[1.15]">
-              Ayudamos a los pequeños comerciantes a entender y controlar su negocio con tranquilidad
-            </h1>
-
-            <p className="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
-              Un comerciante no debería tener que depender de la memoria, revisar varios cuadernos o
-              hacer cuentas una y otra vez para saber cómo va su día. Gestión Neiva hace que
-              administrar tu tienda sea más claro, ordenado y cercano.
-            </p>
-
-            <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
-              <Link
-                to="/registro"
-                className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base px-7 py-3.5 rounded-2xl transition-all shadow-md active:scale-98 flex items-center justify-center gap-2"
+            {/* Panel visual: "06:15 — abre el persiano" (micro-detalle de marca) */}
+            <div className="relative hidden lg:block" data-reveal>
+              <div className="rounded-[2rem] overflow-hidden border" style={{ borderColor: 'var(--linea)', boxShadow: '0 30px 60px -12px rgba(0,0,0,.55)' }}>
+                <img
+                  src="/media/hero-tienda.jpg"
+                  alt="Interior de una tienda de barrio al amanecer, con las estanterías surtidas listas para el día"
+                  className="lnd-kenburns w-full h-[440px] object-cover"
+                  loading="eager"
+                />
+              </div>
+              <div
+                className="absolute -bottom-3 left-6 rounded-xl px-4 py-2 text-[11px] font-mono tracking-widest border"
+                style={{ background: 'var(--lnd-card)', color: 'var(--tinta-suave)', borderColor: 'var(--linea)' }}
               >
-                <span>Crea tu cuenta y comienza</span>
-                <ArrowRight size={18} />
-              </Link>
-              <button
-                onClick={() => setVideoModalAbierto(true)}
-                className="w-full sm:w-auto bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-semibold text-base px-6 py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2"
-              >
-                <Play size={18} className="text-emerald-600 fill-emerald-600" />
-                <span>Ver cómo funciona</span>
-              </button>
-            </div>
-
-            <div className="pt-6 flex flex-wrap items-center justify-center gap-6 text-xs text-slate-500 font-medium">
-              <span className="flex items-center gap-1.5">
-                <CheckCircle2 size={16} className="text-emerald-600" />
-                Sin necesidad de conocimientos técnicos
-              </span>
-              <span className="flex items-center gap-1.5">
-                <CheckCircle2 size={16} className="text-emerald-600" />
-                Venta por unidades o por peso (libras/kilos)
-              </span>
-              <span className="flex items-center gap-1.5">
-                <CheckCircle2 size={16} className="text-emerald-600" />
-                Diseñado para el comercio popular de Neiva
-              </span>
+                06:15 — ABRE EL PERSIANO
+              </div>
             </div>
           </div>
         </section>
@@ -386,92 +474,25 @@ export default function LandingPage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Tarjeta de caso pendiente 1 */}
-              <div className="bg-[#fafaf9] rounded-2xl p-6 border border-dashed border-slate-300 relative space-y-4">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-200 text-slate-700 text-xs font-semibold">
-                  <span>[HISTORIA REAL PENDIENTE]</span>
-                </div>
-
-                <div className="space-y-3 pt-2">
-                  <div className="border-l-2 border-amber-400 pl-3">
-                    <span className="text-[11px] font-bold uppercase text-amber-700 tracking-wider block">
-                      Antes
-                    </span>
-                    <p className="text-xs text-slate-600 mt-0.5 italic">
-                      "Situación inicial del comerciante antes de incorporar una herramienta digital
-                      en el negocio..."
-                    </p>
-                  </div>
-
-                  <div className="border-l-2 border-blue-400 pl-3">
-                    <span className="text-[11px] font-bold uppercase text-blue-700 tracking-wider block">
-                      Durante
-                    </span>
-                    <p className="text-xs text-slate-600 mt-0.5 italic">
-                      "Cómo fue su proceso de aprendizaje y cómo incorporó el registro diario en su
-                      mostrador..."
-                    </p>
-                  </div>
-
-                  <div className="border-l-2 border-emerald-500 pl-3">
-                    <span className="text-[11px] font-bold uppercase text-emerald-700 tracking-wider block">
-                      Después
-                    </span>
-                    <p className="text-xs text-slate-600 mt-0.5 italic">
-                      "Qué cambios percibió en el control de sus productos y en el orden de sus
-                      ganancias..."
-                    </p>
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t border-slate-200 text-xs text-slate-400 flex items-center justify-between">
-                  <span>Comercio local en Neiva</span>
-                  <span>Documentación en proceso</span>
-                </div>
-              </div>
-
-              {/* Tarjeta de caso pendiente 2 */}
-              <div className="bg-[#fafaf9] rounded-2xl p-6 border border-dashed border-slate-300 relative space-y-4">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-200 text-slate-700 text-xs font-semibold">
-                  <span>[HISTORIA REAL PENDIENTE]</span>
-                </div>
-
-                <div className="space-y-3 pt-2">
-                  <div className="border-l-2 border-amber-400 pl-3">
-                    <span className="text-[11px] font-bold uppercase text-amber-700 tracking-wider block">
-                      Antes
-                    </span>
-                    <p className="text-xs text-slate-600 mt-0.5 italic">
-                      "Dificultades frecuentes con las cuentas de surtido y la rotación de mercancía
-                      a granel..."
-                    </p>
-                  </div>
-
-                  <div className="border-l-2 border-blue-400 pl-3">
-                    <span className="text-[11px] font-bold uppercase text-blue-700 tracking-wider block">
-                      Durante
-                    </span>
-                    <p className="text-xs text-slate-600 mt-0.5 italic">
-                      "Familiarización progresiva de la familia con el punto de venta en el celular..."
-                    </p>
-                  </div>
-
-                  <div className="border-l-2 border-emerald-500 pl-3">
-                    <span className="text-[11px] font-bold uppercase text-emerald-700 tracking-wider block">
-                      Después
-                    </span>
-                    <p className="text-xs text-slate-600 mt-0.5 italic">
-                      "Claridad al final de cada semana para saber cuánto reponer a los distribuidores..."
-                    </p>
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t border-slate-200 text-xs text-slate-400 flex items-center justify-between">
-                  <span>Negocio familiar en Neiva</span>
-                  <span>Documentación en proceso</span>
-                </div>
-              </div>
+            {/* Mientras se documentan las historias reales: panel honesto (sin placeholders) */}
+            <div className="rounded-2xl p-8 md:p-10 border border-dashed border-slate-300 bg-[#fafaf9] relative" data-reveal>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-200 text-slate-700 text-xs font-semibold">
+                <span>Historias reales en documentación</span>
+              </span>
+              <p className="text-sm text-slate-600 mt-4 max-w-xl leading-relaxed">
+                No vamos a inventar testimonios. Estamos entrevistando a las primeras tiendas que
+                trabajan con Gestión Neiva para documentar, con su permiso, cómo llevaban sus
+                cuentas antes y qué cambió después. Cuando estén listas, las verás aquí.
+              </p>
+              <a
+                href="https://chat.whatsapp.com/gestion-inventario-inteligente"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-emerald-700 hover:text-emerald-800 transition-colors"
+              >
+                ¿Tienes una tienda y quieres contar tu historia? Escríbenos aquí
+                <ArrowRight size={16} />
+              </a>
             </div>
           </div>
         </section>
@@ -540,12 +561,28 @@ export default function LandingPage() {
         {/* ─────────────────────────────────────────────────────────────
             8. ECONOMÍA POPULAR Y COMERCIO LOCAL
         ───────────────────────────────────────────────────────────── */}
-        <section className="py-16 md:py-20 bg-slate-900 text-slate-100">
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 space-y-8">
-            <div className="max-w-2xl">
-              <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
-                Economía popular
-              </span>
+        <section
+          className="relative py-16 md:py-24 overflow-hidden"
+          style={{ background: 'var(--noche)' }}
+        >
+          {/* Fondo real: la luz de un mercado de barrio en la noche */}
+          <img
+            src="/media/mercado-noche.jpg"
+            alt=""
+            aria-hidden="true"
+            className="lnd-kenburns absolute inset-0 h-full w-full object-cover opacity-45"
+            loading="lazy"
+          />
+          <div
+            className="absolute inset-0"
+            style={{ background: 'linear-gradient(180deg, rgba(16,22,19,.75) 0%, rgba(16,22,19,.92) 60%, rgba(16,22,19,.98) 100%)' }}
+          />
+
+          <div className="relative max-w-5xl mx-auto px-4 sm:px-6 space-y-8">
+            <div className="max-w-2xl" data-reveal>
+              <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--ambar)' }}>
+                  Economía popular
+                </span>
               <h2 className="text-2xl sm:text-3xl font-bold text-white mt-1">
                 El corazón productivo de nuestras comunidades
               </h2>
@@ -558,7 +595,7 @@ export default function LandingPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
               <div className="bg-slate-800/80 p-6 rounded-2xl border border-slate-700 space-y-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+                <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--ambar)' }}>
                   Por qué nos importa
                 </span>
                 <h3 className="font-bold text-white text-base">Cercanía y dignidad</h3>
@@ -569,7 +606,7 @@ export default function LandingPage() {
               </div>
 
               <div className="bg-slate-800/80 p-6 rounded-2xl border border-slate-700 space-y-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+                <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--ambar)' }}>
                   Acceso equitativo
                 </span>
                 <h3 className="font-bold text-white text-base">Tecnología sin barreras</h3>
@@ -580,7 +617,7 @@ export default function LandingPage() {
               </div>
 
               <div className="bg-slate-800/80 p-6 rounded-2xl border border-slate-700 space-y-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+                <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--ambar)' }}>
                   Nuestro papel
                 </span>
                 <h3 className="font-bold text-white text-base">Un puente sencillo</h3>
@@ -609,53 +646,16 @@ export default function LandingPage() {
               enredadas.
             </p>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3 relative">
-              <span className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 font-bold text-sm flex items-center justify-center">
-                1
-              </span>
-              <h3 className="font-bold text-slate-800 text-base">Crea tu cuenta</h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Ingresa el nombre de tu tienda y tus datos básicos para comenzar a configurar tu
-                espacio.
-              </p>
-            </div>
-
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3 relative">
-              <span className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 font-bold text-sm flex items-center justify-center">
-                2
-              </span>
-              <h3 className="font-bold text-slate-800 text-base">Agrega tus productos</h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Escribe el nombre de tus artículos, su precio de compra, precio de venta y cantidad
-                disponible.
-              </p>
-            </div>
-
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3 relative">
-              <span className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 font-bold text-sm flex items-center justify-center">
-                3
-              </span>
-              <h3 className="font-bold text-slate-800 text-base">Registra tus ventas</h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                En el mostrador, selecciona los productos o pésalos si son a granel y confirma la
-                venta en segundos.
-              </p>
-            </div>
-
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3 relative">
-              <span className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 font-bold text-sm flex items-center justify-center">
-                4
-              </span>
-              <h3 className="font-bold text-slate-800 text-base">Consulta tus números</h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Revisa cuánto vendiste hoy, qué productos están por agotarse y cuál es tu ganancia
-                limpia.
-              </p>
-            </div>
-          </div>
         </section>
+
+        {/* 9b. SCROLL-TELLING: el recorrido del día en la tienda, fotograma a fotograma */}
+        <FrameSequence
+          pattern="/media/viaje/v{n}.webp"
+          frames={120}
+          pad={3}
+          steps={pasosScrollTelling}
+          heightClass="h-[420svh]"
+        />
 
         {/* ─────────────────────────────────────────────────────────────
             10. VIDEO TUTORIAL GUIADO (CON CARGA DIFERIDA)

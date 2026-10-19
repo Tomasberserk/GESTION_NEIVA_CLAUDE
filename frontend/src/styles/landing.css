@@ -1,0 +1,73 @@
+/* landing.css — tokens dark-first scopeados a la clase .lnd.
+   ⚠️ Todo vive bajo .lnd para NO afectar el POS (que comparte index.css). */
+
+.lnd {
+  --noche: #101613;        /* fondo base verde-negro Huila */
+  --bosque: #16281f;       /* superficie de secciones      */
+  --lnd-card: #1b2a22;     /* cards sobre oscuro           */
+  --crema: #f5efe6;        /* tinta principal sobre oscuro */
+  --tinta-suave: #a7b1aa;  /* texto secundario             */
+  --ambar: #d89a3d;        /* acento CTA                   */
+  --tierra: #6b3f2a;
+  --linea: rgba(245, 239, 230, 0.09);
+}
+
+/* ── Ken-Burns cinematográfico (22s, alternante, economía de bytes) ─────────── */
+.lnd-kenburns {
+  animation: lnd-kenburns 22s ease-in-out infinite alternate;
+  will-change: transform;
+}
+@keyframes lnd-kenburns {
+  from { transform: scale(1) translate(0, 0); }
+  to   { transform: scale(1.12) translate(-1.5%, 1%); }
+}
+
+/* ── Niebla ambiental (drift de 38s) ────────────────────────────────────────── */
+.lnd-mist {
+  animation: lnd-mist 38s linear infinite;
+  will-change: transform, opacity;
+}
+@keyframes lnd-mist {
+  0%   { transform: translate3d(-6%, 2%, 0) scale(1);   opacity: .35; }
+  50%  { transform: translate3d(4%, -3%, 0) scale(1.08); opacity: .55; }
+  100% { transform: translate3d(-6%, 2%, 0) scale(1);   opacity: .35; }
+}
+
+/* ── Motas flotantes (partículas ambientales) ──────────────────────────────── */
+.lnd-mote {
+  animation: lnd-mote 14s linear infinite;
+  will-change: transform, opacity;
+}
+@keyframes lnd-mote {
+  0%   { transform: translateY(0) scale(1);    opacity: 0; }
+  10%  { opacity: .8; }
+  90%  { opacity: .4; }
+  100% { transform: translateY(-90vh) scale(.6); opacity: 0; }
+}
+
+/* ── Header flotante sobre hero dark (specificity > Tailwind utilities) ────── */
+.lnd .lnd-hd-float { background: transparent; }
+.lnd .lnd-hd-float .lnd-hd-word { color: var(--crema); }
+.lnd .lnd-hd-float .lnd-hd-sub { color: var(--tinta-suave); }
+.lnd .lnd-hd-float nav a { color: var(--tinta-suave); }
+.lnd .lnd-hd-float nav a:hover { color: var(--crema); }
+.lnd .lnd-hd-float .lnd-hd-login { color: var(--tinta-suave); }
+
+/* ── Reveals: contenido NUNCA desaparece si JS no carga (lección ORIVIA) ──────
+   El estado inicial visible por defecto; .js-reveal-arm lo arma ANTES vía JS. */
+@media (prefers-reduced-motion: no-preference) {
+  .js-reveal-arm [data-reveal] {
+    opacity: 0;
+    transform: translateY(18px);
+    transition: opacity .7s cubic-bezier(.2, 0, .2, 1), transform .7s cubic-bezier(.2, 0, .2, 1);
+  }
+  .js-reveal-arm [data-reveal].in-view {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── Respeto total a preferencias de movimiento reducido ──────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .lnd-kenburns, .lnd-mist, .lnd-mote { animation: none; }
+}
