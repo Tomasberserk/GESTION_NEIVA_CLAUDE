@@ -27,8 +27,9 @@
 [✅] Sprint 8.2 — Transformación Web Informativa + Onboarding Educativo No Bloqueante (COMPLETO)
 [✅] Sprint 8.3 — Gobernanza RBAC en Asistente IA, Reabastecimiento con Costo y Latencia Cero (COMPLETO)
 [✅] Sprint 8.4 — Entitlements (Trial 15 Días), Normalización Errores 422, UI Pro en Header (COMPLETO)
-[ ] Sprint 9 — Despliegue y Activación de Hermes-3 en Producción (SIGUIENTE)
-[ ] Sprint 10 — Landing Premium Dark-First (PROPUESTA — ver al final del documento)
+[ ] Sprint 9 — Despliegue y Activación en Producción (SIGUIENTE)
+[ ] Sprint 10 — Landing Premium Dark-First (PROPUESTA — ver al final del documento; copy al ICP va ANTES del diseño)
+[ ] Sprint 10.5 — Redefinición de Alcance: SaaS vertical microempresarial + Modo Lite "Solo Stock" (PROPUESTA DEL DUEÑO 2026-10-19 — ver abajo)
 ```
 
 ---
@@ -607,6 +608,54 @@
 2. Landing con ≥ 1 imagen real animada (ken-burns) y ≥ 1 sección scroll-telling funcional.
 3. Checklist anti-AI-slop §2 del playbook: tokens nombrados, ≥ 3 layouts distintos entre secciones, textura ambiental activa.
 4. Gemini QA sin issues de severidad roja.
+
+---
+
+## Redefinición de Alcance — 2026-10-19 (decisión del dueño)
+
+> [DUEÑO APRUEBA] Debate resuelto: "el SaaS dedicado a ahorrar horas contando unidades,
+> llevando registro y ver cómo va el negocio desde cualquier parte".
+
+### Qué se decidió
+
+1. **Fábrica = motor interno, nunca producto público.** La fábrica sigue siendo nuestro martillo para
+   generar y evolucionar clientes/software, pero NO se ofrece al exterior. El producto visible y en
+   venta es **UNA SaaS vertical multi-tenant: Gestión Neiva**. Los sistemas de demo de la fábrica
+   (`pos-papeleria`, `erp-distribuidora`) pasan a ser artefactos internos de QA/regresión del motor,
+   no portafolio de oferta.
+2. **ICP (cliente ideal) redefinido — microempresarial ampliado, no solo tendero:** cualquier persona
+   con un emprendimiento cuyo negocio todavía no es lo suficientemente grande ni formal para
+   llamarse microempresa completa, o una microempresa real (papelería, ferretería, talleres, comida,
+   almacenes). Su rasgo común: **hoy lleva el stock y las cuentas en cuaderno, Excel o memoria;
+   no quiere ni necesita página web; quiere anotar, contar unidades, guardar el registro y ver
+   su negocio desde cualquier parte (celular), sin exponer datos al público.**
+3. **Posicionamiento / one-liner de producto:**
+   *"El registro de tu negocio en el bolsillo: anota tu stock y tus cuentas desde el celular,
+   y mira cómo va tu negocio desde cualquier parte, sin exponer nada al público."*
+   Beneficio central (las palabras del dueño): **ahorrar horas de trabajo contando unidades.**
+4. **Modo Lite "Solo Stock" = puerta de entrada al ICP** (producto existente + nuevo modo):
+   - Onboarding mínimo: nombre del negocio → primer producto. Sin registros de cajeros ni complejidad POS.
+   - Agregar/editar/ajustar stock, entradas y salidas rápidas, resumen simple (cuánto hay, qué se movió).
+   - móvil primero, consultable desde cualquier parte; sin exposición pública de datos.
+   - Upsell natural a POS completo (ventas, caja, cajeros, reportes) cuando el negocio crece — el trial
+     y entitlements existentes (Sprint 8.4) son el puente comercial ya construido.
+   - Especificación técnica detallada: SPRINT PENDIENTE (sprint 10.5 o 11) — se propone sobre el
+     pipeline existente (entitlements + configuración por empresa), NO un producto aparte.
+
+### Impacto inmediato en el Sprint 10 (landing)
+
+- El copy del landing se reordena: **H0 (NUEVO)** redactar los mensajes al nuevo ICP (titular hero,
+  promesa del Modo Lite, redefinir Hero / Propuesta de Valor / Pasos Reales / FAQ) ANTES de los
+  tokens visuales (F0). Racional: el copy define contenedores y altura de las secciones; iterar
+  copy cuesta 10 min, iterar layouts animados cuesta horas. Si se rediseña primero, el nuevo copy
+  obliga a re-iterar el diseño (pago doble).
+- H1/H2 (jerga/placeholders) se ejecutan en la misma pasada que H0.
+- La dirección dark-first (bosque/crema/ámbar) se mantiene; se rellena con la narrativa ICP.
+
+### Qué NO cambia
+
+- Stack, arquitectura, tests, deploy en curso (Sprint 9), entitlements, RBAC, modo voz.
+- La fábrica sigue operando con su protocolo actual para construir el resto del producto.
 
 ---
 
