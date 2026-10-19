@@ -199,32 +199,55 @@ export default function FrameSequence({
               </span>
             </div>
 
-            {steps.map((s, i) => (
-              <motion.div
-                key={s.title}
-                initial={false}
-                animate={{
-                  opacity: i === activeStep ? 1 : 0,
-                  y: i === activeStep ? 0 : 8,
-                }}
-                // Curva final explícita (auditoría §3A): 420ms, cubic-bezier(.22,1,.36,1)
-                transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-                className={i === activeStep ? 'block' : 'hidden'}
-              >
-                <h3
-                  className="text-2xl sm:text-4xl font-black tracking-tight"
-                  style={{ color: 'var(--crema)', lineHeight: 1.08 }}
-                >
-                  {s.title}
-                </h3>
-                <p
-                  className="mt-2 max-w-xl text-sm sm:text-base leading-relaxed"
-                  style={{ color: '#d5ddd6' }}
-                >
-                  {s.text}
-                </p>
-              </motion.div>
-            ))}
+            {reduce ? (
+              /* Sin motion: la historia completa, apilada y legible (SKILL.md:
+                 el canvas necesita alternativa textual equivalente, y el
+                 contenido no puede depender de la animación). */
+              <div className="space-y-4">
+                {steps.map((s, i) => (
+                  <div key={s.title}>
+                    <h3
+                      className="text-2xl font-black tracking-tight"
+                      style={{ color: 'var(--crema)', lineHeight: 1.08 }}
+                    >
+                      {String(i + 1).padStart(2, '0')} — {s.title}
+                    </h3>
+                    <p className="mt-1 max-w-xl text-sm leading-relaxed" style={{ color: '#d5ddd6' }}>
+                      {s.text}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="relative h-[140px] sm:h-[170px]">
+                {steps.map((s, i) => (
+                  <motion.div
+                    key={s.title}
+                    initial={false}
+                    animate={{
+                      opacity: i === activeStep ? 1 : 0,
+                      y: i === activeStep ? 0 : 8,
+                    }}
+                    // Curva final explícita (auditoría §3A): 420ms, cubic-bezier(.22,1,.36,1)
+                    transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+                    className={i === activeStep ? 'block' : 'hidden'}
+                  >
+                    <h3
+                      className="text-2xl sm:text-4xl font-black tracking-tight"
+                      style={{ color: 'var(--crema)', lineHeight: 1.08 }}
+                    >
+                      {s.title}
+                    </h3>
+                    <p
+                      className="mt-2 max-w-xl text-sm sm:text-base leading-relaxed"
+                      style={{ color: '#d5ddd6' }}
+                    >
+                      {s.text}
+                    </p>
+                  </motion.div>
+                ))}
+              </div>
+            )}
 
             <div className="flex gap-1.5">
               {steps.map((_, i) => (
