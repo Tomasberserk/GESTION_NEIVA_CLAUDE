@@ -67,3 +67,17 @@
   .lnd-kenburns, .lnd-mote { animation: none; }
   .lnd-kenburns { will-change: auto; }
 }
+
+/* ── Anillo de foco doble tono (SKILL.md §Accesibilidad) ─────────────────────
+   La línea ámbar es visible sobre verde-noche y el halo oscuro la sostiene
+   sobre superficies claras (crema/blanco). */
+.lnd :focus-visible {
+  outline: 2px solid var(--ambar);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(16, 22, 19, 0.85);
+}
+
+/* Los anchos de sección no quedan debajo del header fijo al navegar por anclas */
+.lnd section[id] {
+  scroll-margin-top: 88px;
+}

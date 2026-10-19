@@ -36,15 +36,27 @@ export default function LandingPage() {
   }, [])
 
   useEffect(() => {
-    // Header: estado sólido solo cuando se supera el final del hero (sentinel)
+    // Header: sólido cuando el FIN del hero cruza la línea del header (~88px).
+    // Lectura directa del sentinel en cada scroll: los saltos por ancla no
+    // siempre disparan eventos de IntersectionObserver, pero sí scroll.
     let obsHeader
-    if (hdSentinelRef.current) {
-      obsHeader = new IntersectionObserver(
-        ([entry]) => setScrolled(!entry.isIntersecting),
-        { threshold: 0 },
-      )
-      obsHeader.observe(hdSentinelRef.current)
+    const mount = () => {
+      const sentinel = hdSentinelRef.current
+      if (!sentinel) return
+      let last = null
+      const update = () => {
+        const solid = sentinel.getBoundingClientRect().top < 88
+        if (solid !== last) { last = solid; setScrolled(solid) }
+      }
+      update()
+      window.addEventListener('scroll', update, { passive: true })
+      window.addEventListener('resize', update, { passive: true })
+      obsHeader = { disconnect: () => {
+        window.removeEventListener('scroll', update)
+        window.removeEventListener('resize', update)
+      } }
     }
+    mount()
     // Reveals: un solo ciclo por elemento (IO se desconecta al entrar una vez)
     const obs = new IntersectionObserver(
       (entries) =>
@@ -146,22 +158,22 @@ export default function LandingPage() {
           </div>
 
           <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
-            <a href="#problema" className="hover:text-emerald-700 transition-colors">
+            <a href="#problema" className="hover:text-emerald-700 transition-colors inline-block px-2 py-3 whitespace-nowrap">
               El problema
             </a>
-            <a href="#proposito" className="hover:text-emerald-700 transition-colors">
+            <a href="#proposito" className="hover:text-emerald-700 transition-colors inline-block px-2 py-3 whitespace-nowrap">
               Nuestra propuesta
             </a>
-            <a href="#quienes" className="hover:text-emerald-700 transition-colors">
+            <a href="#quienes" className="hover:text-emerald-700 transition-colors inline-block px-2 py-3 whitespace-nowrap">
               ¿A quién ayudamos?
             </a>
-            <a href="#historias" className="hover:text-emerald-700 transition-colors">
+            <a href="#historias" className="hover:text-emerald-700 transition-colors inline-block px-2 py-3 whitespace-nowrap">
               Historias
             </a>
-            <a href="#como-funciona" className="hover:text-emerald-700 transition-colors">
+            <a href="#como-funciona" className="hover:text-emerald-700 transition-colors inline-block px-2 py-3 whitespace-nowrap">
               ¿Cómo funciona?
             </a>
-            <a href="#faq" className="hover:text-emerald-700 transition-colors">
+            <a href="#faq" className="hover:text-emerald-700 transition-colors inline-block px-2 py-3 whitespace-nowrap">
               Preguntas
             </a>
           </nav>
@@ -169,13 +181,13 @@ export default function LandingPage() {
           <div className="flex items-center gap-3">
             <Link
               to="/login"
-              className="text-sm font-semibold text-slate-700 hover:text-emerald-700 px-3 py-2 rounded-xl transition-colors"
+              className="text-sm font-semibold text-slate-700 hover:text-emerald-700 px-3 py-3 rounded-xl transition-colors"
             >
               Entrar a mi Tienda
             </Link>
             <Link
               to="/registro"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-all shadow-sm active:scale-95 flex items-center gap-1.5"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-4 py-3 rounded-xl transition-all shadow-sm active:scale-95 flex items-center gap-1.5"
             >
               <span>Crear cuenta</span>
               <ArrowRight size={16} />
@@ -294,7 +306,7 @@ export default function LandingPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+            <div className="rounded-2xl bg-[#fafaf9] p-6 shadow-[0_2px_16px_-6px_rgba(20,37,31,0.12)] space-y-3">
               <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center text-xl font-bold">
                 📝
               </div>
@@ -305,7 +317,7 @@ export default function LandingPage() {
               </p>
             </div>
 
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+            <div className="rounded-2xl bg-[#fafaf9] p-6 shadow-[0_2px_16px_-6px_rgba(20,37,31,0.12)] space-y-3">
               <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-700 flex items-center justify-center text-xl font-bold">
                 📦
               </div>
@@ -316,7 +328,7 @@ export default function LandingPage() {
               </p>
             </div>
 
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+            <div className="rounded-2xl bg-[#fafaf9] p-6 shadow-[0_2px_16px_-6px_rgba(20,37,31,0.12)] space-y-3">
               <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center text-xl font-bold">
                 🪙
               </div>
@@ -348,7 +360,7 @@ export default function LandingPage() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div className="p-5 rounded-2xl bg-[#fafaf9] border border-slate-200 space-y-2">
+              <div className="p-5 rounded-2xl bg-[#fafaf9] space-y-2">
                 <div className="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
                   <Package size={18} />
                 </div>
@@ -359,7 +371,7 @@ export default function LandingPage() {
                 </p>
               </div>
 
-              <div className="p-5 rounded-2xl bg-[#fafaf9] border border-slate-200 space-y-2">
+              <div className="p-5 rounded-2xl bg-[#fafaf9] space-y-2">
                 <div className="w-9 h-9 rounded-lg bg-violet-100 text-violet-700 flex items-center justify-center font-bold">
                   <Scale size={18} />
                 </div>
@@ -370,7 +382,7 @@ export default function LandingPage() {
                 </p>
               </div>
 
-              <div className="p-5 rounded-2xl bg-[#fafaf9] border border-slate-200 space-y-2">
+              <div className="p-5 rounded-2xl bg-[#fafaf9] space-y-2">
                 <div className="w-9 h-9 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
                   <TrendingUp size={18} />
                 </div>
@@ -381,7 +393,7 @@ export default function LandingPage() {
                 </p>
               </div>
 
-              <div className="p-5 rounded-2xl bg-[#fafaf9] border border-slate-200 space-y-2">
+              <div className="p-5 rounded-2xl bg-[#fafaf9] space-y-2">
                 <div className="w-9 h-9 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center font-bold">
                   ⚠️
                 </div>
@@ -392,7 +404,7 @@ export default function LandingPage() {
                 </p>
               </div>
 
-              <div className="p-5 rounded-2xl bg-[#fafaf9] border border-slate-200 space-y-2">
+              <div className="p-5 rounded-2xl bg-[#fafaf9] space-y-2">
                 <div className="w-9 h-9 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
                   <Users size={18} />
                 </div>
@@ -403,7 +415,7 @@ export default function LandingPage() {
                 </p>
               </div>
 
-              <div className="p-5 rounded-2xl bg-[#fafaf9] border border-slate-200 space-y-2">
+              <div className="p-5 rounded-2xl bg-[#fafaf9] space-y-2">
                 <div className="w-9 h-9 rounded-lg bg-slate-200 text-slate-700 flex items-center justify-center font-bold">
                   📄
                 </div>
@@ -435,7 +447,7 @@ export default function LandingPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 text-center space-y-2">
+            <div className="rounded-2xl bg-[#fafaf9] p-5 text-center space-y-2">
               <span className="text-3xl block">🏪</span>
               <h3 className="font-bold text-slate-800 text-base">Tiendas de barrio</h3>
               <p className="text-xs text-slate-500">
@@ -443,7 +455,7 @@ export default function LandingPage() {
               </p>
             </div>
 
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 text-center space-y-2">
+            <div className="rounded-2xl bg-[#fafaf9] p-5 text-center space-y-2">
               <span className="text-3xl block">🛒</span>
               <h3 className="font-bold text-slate-800 text-base">Micromercados</h3>
               <p className="text-xs text-slate-500">
@@ -451,7 +463,7 @@ export default function LandingPage() {
               </p>
             </div>
 
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 text-center space-y-2">
+            <div className="rounded-2xl bg-[#fafaf9] p-5 text-center space-y-2">
               <span className="text-3xl block">🥖</span>
               <h3 className="font-bold text-slate-800 text-base">Panaderías y cafeterías</h3>
               <p className="text-xs text-slate-500">
@@ -459,7 +471,7 @@ export default function LandingPage() {
               </p>
             </div>
 
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 text-center space-y-2">
+            <div className="rounded-2xl bg-[#fafaf9] p-5 text-center space-y-2">
               <span className="text-3xl block">👨‍👩‍👧‍👦</span>
               <h3 className="font-bold text-slate-800 text-base">Negocios familiares</h3>
               <p className="text-xs text-slate-500">
@@ -877,6 +889,7 @@ export default function LandingPage() {
                 >
                   <button
                     type="button"
+                    aria-expanded={faqAbierta === idx}
                     onClick={() => toggleFaq(idx)}
                     className="w-full text-left p-5 font-semibold text-slate-800 text-sm sm:text-base flex items-center justify-between gap-4"
                   >
