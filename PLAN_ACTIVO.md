@@ -580,8 +580,13 @@
 
 ### Micro-tareas (atómicas, con comando de verificación — regla §7 de AGENTS.md)
 
+**ORDEN CONFIRMADO POR EL DUEÑO (2026-10-19): copy primero (H0→H2), luego visual (F0→F3).**
+Racional: iterar copy cuesta ~10 min, iterar layouts animados cuesta horas. El diseño se
+construye sobre el mensaje final del ICP, no sobre el copy viejo (ver Redefinición de Alcance).
+
 | # | Tarea | Asignado | Archivo | Verificación |
 |---|-------|----------|---------|--------------|
+| H0 | Copy al nuevo ICP ANTES de todo diseño: titular hero + promesa del Modo Lite + redefinir narrativa de Hero, Propuesta de Valor, Pasos Reales y FAQ según Redefinición de Alcance 2026-10-19. Borrador en `docs/landing_copy.md` para review del dueño | Claude (dueño aprueba) | `docs/landing_copy.md` | REVIEW DEL DUEÑO — sin F0 hasta su visto bueno |
 | H1 | Retirar jerga interna del header ("Cuenta local y Twilio" → tagline humana "La cuenta de tu negocio, al día") | Claude/Haiku | `LandingPage.jsx` | `grep -c "Twilio" frontend/src/pages/LandingPage.jsx` → 0 |
 | H2 | Resolver placeholders: ocultar sección Historias y redes vacías con flag `CONTENIDO_PENDIENTE=false` hasta tener casos reales | Claude/Haiku | `LandingPage.jsx` | `grep -cE "PENDIENTE" LandingPage.jsx` → 0 (co-beneficio B5) |
 | F0.1 | Instalar Montserrat + tokens `@theme` en `index.css`; mapear clases existentes emerald/slate → tokens | senior-dev | `frontend/src/index.css`, `LandingPage.jsx` | `cd frontend && npm run build` limpio |
@@ -598,7 +603,8 @@
 ### Presupuesto y restricciones
 
 - Sin TypeScript (regla activa). Assets de frames bajo `frontend/public/media/viaje/`.
-- F2.1 depende de Veo (dueño). H1, H2, F0 y F1 **no dependen de nada externo: ejecutables hoy**.
+- **H0 → H2 (copy al ICP) va primero y no depende de nada externo: ejecutable hoy.** F0 y F1
+  dependen del visto bueno de H0 (copy define contenedores). F2.1 depende de Veo (dueño).
 - Presupuesto de bundle: JS bajo control (`motion` ≈ +18 kB gzip en el chunk del landing); lo pesado son assets de frames.
 - Fallback sin-JS: todo contenido servido visible por CSS (lección forense de ORIVIA).
 
