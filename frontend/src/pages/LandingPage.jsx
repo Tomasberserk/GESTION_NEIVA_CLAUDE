@@ -131,7 +131,7 @@ export default function LandingPage() {
   ]
 
   return (
-    <div ref={rootRef} className="min-h-screen bg-[#fafaf9] text-slate-800 font-sans selection:bg-emerald-100 selection:text-emerald-900">
+    <div ref={rootRef} className="min-h-screen bg-[#faf7f1] text-slate-800 font-sans selection:bg-emerald-100 selection:text-emerald-900">
       {/* ─────────────────────────────────────────────────────────────
           1. NAVEGACIÓN PRINCIPAL
       ───────────────────────────────────────────────────────────── */}
@@ -147,11 +147,11 @@ export default function LandingPage() {
             <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-xl shadow-sm">
               <Store size={22} />
             </div>
-            <div>
-              <span className="lnd-hd-word font-extrabold text-slate-900 text-lg tracking-tight block leading-tight">
+            <div className="min-w-0">
+              <span className="lnd-hd-word font-extrabold text-slate-900 text-lg tracking-tight block leading-tight whitespace-nowrap">
                 Gestión Neiva
               </span>
-              <span className="lnd-hd-sub text-[11px] text-emerald-700 font-medium tracking-wide block">
+              <span className="lnd-hd-sub text-[10px] text-emerald-700 font-medium tracking-wide block whitespace-nowrap">
                 Comercio local y popular
               </span>
             </div>
@@ -292,51 +292,64 @@ export default function LandingPage() {
             3. EL PROBLEMA COTIDIANO (STORYTELLING)
         ───────────────────────────────────────────────────────────── */}
         <section id="problema" className="py-16 md:py-20 max-w-5xl mx-auto px-4 sm:px-6">
-          <div className="text-center max-w-2xl mx-auto mb-12">
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">
-              La realidad cotidiana
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">
-              Atender el mostrador y llevar las cuentas al mismo tiempo no es tarea fácil
-            </h2>
-            <p className="text-sm text-slate-600 mt-2">
-              En una tienda de barrio las cosas pasan muy rápido: clientes que llegan al tiempo,
-              proveedores que entregan mercancía y cuentas anotadas en hojas sueltas.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="rounded-2xl bg-[#fafaf9] p-6 shadow-[0_2px_16px_-6px_rgba(20,37,31,0.12)] space-y-3">
-              <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center text-xl font-bold">
-                📝
-              </div>
-              <h3 className="font-bold text-slate-800 text-lg">Cuentas en libretas y papeles</h3>
-              <p className="text-sm text-slate-600 leading-relaxed">
-                Anotar cada venta o cada gasto en un cuaderno hace que al final del día sea difícil y
-                agotador calcular cuánto dinero entró realmente a la caja.
-              </p>
+          <div className="grid grid-cols-1 lg:grid-cols-[5fr_6fr] gap-10 lg:gap-14 items-center">
+            {/* Fotografía real: la manos que cuentan el día en el mostrador */}
+            <div className="relative order-2 lg:order-1" data-reveal>
+              <img
+                src="/media/pago-manos.jpg"
+                alt="Manos intercambiando el pago en el mostrador de una tienda de barrio"
+                className="w-full h-[340px] sm:h-[400px] lg:h-[480px] object-cover rounded-[2rem] shadow-[0_24px_48px_-20px_rgba(20,37,31,0.35)]"
+                loading="lazy"
+                decoding="async"
+              />
             </div>
 
-            <div className="rounded-2xl bg-[#fafaf9] p-6 shadow-[0_2px_16px_-6px_rgba(20,37,31,0.12)] space-y-3">
-              <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-700 flex items-center justify-center text-xl font-bold">
-                📦
+            {/* Bloque editorial: numeración 01/02/03, sin tarjetas */}
+            <div className="order-1 lg:order-2">
+              <div className="mb-8" data-reveal>
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">
+                  La realidad cotidiana
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mt-1 leading-tight">
+                  Atender el mostrador y llevar las cuentas al mismo tiempo no es tarea fácil
+                </h2>
+                <p className="text-sm text-slate-600 mt-3 max-w-xl">
+                  En una tienda de barrio las cosas pasan muy rápido: clientes que llegan al tiempo,
+                  proveedores que entregan mercancía y cuentas anotadas en hojas sueltas.
+                </p>
               </div>
-              <h3 className="font-bold text-slate-800 text-lg">Incertidumbre en el surtido</h3>
-              <p className="text-sm text-slate-600 leading-relaxed">
-                Descubrir que un producto se agotó solo cuando el cliente lo pide, o enterarse de que
-                otra mercancía venció en la estantería sin haber alcanzado a venderla.
-              </p>
-            </div>
 
-            <div className="rounded-2xl bg-[#fafaf9] p-6 shadow-[0_2px_16px_-6px_rgba(20,37,31,0.12)] space-y-3">
-              <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center text-xl font-bold">
-                🪙
+              <div className="space-y-0" data-reveal>
+                {[
+                  {
+                    n: '01',
+                    t: 'Cuentas en libretas y papeles',
+                    d: 'Anotar cada venta o cada gasto en un cuaderno hace que al final del día sea difícil y agotador calcular cuánto dinero entró realmente a la caja.',
+                  },
+                  {
+                    n: '02',
+                    t: 'Incertidumbre en el surtido',
+                    d: 'Descubrir que un producto se agotó solo cuando el cliente lo pide, o enterarse de que otra mercancía venció en la estantería sin haber alcanzado a venderla.',
+                  },
+                  {
+                    n: '03',
+                    t: 'Confusión entre venta y ganancia',
+                    d: 'No todo el dinero recaudado es ganancia de bolsillo. Una parte importante corresponde a lo que costó comprar la mercancía y debe apartarse para reponer surtido.',
+                  },
+                ].map((p) => (
+                  <div key={p.n} className="py-4 border-t" style={{ borderColor: '#e7ddcc' }}>
+                    <div className="flex items-baseline gap-4">
+                      <span className="font-mono text-[11px] tracking-widest shrink-0 w-6" style={{ color: 'var(--ambar)' }}>
+                        {p.n}
+                      </span>
+                      <div className="space-y-1">
+                        <h3 className="font-bold text-slate-800">{p.t}</h3>
+                        <p className="text-sm text-slate-600 leading-relaxed">{p.d}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <h3 className="font-bold text-slate-800 text-lg">Confusión entre venta y ganancia</h3>
-              <p className="text-sm text-slate-600 leading-relaxed">
-                No todo el dinero recaudado es ganancia de bolsillo. Una parte importante corresponde
-                a lo que costó comprar la mercancía y debe apartarse para reponer surtido.
-              </p>
             </div>
           </div>
         </section>
@@ -344,7 +357,7 @@ export default function LandingPage() {
         {/* ─────────────────────────────────────────────────────────────
             4. NUESTRA PROPUESTA DE VALOR
         ───────────────────────────────────────────────────────────── */}
-        <section id="proposito" className="py-16 md:py-20 bg-white border-y border-slate-200">
+        <section id="proposito" className="py-16 md:py-20 bg-[#fffdf8] border-y border-[#ece3d4]">
           <div className="max-w-5xl mx-auto px-4 sm:px-6">
             <div className="max-w-2xl mb-12">
               <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">
@@ -433,11 +446,11 @@ export default function LandingPage() {
             5. ¿A QUIÉNES AYUDAMOS?
         ───────────────────────────────────────────────────────────── */}
         <section id="quienes" className="py-16 md:py-20 max-w-5xl mx-auto px-4 sm:px-6">
-          <div className="text-center max-w-2xl mx-auto mb-12">
+          <div className="max-w-2xl mb-10">
             <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">
               Cercanía y contexto
             </span>
-            <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">
+            <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mt-1 leading-tight">
               Pensado para los negocios que dan vida a nuestras calles y barrios
             </h2>
             <p className="text-sm text-slate-600 mt-2">
@@ -446,37 +459,45 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="rounded-2xl bg-[#fafaf9] p-5 text-center space-y-2">
-              <span className="text-3xl block">🏪</span>
-              <h3 className="font-bold text-slate-800 text-base">Tiendas de barrio</h3>
-              <p className="text-xs text-slate-500">
-                Puntos de abastecimiento cotidiano con productos secos, granos, aseo y bebidas.
-              </p>
+          <div className="grid grid-cols-1 lg:grid-cols-[6fr_5fr] gap-10 lg:gap-14 items-center">
+            {/* Fotografía real: la gente que este sistema sirve */}
+            <div data-reveal>
+              <img
+                src="/media/tienda-cliente.jpg"
+                alt="Persona atendiendo a un cliente detrás del mostrador de su comercio"
+                className="w-full h-[340px] sm:h-[420px] object-cover rounded-[2rem] shadow-[0_24px_48px_-20px_rgba(20,37,31,0.35)]"
+                loading="lazy"
+                decoding="async"
+              />
             </div>
 
-            <div className="rounded-2xl bg-[#fafaf9] p-5 text-center space-y-2">
-              <span className="text-3xl block">🛒</span>
-              <h3 className="font-bold text-slate-800 text-base">Micromercados</h3>
-              <p className="text-xs text-slate-500">
-                Negocios con mayor variedad de estanterías que requieren rapidez en mostrador.
-              </p>
-            </div>
-
-            <div className="rounded-2xl bg-[#fafaf9] p-5 text-center space-y-2">
-              <span className="text-3xl block">🥖</span>
-              <h3 className="font-bold text-slate-800 text-base">Panaderías y cafeterías</h3>
-              <p className="text-xs text-slate-500">
-                Venta ágil de productos frescos del día con cobro rápido en mostrador.
-              </p>
-            </div>
-
-            <div className="rounded-2xl bg-[#fafaf9] p-5 text-center space-y-2">
-              <span className="text-3xl block">👨‍👩‍👧‍👦</span>
-              <h3 className="font-bold text-slate-800 text-base">Negocios familiares</h3>
-              <p className="text-xs text-slate-500">
-                Comercios atendidos en equipo donde varios integrantes colaboran en la atención.
-              </p>
+            <div data-reveal>
+              {[
+                {
+                  t: 'Tiendas de barrio',
+                  d: 'Puntos de abastecimiento cotidiano con productos secos, granos, aseo y bebidas.',
+                },
+                {
+                  t: 'Micromercados',
+                  d: 'Negocios con mayor variedad de estanterías que requieren rapidez en mostrador.',
+                },
+                {
+                  t: 'Panaderías y cafeterías',
+                  d: 'Venta ágil de productos frescos del día con cobro rápido en mostrador.',
+                },
+                {
+                  t: 'Negocios familiares',
+                  d: 'Comercios atendidos en equipo donde varios integrantes colaboran en la atención.',
+                },
+              ].map((s) => (
+                <div key={s.t} className="py-4 border-t" style={{ borderColor: '#e7ddcc' }}>
+                  <h3 className="font-bold text-slate-800 flex items-center gap-2.5">
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: 'var(--ambar)' }} />
+                    {s.t}
+                  </h3>
+                  <p className="text-sm text-slate-600 leading-relaxed mt-1 pl-4">{s.d}</p>
+                </div>
+              ))}
             </div>
           </div>
         </section>
@@ -484,7 +505,7 @@ export default function LandingPage() {
         {/* ─────────────────────────────────────────────────────────────
             6. HISTORIAS REALES (DOCUMENTAL: ANTES -> DURANTE -> DESPUÉS)
         ───────────────────────────────────────────────────────────── */}
-        <section id="historias" className="py-16 md:py-20 bg-white border-y border-slate-200">
+        <section id="historias" className="py-16 md:py-20 bg-[#fffdf8] border-y border-[#ece3d4]">
           <div className="max-w-5xl mx-auto px-4 sm:px-6">
             <div className="max-w-2xl mb-10">
               <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">
@@ -687,7 +708,7 @@ export default function LandingPage() {
         {/* ─────────────────────────────────────────────────────────────
             10. VIDEO TUTORIAL GUIADO (CON CARGA DIFERIDA)
         ───────────────────────────────────────────────────────────── */}
-        <section className="py-16 md:py-20 bg-white border-y border-slate-200">
+        <section className="py-16 md:py-20 bg-[#fffdf8] border-y border-[#ece3d4]">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center space-y-6">
             <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">
               Aprende en video
@@ -867,7 +888,7 @@ export default function LandingPage() {
         {/* ─────────────────────────────────────────────────────────────
             12. PREGUNTAS FRECUENTES (FAQ REALISTA)
         ───────────────────────────────────────────────────────────── */}
-        <section id="faq" className="py-16 md:py-20 bg-white border-y border-slate-200">
+        <section id="faq" className="py-16 md:py-20 bg-[#fffdf8] border-y border-[#ece3d4]">
           <div className="max-w-3xl mx-auto px-4 sm:px-6 space-y-8">
             <div className="text-center space-y-2">
               <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">
@@ -944,7 +965,7 @@ export default function LandingPage() {
       {/* ─────────────────────────────────────────────────────────────
           14. FOOTER INSTITUCIONAL
       ───────────────────────────────────────────────────────────── */}
-      <footer className="border-t border-slate-200 bg-white py-12 text-slate-500 text-xs">
+      <footer className="border-t border-[#ece3d4] bg-[#fffdf8] py-12 text-slate-500 text-xs">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold">
