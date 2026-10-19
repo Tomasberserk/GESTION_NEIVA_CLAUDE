@@ -25,14 +25,15 @@ export default function AmbientLayer({ motes = 18 }) {
         }}
       />
 
-      {/* Niebla cálido-cinematográfica */}
+      {/* Resplandor estático (antes "niebla" animada con blur — fuera por coste
+          en GPUs de gama baja; el mesh estático da el mismo ambiente a 0 bytes 
+          de trabajo por frame — auditoría §3E) */}
       <div
-        className="lnd-mist absolute -inset-x-10 -bottom-1/4 h-1/2"
+        className="absolute -inset-x-10 -bottom-1/4 h-1/2"
         style={{
           background:
             'radial-gradient(55% 100% at 30% 60%, rgba(216,154,61,.10) 0%, transparent 60%),' +
             'radial-gradient(45% 90% at 75% 55%, rgba(245,239,230,.06) 0%, transparent 60%)',
-          filter: 'blur(12px)',
         }}
       />
 

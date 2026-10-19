@@ -27,6 +27,7 @@ export default function LandingPage() {
   const [faqAbierta, setFaqAbierta] = useState(null)
   const [scrolled, setScrolled] = useState(false)
   const rootRef = useRef(null)
+  const hdSentinelRef = useRef(null)
 
   // Arma los reveals ANTES del primer paint (el contenido es visible sin JS:
   // la clase .js-reveal-arm se pierde => CSS deja los elementos visibles).
@@ -35,18 +36,29 @@ export default function LandingPage() {
   }, [])
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > window.innerHeight * 0.6)
-    onScroll()
-    window.addEventListener('scroll', onScroll, { passive: true })
-
+    // Header: estado sólido solo cuando se supera el final del hero (sentinel)
+    let obsHeader
+    if (hdSentinelRef.current) {
+      obsHeader = new IntersectionObserver(
+        ([entry]) => setScrolled(!entry.isIntersecting),
+        { threshold: 0 },
+      )
+      obsHeader.observe(hdSentinelRef.current)
+    }
+    // Reveals: un solo ciclo por elemento (IO se desconecta al entrar una vez)
     const obs = new IntersectionObserver(
       (entries) =>
-        entries.forEach((e) => e.isIntersecting && e.target.classList.add('in-view')),
-      { threshold: 0.12 },
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            e.target.classList.add('in-view')
+            obs.unobserve(e.target)
+          }
+        }),
+      { threshold: 0.13 },
     )
     document.querySelectorAll('[data-reveal]').forEach((el) => obs.observe(el))
     return () => {
-      window.removeEventListener('scroll', onScroll)
+      obsHeader?.disconnect()
       obs.disconnect()
     }
   }, [])
@@ -112,7 +124,7 @@ export default function LandingPage() {
           1. NAVEGACIÓN PRINCIPAL
       ───────────────────────────────────────────────────────────── */}
       <header
-        className={`fixed top-0 z-40 transition-all duration-500 ${
+        className={`fixed top-0 z-40 transition-[background-color,border-color] duration-200 ${
           scrolled
             ? 'bg-white/95 backdrop-blur-md border-b border-slate-200/80'
             : 'bg-transparent border-b border-transparent lnd-hd-float'
@@ -259,6 +271,9 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
+
+          {/* Sentinel del header: cambia a sólido al superarse el final del hero */}
+          <div ref={hdSentinelRef} className="pointer-events-none absolute bottom-0 left-0 h-px w-px opacity-0" aria-hidden="true" />
         </section>
 
         {/* ─────────────────────────────────────────────────────────────
@@ -565,12 +580,12 @@ export default function LandingPage() {
           className="relative py-16 md:py-24 overflow-hidden"
           style={{ background: 'var(--noche)' }}
         >
-          {/* Fondo real: la luz de un mercado de barrio en la noche */}
+          {/* Fondo real ESTÁTICO: solo el hero lleva ken-burns (auditoría §3D) */}
           <img
             src="/media/mercado-noche.jpg"
             alt=""
             aria-hidden="true"
-            className="lnd-kenburns absolute inset-0 h-full w-full object-cover opacity-45"
+            className="absolute inset-0 h-full w-full object-cover opacity-45"
             loading="lazy"
           />
           <div

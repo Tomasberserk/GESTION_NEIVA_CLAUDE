@@ -12,28 +12,17 @@
   --linea: rgba(245, 239, 230, 0.09);
 }
 
-/* ── Ken-Burns cinematográfico (22s, alternante, economía de bytes) ─────────── */
+/* ── Ken-Burns cinematográfico: SOLO hero, recorrido de 4.5% (auditoría §3D) ── */
 .lnd-kenburns {
-  animation: lnd-kenburns 22s ease-in-out infinite alternate;
-  will-change: transform;
+  animation: lnd-kenburns 22s cubic-bezier(0.2, 0.6, 0.3, 1) infinite alternate both;
+  will-change: transform; /* 1 solo elemento lo lleva, ya no 18 */
 }
 @keyframes lnd-kenburns {
   from { transform: scale(1) translate(0, 0); }
-  to   { transform: scale(1.12) translate(-1.5%, 1%); }
+  to   { transform: scale(1.045) translate(-0.5%, 0.4%); }
 }
 
-/* ── Niebla ambiental (drift de 38s) ────────────────────────────────────────── */
-.lnd-mist {
-  animation: lnd-mist 38s linear infinite;
-  will-change: transform, opacity;
-}
-@keyframes lnd-mist {
-  0%   { transform: translate3d(-6%, 2%, 0) scale(1);   opacity: .35; }
-  50%  { transform: translate3d(4%, -3%, 0) scale(1.08); opacity: .55; }
-  100% { transform: translate3d(-6%, 2%, 0) scale(1);   opacity: .35; }
-}
-
-/* ── Motas flotantes (partículas ambientales) ──────────────────────────────── */
+/* ── Motas flotantes: hasta 3 animaciones decorativas máx, nunca en móvil ──── */
 .lnd-mote {
   animation: lnd-mote 14s linear infinite;
   will-change: transform, opacity;
@@ -43,6 +32,9 @@
   10%  { opacity: .8; }
   90%  { opacity: .4; }
   100% { transform: translateY(-90vh) scale(.6); opacity: 0; }
+}
+@media (max-width: 640px) {
+  .lnd-mote { display: none; }
 }
 
 /* ── Header flotante sobre hero dark (specificity > Tailwind utilities) ────── */
@@ -56,10 +48,13 @@
 /* ── Reveals: contenido NUNCA desaparece si JS no carga (lección ORIVIA) ──────
    El estado inicial visible por defecto; .js-reveal-arm lo arma ANTES vía JS. */
 @media (prefers-reduced-motion: no-preference) {
+  /* Valores del informe: 420ms · cubic-bezier(.22,1,.36,1) · 10px · solo transform/opacity */
   .js-reveal-arm [data-reveal] {
     opacity: 0;
-    transform: translateY(18px);
-    transition: opacity .7s cubic-bezier(.2, 0, .2, 1), transform .7s cubic-bezier(.2, 0, .2, 1);
+    transform: translate3d(0, 10px, 0);
+    transition:
+      opacity 420ms cubic-bezier(0.22, 1, 0.36, 1),
+      transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
   }
   .js-reveal-arm [data-reveal].in-view {
     opacity: 1;
@@ -69,5 +64,6 @@
 
 /* ── Respeto total a preferencias de movimiento reducido ──────────────────── */
 @media (prefers-reduced-motion: reduce) {
-  .lnd-kenburns, .lnd-mist, .lnd-mote { animation: none; }
+  .lnd-kenburns, .lnd-mote { animation: none; }
+  .lnd-kenburns { will-change: auto; }
 }

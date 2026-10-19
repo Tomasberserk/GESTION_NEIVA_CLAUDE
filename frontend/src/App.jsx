@@ -1,19 +1,29 @@
+import { Suspense, lazy } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute'
 import Layout from './components/layout/Layout'
-import LandingPage from './pages/LandingPage'
 import Registro from './pages/Registro'
 import Login from './pages/Login'
-import Dashboard from './pages/Dashboard'
-import Inventario from './pages/Inventario'
-import Ventas from './pages/Ventas'
-import Reportes from './pages/Reportes'
-import Soporte from './pages/Soporte'
-import Planes from './pages/Planes'
-import Configuracion from './pages/Configuracion'
-import SuperAdmin from './pages/SuperAdmin'
 import { useAuth } from './context/AuthContext'
 import { isAdmin } from './utils/permissions'
+
+// Code-splitting: cada ruta carga su chunk solo cuando se navega a ella.
+// El visitante del landing NO descarga recharts/zxing (brecha B6 — Sprint 9).
+const LandingPage = lazy(() => import('./pages/LandingPage'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Inventario = lazy(() => import('./pages/Inventario'))
+const Ventas = lazy(() => import('./pages/Ventas'))
+const Reportes = lazy(() => import('./pages/Reportes'))
+const Soporte = lazy(() => import('./pages/Soporte'))
+const Planes = lazy(() => import('./pages/Planes'))
+const Configuracion = lazy(() => import('./pages/Configuracion'))
+const SuperAdmin = lazy(() => import('./pages/SuperAdmin'))
+
+const CargandoPantalla = () => (
+  <div className="min-h-screen flex items-center justify-center bg-[#fafaf9]">
+    <div className="w-8 h-8 rounded-full border-2 border-emerald-200 border-t-emerald-600 animate-spin" />
+  </div>
+)
 
 function RootRedirect() {
   const { usuario } = useAuth()
@@ -22,7 +32,8 @@ function RootRedirect() {
 
 export default function App() {
   return (
-    <Routes>
+    <Suspense fallback={<CargandoPantalla />}>
+      <Routes>
       {/* 🌐 Experiencia WEB: Conoce, Comprende y Confía */}
       <Route path="/" element={<LandingPage />} />
       <Route path="/registro" element={<Registro />} />
@@ -50,7 +61,8 @@ export default function App() {
       <Route path="/superadmin" element={<SuperAdmin />} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+      </Routes>
+    </Suspense>
   )
 }
 
