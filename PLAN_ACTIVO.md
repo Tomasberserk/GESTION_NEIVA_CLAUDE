@@ -586,18 +586,18 @@ construye sobre el mensaje final del ICP, no sobre el copy viejo (ver Redefinici
 
 | # | Tarea | Asignado | Archivo | Verificación |
 |---|-------|----------|---------|--------------|
-| H0 | Copy al nuevo ICP ANTES de todo diseño: titular hero + promesa del Modo Lite + redefinir narrativa de Hero, Propuesta de Valor, Pasos Reales y FAQ según Redefinición de Alcance 2026-10-19. Borrador en `docs/landing_copy.md` para review del dueño | Claude (dueño aprueba) | `docs/landing_copy.md` | REVIEW DEL DUEÑO — sin F0 hasta su visto bueno |
-| H1 | Retirar jerga interna del header ("Cuenta local y Twilio" → tagline humana "La cuenta de tu negocio, al día") | Claude/Haiku | `LandingPage.jsx` | `grep -c "Twilio" frontend/src/pages/LandingPage.jsx` → 0 |
-| H2 | Resolver placeholders: ocultar sección Historias y redes vacías con flag `CONTENIDO_PENDIENTE=false` hasta tener casos reales | Claude/Haiku | `LandingPage.jsx` | `grep -cE "PENDIENTE" LandingPage.jsx` → 0 (co-beneficio B5) |
-| F0.1 | Instalar Montserrat + tokens `@theme` en `index.css`; mapear clases existentes emerald/slate → tokens | senior-dev | `frontend/src/index.css`, `LandingPage.jsx` | `cd frontend && npm run build` limpio |
-| F1.1 | `npm i motion` y componente `Reveal.jsx` (whileInView + `useReducedMotion`) wrappeando secciones | senior-dev | `frontend/src/components/landing/Reveal.jsx` | build + scroll manual en dev server |
-| F1.2 | Parallax simétrico ±40px en wrappers de sección (`useScroll`+`useTransform`) | haiku-worker | `frontend/src/hooks/useParallax.js` | build + scroll manual |
-| F1.3 | Capa ambiental `AmbientLayer.jsx` (motas deterministas + niebla 38s + gradient mesh) sobre fondo dark | haiku-worker | `frontend/src/components/landing/AmbientLayer.jsx` | build + FPS ≥ 55 en devtools móvil |
-| F1.4 | Header sticky que se solidifica pasadas 1.35vh con transición 500ms | haiku-worker | `LandingPage.jsx` | scroll manual |
-| F2.1 | Clip Veo (gemini/flow): "un día en la tienda: abrir persiano, primer cliente, registro de venta" → ffmpeg a 90–151 frames webp 1600px | Dueño (Claude genera el prompt) | `frontend/public/media/viaje/v%03d.webp` | total de frames < 6 MB |
-| F2.2 | Componente `FrameSequence.jsx` (scrub canvas 2D + spring + fallback poster), en la sección "¿Cómo funciona?" (h-[480–620svh] sticky, mapeo de los 4 pasos reales a rangos de progreso) | senior-dev | `frontend/src/components/landing/FrameSequence.jsx` | build + scroll con devtools throttling 3G |
-| F3.1 | Cirugía de layouts: romper patrón "eyebrow+h2+grid de cards" — Economía Popular full-bleed statement, Propuesta en bento asimétrico, Pasos dentro del scroll-telling, Historias fuera (H2) | senior-dev | `LandingPage.jsx` | checklist visual §2 del playbook |
-| F3.2 | Secciones claras alternadas (papel `#f5efe6`) para ritmo dark-first + hero con ken-burns sobre la primera foto real | Claude | `LandingPage.jsx` | contraste AA: ámbar sobre bosque ≥ 4.5:1 |
+| H0 | Copy al nuevo ICP ANTES de todo diseño: titular hero + promesa del Modo Lite + redefinir narrativa de Hero, Propuesta de Valor, Pasos Reales y FAQ según Redefinición de Alcance 2026-10-19. Borrador en `docs/landing_copy.md` para review del dueño | GLM (dueño aprueba) | `docs/landing_copy.md` | REVIEW DEL DUEÑO — sin F0 hasta su visto bueno |
+| H1 | Retirar jerga interna del header ("Cuenta local y Twilio" → tagline humana "La cuenta de tu negocio, al día") | GLM | `LandingPage.jsx` | `grep -c "Twilio" frontend/src/pages/LandingPage.jsx` → 0 |
+| H2 | Resolver placeholders: ocultar sección Historias y redes vacías con flag `CONTENIDO_PENDIENTE=false` hasta tener casos reales | GLM | `LandingPage.jsx` | `grep -cE "PENDIENTE" LandingPage.jsx` → 0 (co-beneficio B5) |
+| F0.1 | Instalar Montserrat + tokens `@theme` en `index.css`; mapear clases existentes emerald/slate → tokens | GLM | `frontend/src/index.css`, `LandingPage.jsx` | `cd frontend && npm run build` limpio |
+| F1.1 | `npm i motion` y componente `Reveal.jsx` (whileInView + `useReducedMotion`) wrappeando secciones | GLM | `frontend/src/components/landing/Reveal.jsx` | build + scroll manual en dev server |
+| F1.2 | Parallax simétrico ±40px en wrappers de sección (`useScroll`+`useTransform`) | GLM | `frontend/src/hooks/useParallax.js` | build + scroll manual |
+| F1.3 | Capa ambiental `AmbientLayer.jsx` (motas deterministas + niebla 38s + gradient mesh) sobre fondo dark | GLM | `frontend/src/components/landing/AmbientLayer.jsx` | build + FPS ≥ 55 en devtools móvil |
+| F1.4 | Header sticky que se solidifica pasadas 1.35vh con transición 500ms | GLM | `LandingPage.jsx` | scroll manual |
+| F2.1 | Clip Veo (gemini/flow): "un día en la tienda: abrir persiano, primer cliente, registro de venta" → ffmpeg a 90–151 frames webp 1600px | Dueño (GLM genera el prompt) | `frontend/public/media/viaje/v%03d.webp` | total de frames < 6 MB |
+| F2.2 | Componente `FrameSequence.jsx` (scrub canvas 2D + spring + fallback poster), en la sección "¿Cómo funciona?" (h-[480–620svh] sticky, mapeo de los 4 pasos reales a rangos de progreso) | GLM | `frontend/src/components/landing/FrameSequence.jsx` | build + scroll con devtools throttling 3G |
+| F3.1 | Cirugía de layouts: romper patrón "eyebrow+h2+grid de cards" — Economía Popular full-bleed statement, Propuesta en bento asimétrico, Pasos dentro del scroll-telling, Historias fuera (H2) | GLM | `LandingPage.jsx` | checklist visual §2 del playbook |
+| F3.2 | Secciones claras alternadas (papel `#f5efe6`) para ritmo dark-first + hero con ken-burns sobre la primera foto real | GLM | `LandingPage.jsx` | contraste AA: ámbar sobre bosque ≥ 4.5:1 |
 | QA1 | [Gemini/AGENTERS] A03 (auditoría de Design Tokens + WCAG 2.1 AA sobre paleta dark-first) + A09 (QA Lead del landing rehecho) | AGENTERS (routing TCS) | QA report en repos | reporte sin issues rojas |
 
 ### Presupuesto y restricciones
