@@ -77,6 +77,7 @@ export class VoiceTurnManager {
     this.watchdogTimer = null
     this.stopRequestTimer = null
     this.processingWatchdogTimer = null
+    this.speakingWatchdogTimer = null
 
     this._bindProviders()
     console.log('[VOICE-DEBUG][VoiceTurnManager] Instanciación completa. Estado inicial:', this.state, 'Proveedor activo:', this.activeProviderType)
@@ -625,6 +626,41 @@ export class VoiceTurnManager {
     this._nextStateAfterSettling = siguienteEstado
     this._setState(VoiceTurnState.SPEAKING)
     this.tts.speak(texto)
+
+    // Watchdog anti-bloqueo: si el navegador nunca dispara utterance.onend
+    // (bug conocido de Chrome con voces sin cargar o síntesis pausada),
+    // forzamos la recuperación al estado siguiente tras 15 segundos.
+    if (this.speakingWatchdogTimer) {
+      clearTimeout(this.speakingWatchdogTimer)
+    }
+    const sessionGen = this.sessionGeneration
+    this.speakingWatchdogTimer = setTimeout(() => {
+      this.speakingWatchdogTimer = null
+      if (turnId !== this.currentTurnId || sessionGen !== this.sessionGeneration) {
+        this._logStaleCallback('speakingWatchdogTimer', { turnId, sessionGen })
+        return
+      }
+      if (this.state !== VoiceTurnState.SPEAKING) {
+        return
+      }
+      console.warn(`[VOICE-LIFECYCLE] Watchdog TTS expiró (15s) en SPEAKING turnId=${turnId}: forzando recuperación al estado ${siguienteEstado}`)
+      this._iniciarVentanaSettling(turnId)
+    }, 15000)
+  }
+
+  /**
+   * Omite la respuesta/TTS en curso y vuelve a la escucha inmediatamente.
+   * Usado por el tap en el orbe durante SPEAKING (salida de emergencia de estados colgados).
+   */
+  omitirRespuesta() {
+    const turnId = this.currentTurnId
+    console.log(`[VOICE-TTS] omitirRespuesta() invocado en estado: ${this.state} turnId=${turnId}`)
+    if (this.state === VoiceTurnState.SPEAKING || this.state === VoiceTurnState.SETTLING) {
+      this.tts.cancel()
+      this._nextStateAfterSettling = VoiceTurnState.READY
+      this._setState(VoiceTurnState.READY)
+      this.iniciarEscucha()
+    }
   }
 
   /**
@@ -633,6 +669,10 @@ export class VoiceTurnManager {
   _iniciarVentanaSettling(turnId) {
     console.log(`[VOICE-TTS] END turnId=${turnId}`)
     console.log(`[VOICE-TURN] SETTLING turnId=${turnId} (250ms)`)
+    if (this.speakingWatchdogTimer) {
+      clearTimeout(this.speakingWatchdogTimer)
+      this.speakingWatchdogTimer = null
+    }
     this._setState(VoiceTurnState.SETTLING)
     this.settlingTimer = setTimeout(() => {
       if (turnId !== this.currentTurnId) {
@@ -837,6 +877,10 @@ export class VoiceTurnManager {
     if (this.processingWatchdogTimer) {
       clearTimeout(this.processingWatchdogTimer)
       this.processingWatchdogTimer = null
+    }
+    if (this.speakingWatchdogTimer) {
+      clearTimeout(this.speakingWatchdogTimer)
+      this.speakingWatchdogTimer = null
     }
   }
 }

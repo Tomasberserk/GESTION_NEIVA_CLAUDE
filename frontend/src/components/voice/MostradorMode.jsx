@@ -22,6 +22,7 @@ export default function MostradorMode({
     activarModoVoz,
     desactivarModoVoz,
     detenerYEnviar,
+    omitirRespuesta,
     confirmarOperacion,
     cancelarOperacion,
     seleccionarOpcion,
@@ -31,6 +32,7 @@ export default function MostradorMode({
   const preview = lastResponse?.preview
   const clarification = lastResponse?.clarification
   const isConfirming = voiceState === VoiceTurnState.CONFIRMING || lastResponse?.estado === 'READY_TO_CONFIRM'
+  const isError = voiceState === VoiceTurnState.ERROR
 
   const handleOrbClick = () => {
     if (voiceState === VoiceTurnState.LISTENING || voiceState === VoiceTurnState.SPEECH_DETECTED) {
@@ -41,6 +43,12 @@ export default function MostradorMode({
       console.log('[MostradorMode] Usuario tocó el orbe durante PROCESSING: reseteando sesión...')
       desactivarModoVoz()
       setTimeout(() => activarModoVoz(false), 200)
+    } else if (voiceState === VoiceTurnState.SPEAKING || voiceState === VoiceTurnState.SETTLING) {
+      console.log('[MostradorMode] Usuario tocó el orbe durante SPEAKING: omitiendo audio...')
+      omitirRespuesta()
+    } else if (isError) {
+      console.log('[MostradorMode] Usuario tocó el orbe durante ERROR: reintentando...')
+      activarModoVoz(true)
     }
   }
 
@@ -187,13 +195,21 @@ export default function MostradorMode({
           <span>Voz: Español (Colombia / Latinoamérica)</span>
         </div>
 
-        {!isActive ? (
+        {!isActive || isError ? (
           <button
-            onClick={activarModoVoz}
+            onClick={() => activarModoVoz(true)}
             className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-cyan-600/30 active:scale-95 transition-all"
           >
             <Mic className="w-4 h-4" />
-            <span>Toca para Iniciar Escucha</span>
+            <span>{isError ? 'Reintentar Escucha' : 'Toca para Iniciar Escucha'}</span>
+          </button>
+        ) : voiceState === VoiceTurnState.SPEAKING ? (
+          <button
+            onClick={omitirRespuesta}
+            className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold text-sm flex items-center justify-center gap-2 active:scale-95 transition-all"
+          >
+            <Volume2 className="w-4 h-4" />
+            <span>Hablando... toca para omitir</span>
           </button>
         ) : (
           <div className="flex items-center gap-2 text-slate-400">

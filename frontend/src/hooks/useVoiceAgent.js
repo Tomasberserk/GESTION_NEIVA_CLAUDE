@@ -67,6 +67,13 @@ export function useVoiceAgent() {
     setTranscript('')
   }, [])
 
+  const omitirRespuesta = useCallback(() => {
+    console.log('[VOICE-DEBUG][useVoiceAgent] omitirRespuesta disparado (skip TTS)')
+    if (managerRef.current) {
+      managerRef.current.omitirRespuesta()
+    }
+  }, [])
+
   const detenerYEnviar = useCallback(() => {
     console.log('[VOICE-DEBUG][useVoiceAgent] detenerYEnviar disparado')
     if (managerRef.current) {
@@ -123,6 +130,7 @@ export function useVoiceAgent() {
     activarModoVoz,
     desactivarModoVoz,
     detenerYEnviar,
+    omitirRespuesta,
     confirmarOperacion,
     cancelarOperacion,
     seleccionarOpcion,

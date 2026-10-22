@@ -535,6 +535,22 @@ clientes potenciales, NO se procede con nada más del plan (ni graphify update, 
 
 **Hallazgo STT-01 (🟡 Media — corregir en Sprint 9):** El fallback STT (Groq Whisper → Gemini) **alucina texto en audio sin voz**: un WAV de 1s con tono 440 Hz y cero voz produjo una frase completa en español elocuente. Riesgo: en móvil con ruido de calle, el pipeline BackendSTT puede generar comandos "fantasma" que llegan al parser. Mitigación propuesta (B-del-Sprint-9): filtro de energía RMS mínimo y duración mínima de voz real en `BackendSTTProvider` antes del upload (el VAD 950ms ya khanea el fin de habla; falta el umbral de "esto ES habla") + descartar transcificaciones < 50% de confianza. Riesgo de mutación: bajo (cualquier venta requiere confirmación explícita).
 
+### Hotfix 22-10-2026 — Congelamiento del Modo Voz (UI trabada en SPEAKING)
+
+**Reporte del usuario:** al abrir el Modo Manos Libres la UI queda congelada; todos los botones muertos excepto "Salir".
+
+**Causa raíz:** el saludo de bienvenida usa TTS → `SPEAKING`. Si Chrome no dispara `utterance.onend` (bug conocido con voces sin cargar o síntesis pausada), la FSM queda atrapada en `SPEAKING` para siempre: `handleOrbClick` no tenía branch para ese estado y el footer solo mostraba un texto informativo (no botón). Única salida: "Salir".
+
+**Correcciones:**
+- `VoiceTurnManager.js`: watchdog de TTS (15s) que fuerza la salida de `SPEAKING` hacia `SETTLING→READY` si `onend` nunca llega (limpiado en `_limpiarTimers` y `_iniciarVentanaSettling`).
+- `VoiceTurnManager.omitirRespuesta()`: skip manual de la respuesta TTS con retorno inmediato a escucha.
+- `useVoiceAgent.js`: expone `omitirRespuesta`.
+- `MostradorMode.jsx`: `handleOrbClick` maneja `SPEAKING/SETTLING` (omitir) y `ERROR` (reintentar); footer con botón **"Hablando... toca para omitir"** durante SPEAKING y **"Reintentar Escucha"** durante ERROR.
+
+**Verificación E2E en Chromium:** ciclo `READY → SPEAKING (botón omitir visible) → LISTENING → ERROR (mic denegado en entorno automatizado, con botón Reintentar) → reactivar → SPEAKING...` sin storm (6 errores de consola en total, 1 por denegación). Suite de voz 43/43 ✅ y `npm run build` limpio.
+
+**Falsos positivos del reporte:** los `TypeError: reading 'M_ID'` provienen de `200.js` que NO es un archivo del proyecto (vite solo sirve módulos hasheados; `index.html` no carga script externos) → extensión de Chrome del usuario. Los `POST /api/token 401` en loop son consistentes con reintentos de login automático con contraseña vieja (autofill de Chrome / credencial desactualizada tras el reset de la demo). Recomendación al usuario: hard reload (Ctrl+Shift+R), probar en ventana de incógnito para descartar extensión, y limpiar autofill del formulario de login.
+
 **Falsos positivos descartados:** El polling cada ~20s de `GET /health` y los `GET /v1/models` (404) provienen de `opencode-cli.exe` (harness de agente, PID 2620), NO de la app. Los 3× `POST /token 401` fueron artefactos de submits inyectados durante la automatización con state de React no asentado — no reproducible por un usuario real.
 
 ---
