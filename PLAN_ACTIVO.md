@@ -1,10 +1,13 @@
 ﻿# PLAN ACTIVO — Gestión Neiva + Fábrica de Agentes IA
 
-**Fecha:** 2026-05-20  
-**Sprint activo:** Sprint 6 — Template medium  
-**Próxima revisión:** Fin de Sprint 6
+**Fecha:** 2026-10-22
+**Sprint activo:** Sprint 10 — Rebuild del landing (PRIORIDAD ÚNICA — ver pausa abajo)
+**⛔ ESTADO DEL PLAN: PAUSA GENERAL** — hasta tener un landing atractivo que capte más
+clientes potenciales, NO se procede con nada más del plan (ni graphify update, ni Sprint
+10.5 Lite, ni deploy extra). El landing ES lo único en progreso: copy H0 ya en borrador
+(`docs/landing_copy.md`, espera review del dueño) → H1/H2 → F0–F3 → QA1.
 
-> Este documento es **mutable por Claude y Gemini**. Ver `AGENTS.md` para el protocolo de cambios.  
+> Este documento es **mutable por Claude y Gemini**. Ver `AGENTS.md` para el protocolo de cambios.
 > Usa `> [GEMINI PROPONE]` o `> [CLAUDE PROPONE]` para proponer cambios sin implementarlos aún.
 
 ---
@@ -28,8 +31,8 @@
 [✅] Sprint 8.3 — Gobernanza RBAC en Asistente IA, Reabastecimiento con Costo y Latencia Cero (COMPLETO)
 [✅] Sprint 8.4 — Entitlements (Trial 15 Días), Normalización Errores 422, UI Pro en Header (COMPLETO)
 [ ] Sprint 9 — Despliegue y Activación en Producción (SIGUIENTE)
-[ ] Sprint 10 — Landing Premium Dark-First (PROPUESTA — ver al final del documento; copy al ICP va ANTES del diseño)
-[ ] Sprint 10.5 — Redefinición de Alcance: SaaS vertical microempresarial + Modo Lite "Solo Stock" (PROPUESTA DEL DUEÑO 2026-10-19 — ver abajo)
+[ ] Sprint 10 — Landing Premium Dark-First (ACTIVA — **prioridad única, plan en PAUSA hasta terminarlo**; copy ICP primero)
+[ ] Sprint 10.5 — Redefinición de Alcance: SaaS vertical microempresarial + Modo Lite "Solo Stock" (DECISIÓN DEL DUEÑO — detalla tras el landing)
 ```
 
 ---
@@ -673,6 +676,15 @@ la tabla migrará a sus IDs según `docs/04_PROTOCOLO_UNIVERSAL_MODELO_AGNOSTICO
 ---
 
 ## Bitácora Sprint 9 — Despliegue
+
+### 2026-10-22 — ⛔ PAUSA GENERAL del plan (decisión del dueño)
+- **Estado:** todo el plan queda detenido **hasta tener un landing atractivo que capte más
+  clientes potenciales**. El rebuild del landing es la única tarea en progreso (Sprint 10).
+- **En cola tras esa barrera (NO proceder antes):** graphify update, especificación del
+  Modo Lite "Solo Stock" (Sprint 10.5), resto del deploy/activación.
+- **Dónde quedó el Sprint 10:** H0 copy en borrador (`docs/landing_copy.md`, verificación =
+  review del dueño), asignaciones → GLM (AGENTERS en pausa hasta actualización completa).
+- **Racional del dueño:** sin landing que convierta, nada de lo demás genera clientes.
 
 ### 2026-10-18 — Fix deploy Render: SQLAlchemy 2.1 cambió el driver default de PostgreSQL
 - **Síntoma:** `ModuleNotFoundError: No module named 'psycopg'` en `alembic upgrade head` y uvicorn. El servicio nunca abrió puerto ("No open ports detected").
