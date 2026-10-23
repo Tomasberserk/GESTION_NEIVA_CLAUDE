@@ -693,6 +693,30 @@ la tabla migrará a sus IDs según `docs/04_PROTOCOLO_UNIVERSAL_MODELO_AGNOSTICO
 
 ## Bitácora Sprint 9 — Despliegue
 
+### 2026-10-23bis — HERO CINEMÁTICO AUTOPLAY (corrección de concepto, commit f5e06a5)
+
+**Feedback del dueño:** el spot NO debe ser scroll-scrub; debe **presentarse solo** en el
+primer apartado, y en la prueba real no se veía (el servidor Vite estaba caído y la sección
+estaba a ~6000px de scroll).
+
+**Cambio:**
+- `hero.mp4` (2.95MB, crf26, faststart, fade in/out para loop) + `hero-poster.jpg` (97KB)
+  generados desde `master_viaje.mp4`; el hero es ahora `<video autoplay muted loop playsInline>`
+  a pantalla completa con el copy H1/CTA encima (scrim) y cinta "Una tienda real en Neiva".
+- Se eliminó la sección scroll-scrub (`FrameSequence`); los 6 pasos quedan como tarjetas
+  estáticas con fotogramas del spot (v010/036/054/076/098/114).
+- Fixes de paso: header flotante con texto claro sobre video (`lnd-hd-login`), whitespace-nowrap
+  en botones, ribbon sin overflow en móvil, `min-h-[100svh]` calibrado (hero = viewport exacto).
+- Verificación (Edge headless + CDP): video `paused=false`, loop 48.7s, 6 tarjetas, 6 imágenes
+  960×540 HTTP 200, `npm run build` limpio (LandingPage 45.92kB). El servidor Vite se relanzó
+  (`npm run dev`, :5173).
+
+**Lección de operación:** Vite muere por los restarts de OpenCode → si "no se ve el cambio",
+primero comprobar `http://localhost:5173/` (Invoke-WebRequest) antes de asumir nada del código.
+
+**Pendiente del dueño:** feedback visual del hero (¿el loop de 48s es demasiado largo? ¿quiere
+un corte corto de ~20s para el hero?). Test de foco con teclado.
+
 ### 2026-10-23 — Spot scroll-telling del landing COMPLETO (F2.1 + guion, commit 38bf80d)
 
 **Qué se hizo:**
