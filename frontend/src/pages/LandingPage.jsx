@@ -75,23 +75,31 @@ export default function LandingPage() {
     }
   }, [])
 
-  // Los 4 pasos reales, ahora como guion del scroll-telling
+  // Guion del scroll-telling (video real: llegas → stock → cobro → app → asistente → cierre)
   const pasosScrollTelling = [
     {
-      title: 'Crea tu cuenta',
-      text: 'Ingresa el nombre de tu tienda y tus datos básicos para comenzar a configurar tu espacio.',
+      title: 'El día empieza en tu mostrador',
+      text: 'La tienda abre, la gente entra y las compras van y vienen. Como siempre. La diferencia empieza cuando todo lo que pasa aquí lo sabes al momento.',
     },
     {
-      title: 'Agrega tus productos',
-      text: 'Escribe el nombre de tus artículos, su precio de compra, precio de venta y cantidad disponible.',
+      title: 'Tu stock, sin inventarios interminables',
+      text: 'Cada artículo con su precio y su existencia, a un vistazo desde tu celular. Sabras qué falta antes de que se agote en la góndola.',
     },
     {
-      title: 'Registra tus ventas',
-      text: 'En el mostrador, selecciona los productos o pésalos si son a granel y confirma la venta en segundos.',
+      title: 'El cobro corre a tu ritmo',
+      text: 'En caja escaneas o escoges productos, confirmas la venta en segundos y sigues atendiendo a la fila que te espera.',
     },
     {
-      title: 'Consulta tus números',
-      text: 'Revisa cuánto vendiste hoy, qué productos están por agotarse y cuál es tu ganancia limpia.',
+      title: 'Y el día entero cabe en tu teléfono',
+      text: 'Dashboard, inventario, carrito y ventas: lo que se vendió, lo que entró y lo que hay que surtir en un solo lugar, desde tu celular.',
+    },
+    {
+      title: 'Tus números sin cuentas de cabeza',
+      text: 'Ingresos de hoy, ganancia limpia y presupuesto de reinversion, explicados en lenguaje de tienda. Decisiones claras, sin tinta roja.',
+    },
+    {
+      title: 'Y si algo se enreda, se lo dices',
+      text: '«Vendí 2 arroz» — y el Asistente POS registra la venta por voz o texto, te la confirma y la deja lista. Tu negocio, ordenado y tranquilo.',
     },
   ]
 
