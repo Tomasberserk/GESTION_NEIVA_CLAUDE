@@ -693,6 +693,45 @@ la tabla migrará a sus IDs según `docs/04_PROTOCOLO_UNIVERSAL_MODELO_AGNOSTICO
 
 ## Bitácora Sprint 9 — Despliegue
 
+### 2026-10-23 — Spot scroll-telling del landing COMPLETO (F2.1 + guion, commit 38bf80d)
+
+**Qué se hizo:**
+- **F2.1 resuelto SIN Veo/créditos pagos:** pivot definitivo a capturas CDP deterministas
+  (`browser.screenshot` por estado de la app real) + b-roll free de Pexels. La ventana de
+  OpenCode solo necesita estar visible; produce stills 1209×789 nítidos de:
+  Dashboard (ventas hoy 6 · $106.751 · 15 productos), Productos (Tienda Don Carlos),
+  Carrito $11.065 → "Venta registrada", Timeline $61.474, Reportes ($6.081.742/$1.062.497)
+  y el ciclo REAL del Asistente POS: "Vendi 2 arroz" → CONFIRMACIÓN REQUERIDA ($17.106)
+  → "confirmar" → "Venta registrada exitosamente". Cero simulación: es la app corriendo.
+- **Lecciones de interacción:** solo `browser.fill` + `browser.click` (trusted) disparan el
+  envío del widget; clicks sintéticos de `evaluate` no enviaron el mensaje y a veces cerraron
+  el widget. Ventas demo de hoy creadas VÍA el propio agente (no existe POST público de /ventas).
+- **Pipeline ffmpeg documentado en noticias:** (1) zoompan de video continuo exige `fps=24`
+  primero y `zoompan d=1` con expresiones en `in` (un solo `d=180` multiplica frames 180×;
+  un zoompan default encadenado cae en `s=hd720`); (2) `settb=1/24576` en cada rama +
+  offsets xfade = duración acumulada del previo − 0.5 (mal offset → master truncado a 24s);
+  (3) chat: crop del widget `crop=610:700:608:85` sobre imagen 1209×789, panel vertical
+  sobre fondo `0x0a0a12` → legible en 960×540.
+- **Master:** `master_viaje.mp4` 48.67s (a1a frutería→a1b calle→a2 góndolas→c1 datáfono→
+  product_block 24.29s→tail dark), todo 960×540@24 con xfades 0.35/0.5.
+- **Frames:** 120 webp q62 @ fps=2.465753 (exacto 120/48.67) en `frontend/public/media/viaje/`
+  → **3.15MB total** (~26KB/frame; antes 4.67MB). Hoja de contacto 8×15 verificada:
+  narrativa completa y legible; único débil: frames ~93–100 (toast de cobro, mayormente
+  blanco pero breve).
+- **Guion:** `pasosScrollTelling` en `LandingPage.jsx` reemplazado de 4 steps onboarding a
+  6 pasos narrativos (mostrador → stock → cobro → día en tu teléfono → números → asistente
+  «Vendí 2 arroz») alineados a bins de 20 frames (20/40/60/80/100 — el chat abre por el
+  frame ~113 = bin 6 ✓). `FrameSequence.jsx` sin cambios (pattern/frames ya correctos).
+- **Demo:** backend :8000 vivo con trial Pro hasta ~2026-11-01; login `admin@admin.com` /
+  `admin123` (bcrypt re-reseteado); password demo se re-rota misteriosamente → resetear
+  bcrypt cuando haga falta.
+
+**Comando de verificación ejecutado:** `count: 120 · total MB: 3.15` sobre
+`frontend/public/media/viaje/` + hoja de contacto `viaje-contact.jpg` revisada visually.
+
+**Siguiente (necesita al dueño):** probar el scroll-telling en :5173 (test de foco con
+teclado + LCP), YA que el guion usa las tomas reales. Luego QA1 (Gemini) del landing.
+
 ### 2026-10-22 — ⛔ PAUSA GENERAL del plan (decisión del dueño)
 - **Estado:** todo el plan queda detenido **hasta tener un landing atractivo que capte más
   clientes potenciales**. El rebuild del landing es la única tarea en progreso (Sprint 10).
