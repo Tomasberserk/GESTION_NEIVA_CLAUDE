@@ -1,8 +1,6 @@
 import { useState, useLayoutEffect, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import './../styles/landing.css'
-import FrameSequence from './../components/landing/FrameSequence.jsx'
-import AmbientLayer from './../components/landing/AmbientLayer.jsx'
 import {
   Store,
   ChevronDown,
@@ -186,16 +184,16 @@ export default function LandingPage() {
             </a>
           </nav>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 shrink-0">
             <Link
               to="/login"
-              className="text-sm font-semibold text-slate-700 hover:text-emerald-700 px-3 py-3 rounded-xl transition-colors"
+              className="lnd-hd-login hidden sm:inline-block text-sm font-semibold text-slate-700 hover:text-emerald-700 px-3 py-3 rounded-xl transition-colors whitespace-nowrap"
             >
               Entrar a mi Tienda
             </Link>
             <Link
               to="/registro"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-4 py-3 rounded-xl transition-all shadow-sm active:scale-95 flex items-center gap-1.5"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-4 py-3 rounded-xl transition-all shadow-sm active:scale-95 flex items-center gap-1.5 whitespace-nowrap"
             >
               <span>Crear cuenta</span>
               <ArrowRight size={16} />
@@ -209,19 +207,41 @@ export default function LandingPage() {
             2. HERO SECTION
         ───────────────────────────────────────────────────────────── */}
         <section
-          className="relative pt-28 pb-20 md:pt-32 md:pb-28 overflow-hidden"
-          style={{ background: 'linear-gradient(180deg, var(--noche) 0%, var(--bosque) 100%)' }}
+          className="relative min-h-[100svh] flex items-center overflow-hidden"
+          style={{ background: 'var(--noche)' }}
         >
-          <AmbientLayer motes={18} />
+          {/* El spot corre solo (mudo + loop + playsInline): lo primero que ve el visitante */}
+          <video
+            className="absolute inset-0 h-full w-full object-cover"
+            src="/media/viaje/hero.mp4"
+            poster="/media/viaje/hero-poster.jpg"
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="auto"
+            aria-hidden="true"
+          />
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background:
+                'linear-gradient(90deg, rgba(10,15,12,.94) 0%, rgba(10,15,12,.80) 42%, rgba(10,15,12,.32) 70%, rgba(10,15,12,.18) 100%)',
+            }}
+          />
+          <div
+            className="absolute inset-x-0 bottom-0 h-28 pointer-events-none"
+            style={{ background: 'linear-gradient(to top, rgba(10,15,12,.88), transparent)' }}
+          />
 
-          <div className="relative max-w-6xl mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-[1.1fr_.9fr] gap-12 items-center" data-reveal>
-            <div className="space-y-6 text-center lg:text-left">
+          <div className="relative w-full max-w-6xl mx-auto px-4 sm:px-6 pt-20 pb-12" data-reveal>
+            <div className="max-w-2xl mx-auto lg:mx-0 space-y-6 text-center lg:text-left">
               <div
-                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold"
+                className="inline-flex items-center gap-2 max-w-full px-3.5 py-1.5 rounded-full text-xs font-semibold"
                 style={{ background: 'rgba(216,154,61,.12)', border: '1px solid rgba(216,154,61,.35)', color: 'var(--ambar)' }}
               >
-                <HeartHandshake size={15} />
-                <span>Para tenderos, micromercados y negocios familiares</span>
+                <HeartHandshake size={15} className="shrink-0" />
+                <span className="leading-snug">Para tenderos, micromercados y negocios familiares</span>
               </div>
 
               <h1
@@ -273,22 +293,15 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* Panel visual: "06:15 — abre el persiano" (micro-detalle de marca) */}
-            <div className="relative hidden lg:block" data-reveal>
-              <div className="rounded-[2rem] overflow-hidden border" style={{ borderColor: 'var(--linea)', boxShadow: '0 30px 60px -12px rgba(0,0,0,.55)' }}>
-                <img
-                  src="/media/hero-tienda.jpg"
-                  alt="Interior de una tienda de barrio al amanecer, con las estanterías surtidas listas para el día"
-                  className="lnd-kenburns w-full h-[440px] object-cover"
-                  loading="eager"
-                />
-              </div>
-              <div
-                className="absolute -bottom-3 left-6 rounded-xl px-4 py-2 text-[11px] font-mono tracking-widest border"
-                style={{ background: 'var(--lnd-card)', color: 'var(--tinta-suave)', borderColor: 'var(--linea)' }}
-              >
-                06:15 — ABRE EL PERSIANO
-              </div>
+            </div>
+
+          {/* Cinta inferior: contexto honesto de lo que se está viendo */}
+          <div className="absolute bottom-5 inset-x-0">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center gap-3 text-[10px] sm:text-[11px] font-mono tracking-widest uppercase" style={{ color: 'rgba(245,239,230,.72)' }}>
+              <span className="inline-block h-1.5 w-1.5 rounded-full shrink-0" style={{ background: 'var(--ambar)' }} />
+              <span className="whitespace-nowrap">Una tienda real en Neiva</span>
+              <span className="h-px flex-1" style={{ background: 'rgba(245,239,230,.18)' }} />
+              <span className="whitespace-nowrap hidden sm:inline">Del mostrador a tu celular</span>
             </div>
           </div>
 
@@ -702,16 +715,28 @@ export default function LandingPage() {
               enredadas.
             </p>
           </div>
-        </section>
 
-        {/* 9b. SCROLL-TELLING: el recorrido del día en la tienda, fotograma a fotograma */}
-        <FrameSequence
-          pattern="/media/viaje/v{n}.webp"
-          frames={120}
-          pad={3}
-          steps={pasosScrollTelling}
-          heightClass="h-[420svh]"
-        />
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {pasosScrollTelling.map((s, i) => (
+              <article key={s.title} className="rounded-2xl overflow-hidden border border-[#ece3d4] bg-white shadow-sm" data-reveal>
+                <img
+                  src={`/media/viaje/v${String([10, 36, 54, 76, 98, 114][i]).padStart(3, '0')}.webp`}
+                  alt={`Paso ${i + 1}: ${s.title}`}
+                  loading="lazy"
+                  decoding="async"
+                  className="w-full h-36 object-cover"
+                />
+                <div className="p-5">
+                  <span className="text-[10px] font-mono font-bold tracking-widest text-emerald-700">
+                    {String(i + 1).padStart(2, '0')} / 06
+                  </span>
+                  <h3 className="text-base font-bold text-slate-900 mt-1">{s.title}</h3>
+                  <p className="text-sm text-slate-600 mt-1.5 leading-relaxed">{s.text}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
 
         {/* ─────────────────────────────────────────────────────────────
             10. VIDEO TUTORIAL GUIADO (CON CARGA DIFERIDA)
