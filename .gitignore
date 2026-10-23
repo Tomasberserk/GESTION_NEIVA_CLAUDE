@@ -44,3 +44,5 @@ build/
 graphify-out/
 scratch/
 frontend/dist/
+# Asset publico del landing (spot del hero)
+!frontend/public/media/viaje/*.mp4
