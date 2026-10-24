@@ -81,7 +81,7 @@ export default function LandingPage() {
     },
     {
       title: 'Tu stock, sin inventarios interminables',
-      text: 'Cada artículo con su precio y su existencia, a un vistazo desde tu celular. Sabras qué falta antes de que se agote en la góndola.',
+      text: 'Cada artículo con su precio y su existencia, a un vistazo desde tu celular. Sabrás qué falta antes de que se agote en la góndola.',
     },
     {
       title: 'El cobro corre a tu ritmo',
@@ -93,7 +93,7 @@ export default function LandingPage() {
     },
     {
       title: 'Tus números sin cuentas de cabeza',
-      text: 'Ingresos de hoy, ganancia limpia y presupuesto de reinversion, explicados en lenguaje de tienda. Decisiones claras, sin tinta roja.',
+      text: 'Ingresos de hoy, ganancia limpia y presupuesto de reinversión, explicados en lenguaje de tienda. Decisiones claras, sin tinta roja.',
     },
     {
       title: 'Y si algo se enreda, se lo dices',
@@ -107,24 +107,32 @@ export default function LandingPage() {
 
   const preguntasFrecuentes = [
     {
-      q: '¿Qué es exactamente Gestión Neiva?',
-      a: 'Es una herramienta digital sencilla pensada para pequeños comerciantes, tenderos y negocios familiares. Te ayuda a registrar tus ventas diarias, saber qué productos tienes disponibles en tus estanterías y conocer tu ganancia real sin necesidad de llevar cuadernos ni hacer cuentas manuales.',
+      q: '¿Qué es exactamente GIN?',
+      a: 'Es una herramienta digital sencilla que te ayuda a registrar lo que entra y lo que sale, saber qué productos tienes disponibles y conocer tu ganancia real, sin cuadernos ni cuentas manuales.',
     },
     {
       q: '¿A quién está dirigido?',
-      a: 'Principalmente a tenderos de barrio, micromercados, panaderías, cafeterías y pequeños establecimientos comerciales de Neiva y la región que buscan trabajar con mayor orden y tranquilidad en su día a día.',
+      a: 'A comercios, emprendimientos y negocios familiares de cualquier área: tiendas, servicios, comida, ventas desde casa. Si necesitas llevar el registro de tu stock y tus cuentas, GIN es para ti.',
+    },
+    {
+      q: 'Mi negocio es pequeño y gano poco, ¿esto es para mí?',
+      a: 'Sí. GIN está hecho justo para eso: negocios que apenas empiezan o que son pequeños. No necesitas un equipo ni procesos complicados — solo el deseo de tener tus números ordenados.',
+    },
+    {
+      q: '¿La información de mi negocio se ve al público en algún lado?',
+      a: 'No. Tu registro es privado: solo tú y las personas que tú autorices pueden consultarlo. Nada de tu inventario ni de tus ventas se publica en ningún lugar.',
+    },
+    {
+      q: 'Yo hoy lo llevo en un cuaderno, ¿puedo migrarlo?',
+      a: 'Sí. Empieza con lo básico: agrega tus productos más vendidos con sus cantidades. No necesitas trasladar todo el cuaderno de una vez — el registro crece con tu rutina.',
     },
     {
       q: '¿Necesito conocimientos técnicos de computación?',
-      a: 'No. El sistema fue diseñado desde cero para personas que nunca han utilizado un software de gestión. Los botones son claros, la tipografía es legible y los pasos se adaptan al ritmo de trabajo habitual del mostrador.',
+      a: 'No. El sistema fue diseñado desde cero para personas que nunca han utilizado un software de gestión. Los botones son claros, la tipografía es legible y los pasos se adaptan al ritmo de trabajo habitual de tu negocio.',
     },
     {
       q: '¿Puedo utilizarlo desde mi teléfono celular?',
-      a: 'Sí. Puedes acceder a Gestión Neiva desde cualquier navegador web en tu teléfono celular o tableta, así como desde un computador portátil o de escritorio.',
-    },
-    {
-      q: '¿Cómo se protege la información de mi tienda?',
-      a: 'Tu información pertenece exclusivamente a tu negocio y permanece estrictamente separada de la de otras tiendas. Nadie fuera de los usuarios autorizados por ti puede consultar tus ventas ni tu inventario.',
+      a: 'Sí. Puedes acceder a GIN desde cualquier navegador web en tu teléfono celular o tableta, así como desde un computador portátil o de escritorio.',
     },
     {
       q: '¿Necesito un lector de código de barras para empezar?',
@@ -132,7 +140,7 @@ export default function LandingPage() {
     },
     {
       q: '¿Cómo puedo comenzar a utilizarlo?',
-      a: 'Solo debes pulsar en "Crear cuenta", ingresar el nombre de tu tienda y tus datos básicos. En pocos pasos podrás agregar tus primeros artículos y comenzar a registrar tus operaciones.',
+      a: 'Solo debes pulsar en "Crear cuenta", ingresar el nombre de tu negocio y tus datos básicos. En pocos pasos podrás agregar tus primeros artículos y comenzar a registrar tus operaciones.',
     },
   ]
 
@@ -155,10 +163,10 @@ export default function LandingPage() {
             </div>
             <div className="min-w-0">
               <span className="lnd-hd-word font-extrabold text-slate-900 text-lg tracking-tight block leading-tight whitespace-nowrap">
-                Gestión Neiva
+                GIN
               </span>
               <span className="lnd-hd-sub text-[10px] text-emerald-700 font-medium tracking-wide block whitespace-nowrap">
-                Comercio local y popular
+                Gestión de Inventario Inteligente
               </span>
             </div>
           </div>
@@ -189,7 +197,7 @@ export default function LandingPage() {
               to="/login"
               className="lnd-hd-login hidden sm:inline-block text-sm font-semibold text-slate-700 hover:text-emerald-700 px-3 py-3 rounded-xl transition-colors whitespace-nowrap"
             >
-              Entrar a mi Tienda
+              Entrar a mi cuenta
             </Link>
             <Link
               to="/registro"
@@ -241,21 +249,21 @@ export default function LandingPage() {
                 style={{ background: 'rgba(216,154,61,.12)', border: '1px solid rgba(216,154,61,.35)', color: 'var(--ambar)' }}
               >
                 <HeartHandshake size={15} className="shrink-0" />
-                <span className="leading-snug">Para tenderos, micromercados y negocios familiares</span>
+                <span className="leading-snug">Para comercios pequeños, emprendimientos y negocios familiares</span>
               </div>
 
               <h1
                 className="text-3xl sm:text-5xl font-black tracking-tight leading-[1.15]"
                 style={{ color: 'var(--crema)' }}
               >
-                Ayudamos a los pequeños comerciantes a entender y controlar su negocio con
-                <span className="italic-rk" style={{ color: 'var(--ambar)' }}> tranquilidad</span>
+                Anota tu stock y tus cuentas desde el celular, y deja de llevarlas en
+                <span className="italic-rk" style={{ color: 'var(--ambar)' }}> la memoria</span>
               </h1>
 
               <p className="text-base sm:text-lg max-w-2xl mx-auto lg:mx-0 leading-relaxed" style={{ color: 'var(--tinta-suave)' }}>
-                Un comerciante no debería tener que depender de la memoria, revisar varios cuadernos o
-                hacer cuentas una y otra vez para saber cómo va su día. Gestión Neiva hace que
-                administrar tu tienda sea más claro, ordenado y cercano.
+                Tu negocio no necesita página web ni sistemas complicados. Necesita un registro confiable:
+                qué tienes, qué se movió y cómo va. GIN guarda tus números y te los muestra
+                desde donde estés.
               </p>
 
               <div className="pt-2 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3">
@@ -264,7 +272,7 @@ export default function LandingPage() {
                   className="w-full sm:w-auto font-bold text-base px-7 py-3.5 rounded-2xl transition-all shadow-md hover:shadow-lg active:scale-95 flex items-center justify-center gap-2"
                   style={{ background: 'var(--ambar)', color: 'var(--noche)' }}
                 >
-                  <span>Crea tu cuenta y comienza</span>
+                  <span>Empieza a anotar tu negocio hoy</span>
                   <ArrowRight size={18} />
                 </Link>
                 <button
@@ -280,15 +288,15 @@ export default function LandingPage() {
               <div className="pt-4 flex flex-wrap items-center justify-center lg:justify-start gap-6 text-xs font-medium" style={{ color: 'var(--tinta-suave)' }}>
                 <span className="flex items-center gap-1.5">
                   <CheckCircle2 size={16} style={{ color: 'var(--ambar)' }} />
-                  Sin conocimientos técnicos requeridos
+                  Sin conocimientos técnicos y funciona en el celular
                 </span>
                 <span className="flex items-center gap-1.5">
                   <CheckCircle2 size={16} style={{ color: 'var(--ambar)' }} />
-                  Venta por unidades o por peso (libras/kilos)
+                  Tu registro es privado: solo tú y tu equipo lo ven
                 </span>
                 <span className="flex items-center gap-1.5">
                   <CheckCircle2 size={16} style={{ color: 'var(--ambar)' }} />
-                  Diseñado para el comercio popular de Neiva
+                  Desde cualquier parte: mira cómo va tu negocio sin estar en la tienda
                 </span>
               </div>
             </div>
@@ -299,7 +307,7 @@ export default function LandingPage() {
           <div className="absolute bottom-5 inset-x-0">
             <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center gap-3 text-[10px] sm:text-[11px] font-mono tracking-widest uppercase" style={{ color: 'rgba(245,239,230,.72)' }}>
               <span className="inline-block h-1.5 w-1.5 rounded-full shrink-0" style={{ background: 'var(--ambar)' }} />
-              <span className="whitespace-nowrap">Una tienda real en Neiva</span>
+              <span className="whitespace-nowrap">Un negocio real, de cualquier área</span>
               <span className="h-px flex-1" style={{ background: 'rgba(245,239,230,.18)' }} />
               <span className="whitespace-nowrap hidden sm:inline">Del mostrador a tu celular</span>
             </div>
@@ -388,7 +396,7 @@ export default function LandingPage() {
                 Menos tiempo intentando recordar qué pasó. Más claridad para saber qué está ocurriendo.
               </h2>
               <p className="text-sm text-slate-600 mt-2">
-                Gestión Neiva no busca vender tecnología por sí misma. El propósito es entregarte una
+                GIN no busca vender tecnología por sí misma. El propósito es entregarte una
                 herramienta limpia y comprensible para respaldar el esfuerzo de tu trabajo diario.
               </p>
             </div>
@@ -442,10 +450,10 @@ export default function LandingPage() {
                 <div className="w-9 h-9 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
                   <Users size={18} />
                 </div>
-                <h3 className="font-bold text-slate-800 text-base">Acceso para tus colaboradores</h3>
+                <h3 className="font-bold text-slate-800 text-base">Anota entre varios</h3>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Permite que tus cajeros o familiares registren ventas en mostrador sin que tengan
-                  acceso a tus precios de costo ni reportes privados.
+                  Un familiar o socio puede registrar movimientos contigo, sin acceso a tus
+                  reportes privados ni a tus precios de costo.
                 </p>
               </div>
 
@@ -469,14 +477,15 @@ export default function LandingPage() {
         <section id="quienes" className="py-16 md:py-20 max-w-5xl mx-auto px-4 sm:px-6">
           <div className="max-w-2xl mb-10">
             <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">
-              Cercanía y contexto
+              ¿A quiénes ayudamos?
             </span>
             <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mt-1 leading-tight">
-              Pensado para los negocios que dan vida a nuestras calles y barrios
+              Pensado para cualquier negocio que solo quiere tener sus cuentas en orden
             </h2>
             <p className="text-sm text-slate-600 mt-2">
-              Hablamos de personas y familias que atienden con dedicación a sus vecinos, no de
-              grandes corporaciones ni de estructuras complejas.
+              Tiendas, servicios, comida, papelerías, ferreterías, talleres, ventas desde casa:
+              da igual el área. Si tu negocio necesita anotar qué tienes, qué se movió y cómo va,
+              GIN está hecho para ti.
             </p>
           </div>
 
@@ -493,32 +502,20 @@ export default function LandingPage() {
             </div>
 
             <div data-reveal>
-              {[
-                {
-                  t: 'Tiendas de barrio',
-                  d: 'Puntos de abastecimiento cotidiano con productos secos, granos, aseo y bebidas.',
-                },
-                {
-                  t: 'Micromercados',
-                  d: 'Negocios con mayor variedad de estanterías que requieren rapidez en mostrador.',
-                },
-                {
-                  t: 'Panaderías y cafeterías',
-                  d: 'Venta ágil de productos frescos del día con cobro rápido en mostrador.',
-                },
-                {
-                  t: 'Negocios familiares',
-                  d: 'Comercios atendidos en equipo donde varios integrantes colaboran en la atención.',
-                },
-              ].map((s) => (
-                <div key={s.t} className="py-4 border-t" style={{ borderColor: '#e7ddcc' }}>
-                  <h3 className="font-bold text-slate-800 flex items-center gap-2.5">
-                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: 'var(--ambar)' }} />
-                    {s.t}
-                  </h3>
-                  <p className="text-sm text-slate-600 leading-relaxed mt-1 pl-4">{s.d}</p>
-                </div>
-              ))}
+              <p className="text-sm text-slate-600 leading-relaxed">
+                No necesitas instalación, ni página web, ni conocimientos técnicos. Solo el deseo
+                de tener tus números ordenados, desde el celular y sin exponer nada al público.
+              </p>
+              <div className="flex flex-wrap gap-2 mt-5">
+                {['Tiendas', 'Servicios', 'Comida', 'Papelerías', 'Ferreterías', 'Talleres', 'Ventas desde casa'].map((chip) => (
+                  <span
+                    key={chip}
+                    className="px-3 py-1.5 rounded-full text-xs font-semibold bg-[#fafaf9] border border-[#e7ddcc] text-slate-700"
+                  >
+                    {chip}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
         </section>
@@ -537,7 +534,7 @@ export default function LandingPage() {
               </h2>
               <p className="text-sm text-slate-600 mt-2">
                 Creemos en el valor de los testimonios documentales y respetuosos. Esta sección está
-                reservada para compartir vivencias reales de comerciantes en Neiva mediante la
+                reservada para compartir vivencias reales de comerciantes de cualquier área mediante la
                 estructura de su experiencia: cómo gestionaban antes, cómo fue su proceso y qué
                 cambió en su tranquilidad.
               </p>
@@ -550,7 +547,7 @@ export default function LandingPage() {
               </span>
               <p className="text-sm text-slate-600 mt-4 max-w-xl leading-relaxed">
                 No vamos a inventar testimonios. Estamos entrevistando a las primeras tiendas que
-                trabajan con Gestión Neiva para documentar, con su permiso, cómo llevaban sus
+                trabajan con GIN para documentar, con su permiso, cómo llevaban sus
                 cuentas antes y qué cambió después. Cuando estén listas, las verás aquí.
               </p>
               <a
@@ -580,7 +577,7 @@ export default function LandingPage() {
               </h2>
               <p className="text-sm text-slate-600 leading-relaxed">
                 Entendemos que dar el paso de la libreta a una herramienta digital puede generar
-                inquietud o temor a equivocarse. Por eso, Gestión Neiva no es un software empresarial
+                inquietud o temor a equivocarse. Por eso, GIN no es un software empresarial
                 pesado; es un puente sencillo para familiarizarse con la gestión digital.
               </p>
 
@@ -615,8 +612,8 @@ export default function LandingPage() {
               </div>
               <h3 className="font-bold text-slate-800 text-lg">¿Cómo entendemos la alfabetización digital?</h3>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Para nosotros no significa hacer cursos teóricos complejos. Significa que un tendero
-                pueda registrar una venta en 10 segundos, mirar su celular al cerrar y saber con
+                Para nosotros no significa hacer cursos teóricos complejos. Significa que un dueño
+                de negocio pueda registrar una venta en 10 segundos, mirar su celular al cerrar y saber con
                 certeza cuánto vendió hoy. La confianza se gana usando herramientas que no complican
                 la vida.
               </p>
@@ -657,8 +654,7 @@ export default function LandingPage() {
               </h2>
               <p className="text-sm text-slate-300 mt-2 leading-relaxed">
                 Las tiendas de barrio y los micromercados son mucho más que puntos de venta: son
-                espacios de encuentro, confianza entre vecinos y sustento digno para miles de familias
-                en Neiva.
+                espacios de encuentro, confianza entre vecinos y sustento digno para miles de familias.
               </p>
             </div>
 
@@ -670,7 +666,7 @@ export default function LandingPage() {
                 <h3 className="font-bold text-white text-base">Cercanía y dignidad</h3>
                 <p className="text-xs text-slate-300 leading-relaxed">
                   El comercio popular resuelve el día a día de las familias. Apoyar su labor con
-                  herramientas claras es reconocer el valor que aportan al tejido social de la ciudad.
+                  herramientas claras es reconocer el valor que aportan al tejido social de cada barrio.
                 </p>
               </div>
 
@@ -691,7 +687,7 @@ export default function LandingPage() {
                 </span>
                 <h3 className="font-bold text-white text-base">Un puente sencillo</h3>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Gestión Neiva busca acompañar de forma práctica a los comerciantes locales,
+                  GIN busca acompañar de forma práctica a los negocios pequeños de cualquier área,
                   ofreciendo orden en sus números para que tomen mejores decisiones para su negocio.
                 </p>
               </div>
@@ -708,7 +704,7 @@ export default function LandingPage() {
               Paso a paso
             </span>
             <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">
-              ¿Cómo funciona Gestión Neiva en tu negocio?
+              ¿Cómo funciona GIN en tu negocio?
             </h2>
             <p className="text-sm text-slate-600 mt-2">
               Un flujo de trabajo transparente y directo, sin pasos ocultos ni configuraciones
@@ -766,7 +762,7 @@ export default function LandingPage() {
                 >
                   <Play size={28} className="fill-white translate-x-0.5" />
                 </button>
-                <p className="text-white font-bold text-base">Aprende a usar Gestión Neiva</p>
+                <p className="text-white font-bold text-base">Aprende a usar GIN</p>
                 <span className="text-xs text-slate-300 block">
                   Duración aproximada: 1 minuto · Carga bajo demanda
                 </span>
@@ -787,7 +783,7 @@ export default function LandingPage() {
               Gestión de Inventario Inteligente en Redes
             </h2>
             <p className="text-sm text-slate-600">
-              Síguenos para aprender trucos de mostrador, conocer experiencias de tenderos de Neiva y el Huila, y participar en capacitaciones gratuitas.
+              Síguenos para aprender trucos de mostrador, conocer experiencias de otros negocios y participar en capacitaciones gratuitas.
             </p>
           </div>
 
@@ -836,7 +832,7 @@ export default function LandingPage() {
                   <span className="text-[10px] text-slate-400 group-hover:translate-x-0.5 transition-transform">↗</span>
                 </div>
                 <p className="text-xs font-medium text-slate-700 truncate">Gestión de Inventario Inteligente</p>
-                <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">Comunidad regional de tenderos y eventos</p>
+                <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">Comunidad de negocios y emprendimientos</p>
               </div>
             </a>
 
@@ -903,7 +899,7 @@ export default function LandingPage() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-emerald-900 group-hover:text-emerald-700 transition-colors">
-                    Comunidad WhatsApp: Comerciantes Neiva & Huila
+                    Comunidad WhatsApp: Comerciantes GIN
                   </span>
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
                     Comunidad Oficial
@@ -911,7 +907,7 @@ export default function LandingPage() {
                 </div>
                 <p className="text-xs font-semibold text-emerald-800 mt-0.5">Gestión de Inventario Inteligente</p>
                 <p className="text-[11px] text-emerald-700 mt-0.5">
-                  Grupo abierto para resolver dudas, compartir consejos de abastecimiento y conectar con otros comerciantes de la región.
+                  Grupo abierto para resolver dudas, compartir consejos de abastecimiento y conectar con otros comerciantes.
                 </p>
               </div>
             </a>
@@ -971,18 +967,18 @@ export default function LandingPage() {
         ───────────────────────────────────────────────────────────── */}
         <section className="py-16 md:py-24 max-w-4xl mx-auto px-4 sm:px-6 text-center space-y-6">
           <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
-            Comienza a organizar tu negocio con mayor orden y tranquilidad
+            Empieza a anotar tu negocio hoy
           </h2>
           <p className="text-base text-slate-600 max-w-xl mx-auto leading-relaxed">
-            Únete a la iniciativa que busca acercar herramientas útiles y comprensibles al comercio
-            popular de Neiva.
+            Un registro confiable: qué tienes, qué se movió y cómo va. GIN guarda tus números
+            y te los muestra desde donde estés.
           </p>
           <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
               to="/registro"
               className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base px-8 py-4 rounded-2xl transition-all shadow-md active:scale-98 flex items-center justify-center gap-2"
             >
-              <span>Crear cuenta y comenzar</span>
+              <span>Empieza a anotar tu negocio hoy</span>
               <ArrowRight size={18} />
             </Link>
             <Link
@@ -1005,8 +1001,8 @@ export default function LandingPage() {
               <Store size={18} />
             </div>
             <div>
-              <span className="font-bold text-slate-800 text-sm block">Gestión Neiva</span>
-              <span>Herramienta digital para pequeños comercios y economía popular</span>
+              <span className="font-bold text-slate-800 text-sm block">GIN</span>
+              <span>Herramienta digital para pequeños comercios</span>
             </div>
           </div>
 
@@ -1016,11 +1012,11 @@ export default function LandingPage() {
             <a href="#como-funciona" className="hover:text-emerald-700">Cómo funciona</a>
             <a href="#comunidad" className="hover:text-emerald-700">Redes sociales</a>
             <a href="#faq" className="hover:text-emerald-700">Preguntas</a>
-            <Link to="/login" className="hover:text-emerald-700 font-semibold text-emerald-800">Acceso a tienda</Link>
+            <Link to="/login" className="hover:text-emerald-700 font-semibold text-emerald-800">Entrar a mi cuenta</Link>
           </div>
 
           <div className="text-center sm:text-right text-[11px] text-slate-400">
-            <span>Neiva, Huila, Colombia</span>
+            <span>Disponible desde tu celular, desde donde estés</span>
             <span className="block mt-0.5">Gestión de Inventario Inteligente</span>
             <span className="block text-[10px] text-slate-400">Tecnología que se adapta a las personas</span>
           </div>
@@ -1036,7 +1032,7 @@ export default function LandingPage() {
             <div className="flex items-center justify-between text-white pb-2 border-b border-slate-800">
               <div className="flex items-center gap-2">
                 <Play size={18} className="text-emerald-500" />
-                <h3 className="font-bold text-sm sm:text-base">Demostración: ¿Cómo funciona Gestión Neiva?</h3>
+                <h3 className="font-bold text-sm sm:text-base">Demostración: ¿Cómo funciona GIN?</h3>
               </div>
               <button
                 type="button"
