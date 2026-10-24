@@ -757,6 +757,10 @@ un corte corto de ~20s para el hero?). Test de foco con teclado.
 teclado + LCP), YA que el guion usa las tomas reales. Luego QA1 (Gemini) del landing.
 
 ### 2026-10-22 — ⛔ PAUSA GENERAL del plan (decisión del dueño)
+
+> **⚠️ ACTUALIZACIÓN 2026-10-24:** la pausa se **levanta ÚNICAMENTE para el Sprint 10** (el landing
+> es justamente lo que desbloquea todo, y el dueño ya corrigió el plan — ver entrada de abajo).
+
 - **Estado:** todo el plan queda detenido **hasta tener un landing atractivo que capte más
   clientes potenciales**. El rebuild del landing es la única tarea en progreso (Sprint 10).
 - **En cola tras esa barrera (NO proceder antes):** graphify update, especificación del
@@ -764,6 +768,34 @@ teclado + LCP), YA que el guion usa las tomas reales. Luego QA1 (Gemini) del lan
 - **Dónde quedó el Sprint 10:** H0 copy en borrador (`docs/landing_copy.md`, verificación =
   review del dueño), asignaciones → GLM (AGENTERS en pausa hasta actualización completa).
 - **Racional del dueño:** sin landing que convierta, nada de lo demás genera clientes.
+
+### 2026-10-24 — ✅ H0 APROBADO + REBRAND GIN + video con 6 imágenes Gemini
+
+**Cierre de sesión (aplicación de copys en código, commit `5047cd6`):**
+- `LandingPage.jsx` con TODOS los copys aprobados + rebrand GIN: badge hero («Para comercios
+  pequeños, emprendimientos y negocios familiares»), 3 checks nuevos (sin Neiva), CTA hero
+  «Empieza a anotar tu negocio hoy», cinta inferior universal, propuesta (colaboradores →
+  «Anota entre varios», sin «cajero»), §quienes → statement universal + 7 chips de ejemplo,
+  FAQ reescrita (9 preguntas: q1 GIN, q2 universal, +3 nuevas del dueño), video poster
+  «Aprende a usar GIN», CTA final reescrito, footer GIN sin ciudad, modal video GIN.
+- Typos corregidos en `pasosScrollTelling`: «Sabras»→«Sabrás», «reinversion»→«reinversión».
+- **Verificación:** `grep Neiva|Huila|tendero|Sabras|reinversion|cajero|Entrar a mi Tienda`
+  sobre LandingPage.jsx → **0 matches**; `cd frontend && npm run build` → ✅ built in 52.7s.
+- **Pendiente:** V1 (6 imágenes del video vía puente Antigravity/Gemini — requiere IDE abierta;
+  `antigravity_status()` falló con "Antigravity no está abierto"). V2 montaje tras V1.
+- **H0 verificado:** Hero **Opción A**; badge/checks/propuesta/FAQ/CTA aprobados; "¿a quiénes
+  ayudamos?" pasa a **versión universal** (negocios de cualquier área, SIN listado por áreas);
+  scroll-telling **condicional** (si la demo no convence, se retira y los pasos van estáticos).
+- **REBRAND (decisión mayor):** el producto pasa a ser **GIN — Gestión de Inventario Inteligente**,
+  cobertura **global**; se elimina toda referencia a Neiva del landing. Rebrand app-completo queda
+  como task separada (RB-APP), no bloquea el rebuild. Detalle completo en `docs/landing_copy.md` §0.
+- **Video (nuevo flujo):** el dueño dictó la voz del video y el flujo — **hasta 6 imágenes
+  individuales generadas con Gemini** → montaje narrado que "habla" al viewer. Guion + prompts
+  en `docs/media/video_gin/STORYBOARD.md`. Las imágenes sustituyen el clip Veo (F2.1).
+- **Nuevas tareas activas:** R1 (rebrand Neiva→GIN en landing), V1 (generar 6 imágenes via
+  Antigravity/Gemini), V2 (montaje video narrado + posterики en landing). Exec: GLM.
+- **Próximo paso inmediato:** H0.5/H1/H2 aplicar el copy aprobado + rebrand en `LandingPage.jsx`,
+  en paralelo con V1 (generación de imágenes).
 
 ### 2026-10-18 — Fix deploy Render: SQLAlchemy 2.1 cambió el driver default de PostgreSQL
 - **Síntoma:** `ModuleNotFoundError: No module named 'psycopg'` en `alembic upgrade head` y uvicorn. El servicio nunca abrió puerto ("No open ports detected").
