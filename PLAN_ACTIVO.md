@@ -549,7 +549,21 @@ clientes potenciales, NO se procede con nada más del plan (ni graphify update, 
 
 **Verificación E2E en Chromium:** ciclo `READY → SPEAKING (botón omitir visible) → LISTENING → ERROR (mic denegado en entorno automatizado, con botón Reintentar) → reactivar → SPEAKING...` sin storm (6 errores de consola en total, 1 por denegación). Suite de voz 43/43 ✅ y `npm run build` limpio.
 
-**Falsos positivos del reporte:** los `TypeError: reading 'M_ID'` provienen de `200.js` que NO es un archivo del proyecto (vite solo sirve módulos hasheados; `index.html` no carga script externos) → extensión de Chrome del usuario. Los `POST /api/token 401` en loop son consistentes con reintentos de login automático con contraseña vieja (autofill de Chrome / credencial desactualizada tras el reset de la demo). Recomendación al usuario: hard reload (Ctrl+Shift+R), probar en ventana de incógnito para descartar extensión, y limpiar autofill del formulario de login.
+### Hotfix 26-10-2026 — Indicador de servicio, Reiniciar y diagnóstico zombi (commit 526cb9a + fix import)
+
+Continuación del blindaje del Modo Voz tras el reporte del usuario (orbe siempre "Listo", clicks muertos):
+
+- `MostradorMode.jsx`:
+  - **Pill visible de servicio**: `🟢 Servicio: Activo / Escuchando / Hablando` vs `⚪ Servicio: Apagado` vs `🔴 Servicio: Error` — respuesta directa a la petición de "entender que el servicio se prendió o apagó".
+  - Botón **Reiniciar** siempre en la barra superior (`desactivar + activar` completo).
+  - **Activación por teclado**: Enter/Espacio ejecuta la acción principal del estado actual; Escape sale (con guard para no robar el focus de botones/inputs).
+  - **Diagnóstico en fase de captura**: listener document-level loguea `[VOICE-UI] click capturado` con el `voiceState` vigente — si el usuario hace click y NO aparece la línea, el DOM está muerto (pestaña zombi de BFCCache/extensiones), cerrando el debate causal en una sola prueba.
+- `useVoiceAgent.js`: guard de ownership en el cleanup (`managerRef.current === manager`) contra remontajes de StrictMode/HMR que dejaban managers huérfanos; nueva acción `reiniciarSesion` expuesta.
+- **Fix crítico post-commit:** `import React, { useEffect }` en `MostradorMode.jsx` — el `useEffect` nuevo se usó sin importarse y derribaba el árbol React completo (`ReferenceError: useEffect is not defined` → pantalla en blanco al abrir el modo voz). Detectado en la verificación en vivo el 26-10 (502 → navegador: colapso del árbol; dashboard y login 86/86 tests ok).
+
+**Verificación E2E (26-10):** pill `⚪ Apagado → 🟢 Hablando → 🟢 Activo` ciclando correctamente, `[VOICE-UI] click capturado` logueando cada tap con su estado (IDLE, ERROR), Reintentar re-activa el ciclo de saludo, 43/43 tests de voz, 86/86 backend, build Vite limpio.
+
+**Falsos positivos del reporte (22-10):** los `TypeError: reading 'M_ID'` provienen de `200.js` que NO es un archivo del proyecto (vite solo sirve módulos hasheados; `index.html` no carga script externos) → extensión de Chrome del usuario. Los `POST /api/token 401` en loop son consistentes con reintentos de login automático con contraseña vieja (autofill de Chrome / credencial desactualizada tras el reset de la demo). Recomendación al usuario: hard reload (Ctrl+Shift+R), probar en ventana de incógnito para descartar extensión, y limpiar autofill del formulario de login.
 
 **Falsos positivos descartados:** El polling cada ~20s de `GET /health` y los `GET /v1/models` (404) provienen de `opencode-cli.exe` (harness de agente, PID 2620), NO de la app. Los 3× `POST /token 401` fueron artefactos de submits inyectados durante la automatización con state de React no asentado — no reproducible por un usuario real.
 

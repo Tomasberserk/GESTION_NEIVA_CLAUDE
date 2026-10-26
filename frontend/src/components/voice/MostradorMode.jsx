@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { X, Mic, MicOff, Check, AlertCircle, Sparkles, Volume2, RotateCcw } from 'lucide-react'
 import VoiceOrb from './VoiceOrb'
 import { VoiceTurnState } from '../../services/voice/VoiceTurnManager'
