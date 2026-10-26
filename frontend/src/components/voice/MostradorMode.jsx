@@ -1,5 +1,5 @@
 import React from 'react'
-import { X, Mic, MicOff, Check, AlertCircle, Sparkles, Volume2 } from 'lucide-react'
+import { X, Mic, MicOff, Check, AlertCircle, Sparkles, Volume2, RotateCcw } from 'lucide-react'
 import VoiceOrb from './VoiceOrb'
 import { VoiceTurnState } from '../../services/voice/VoiceTurnManager'
 
@@ -23,6 +23,7 @@ export default function MostradorMode({
     desactivarModoVoz,
     detenerYEnviar,
     omitirRespuesta,
+    reiniciarSesion,
     confirmarOperacion,
     cancelarOperacion,
     seleccionarOpcion,
@@ -33,6 +34,52 @@ export default function MostradorMode({
   const clarification = lastResponse?.clarification
   const isConfirming = voiceState === VoiceTurnState.CONFIRMING || lastResponse?.estado === 'READY_TO_CONFIRM'
   const isError = voiceState === VoiceTurnState.ERROR
+  const isListeningNow = voiceState === VoiceTurnState.LISTENING || voiceState === VoiceTurnState.SPEECH_DETECTED
+  const isSpeakingNow = voiceState === VoiceTurnState.SPEAKING
+
+  // Diagnóstico BFCache/zombia: loguea TODO click en fase de captura (antes que React).
+  // Si el usuario hace click y NO aparece esta línea en consola, el DOM está muerto (pestaña zombi).
+  useEffect(() => {
+    if (!isOpen) return
+    const listener = (e) => {
+      const label = e.target?.textContent?.trim().slice(0, 30) || e.target?.tagName || '?'
+      console.log(`[VOICE-UI] click capturado en fase-documento: "${label}" (voiceState=${voiceState})`)
+    }
+    document.addEventListener('click', listener, true)
+    return () => document.removeEventListener('click', listener, true)
+    // voiceState se re-evalúa en cada render por el closure del listener
+  })
+
+  // Activación por teclado: Escape = salir, Enter/Espacio = acción principal del estado
+  useEffect(() => {
+    if (!isOpen) return
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        desactivarModoVoz()
+        onClose()
+        return
+      }
+      // No robar Enter/Espacio a los botones enfocados: ellos ya disparan su propio onClick
+      const target = e.target
+      if (target instanceof HTMLElement && (target.tagName === 'BUTTON' || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
+        return
+      }
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault()
+        if (isConfirming) {
+          confirmarOperacion()
+        } else if (isListeningNow) {
+          detenerYEnviar()
+        } else if (isSpeakingNow) {
+          omitirRespuesta()
+        } else if (isError || !isActive) {
+          activarModoVoz(true)
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isOpen, voiceState, isConfirming, isListeningNow, isSpeakingNow, isError, isActive, activarModoVoz, desactivarModoVoz, detenerYEnviar, omitirRespuesta, confirmarOperacion, onClose])
 
   const handleOrbClick = () => {
     if (voiceState === VoiceTurnState.LISTENING || voiceState === VoiceTurnState.SPEECH_DETECTED) {
@@ -53,26 +100,54 @@ export default function MostradorMode({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col justify-between p-4 md:p-6 text-white select-none animate-in fade-in duration-200">
+    <div
+      tabIndex={-1}
+      className="fixed inset-0 z-50 bg-slate-950 flex flex-col justify-between p-4 md:p-6 text-white select-none animate-in fade-in duration-200 outline-none"
+    >
       {/* Barra superior de control */}
-      <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-        <div className="flex items-center gap-2">
-          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-xs md:text-sm font-semibold tracking-wider text-slate-300 uppercase">
+      <div className="flex items-center justify-between border-b border-slate-800/80 pb-3 gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isActive ? 'bg-emerald-500 animate-pulse' : 'bg-slate-600'}`} />
+          <span className="text-xs md:text-sm font-semibold tracking-wider text-slate-300 uppercase truncate">
             Modo Mostrador • Manos Libres
           </span>
         </div>
 
-        <button
-          onClick={() => {
-            desactivarModoVoz()
-            onClose()
-          }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 active:scale-95 transition-all"
-        >
-          <X className="w-4 h-4" />
-          <span>Salir</span>
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Indicador inequívoco de servicio PRENDIDO / APAGADO */}
+          <span
+            className={`hidden sm:inline-flex px-2.5 py-1 rounded-full text-[10px] md:text-xs font-bold uppercase tracking-wider border ${
+              isActive
+                ? 'bg-emerald-950 border-emerald-600 text-emerald-300'
+                : 'bg-slate-900 border-slate-700 text-slate-400'
+            }`}
+          >
+            {isActive
+              ? isSpeakingNow ? '🟢 Servicio: Hablando' : isListeningNow ? '🟢 Servicio: Escuchando' : '🟢 Servicio: Activo'
+              : isError ? '🔴 Servicio: Error' : '⚪ Servicio: Apagado'}
+          </span>
+
+          {/* Reiniciar sesión de voz (siempre disponible, kit de emergencia) */}
+          <button
+            onClick={reiniciarSesion}
+            title="Reiniciar sesión de voz (apaga y prende el servicio)"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 active:scale-95 transition-all"
+          >
+            <RotateCcw className="w-4 h-4" />
+            <span className="hidden sm:inline">Reiniciar</span>
+          </button>
+
+          <button
+            onClick={() => {
+              desactivarModoVoz()
+              onClose()
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 active:scale-95 transition-all"
+          >
+            <X className="w-4 h-4" />
+            <span>Salir</span>
+          </button>
+        </div>
       </div>
 
       {/* Zona Central: Orbe y transcripciones legibles a 1 metro */}

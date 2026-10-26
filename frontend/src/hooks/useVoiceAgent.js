@@ -44,7 +44,12 @@ export function useVoiceAgent() {
 
     return () => {
       console.log('[VOICE-DEBUG][useVoiceAgent] Limpiando sesión en desmontaje...')
-      manager.detenerSesion()
+      // Solo detener/nullear si este effect sigue siendo el dueño del ref
+      // (protege contra ciclos de remontaje de StrictMode/HMR dejando refs huérfanas)
+      if (managerRef.current === manager) {
+        manager.detenerSesion()
+        managerRef.current = null
+      }
     }
   }, [])
 
@@ -71,6 +76,18 @@ export function useVoiceAgent() {
     console.log('[VOICE-DEBUG][useVoiceAgent] omitirRespuesta disparado (skip TTS)')
     if (managerRef.current) {
       managerRef.current.omitirRespuesta()
+    }
+  }, [])
+
+  const reiniciarSesion = useCallback(async () => {
+    console.log('[VOICE-DEBUG][useVoiceAgent] reiniciarSesion disparado (stop + start)')
+    if (managerRef.current) {
+      managerRef.current.detenerSesion()
+    }
+    setTranscript('')
+    setErrorMessage(null)
+    if (managerRef.current) {
+      await managerRef.current.activarSesion(true)
     }
   }, [])
 
@@ -131,6 +148,7 @@ export function useVoiceAgent() {
     desactivarModoVoz,
     detenerYEnviar,
     omitirRespuesta,
+    reiniciarSesion,
     confirmarOperacion,
     cancelarOperacion,
     seleccionarOpcion,
