@@ -549,6 +549,19 @@ clientes potenciales, NO se procede con nada más del plan (ni graphify update, 
 
 **Verificación E2E en Chromium:** ciclo `READY → SPEAKING (botón omitir visible) → LISTENING → ERROR (mic denegado en entorno automatizado, con botón Reintentar) → reactivar → SPEAKING...` sin storm (6 errores de consola en total, 1 por denegación). Suite de voz 43/43 ✅ y `npm run build` limpio.
 
+### Fix definitivo 26-10-2026 (III) — Hallazgos de auditoría externa: portal + condición + pointer-events (commits post-48b9c0c)
+
+Auditoría (Gemini, formato de prompt en `docs/traspaso/PROMPT_AUDITORIA_MODO_VOZ.md`) refutó la tesis de la extensión y encontró **dos defectos deterministas** del propio código, ambos introducidos/compuestos en `48b9c0c`:
+
+- **H2 (aceptado):** el `if (!isOpen) return null` de `MostradorMode` se PERDIÓ en la reestructuración de hooks → el overlay se pintaba SIEMPRE → explicaba "me logueo y de una me manda para la orbe" (era determinista, no click accidental). Fix F1: condición restituida *después* de todos los hooks (legal por Rules of Hooks).
+- **H1 (aceptado):** el `<aside>` de `AgentWidget.jsx:189` es `pointer-events-none` cuando el chat está cerrado, y `abrirModoVoz` cierra el chat → **los clicks atravesaban el overlay** y golpeaban el Header/Dashboard de abajo. El "Salir que deslogueaba" nunca fue el handler propio: era el botón de logout del Header debajo. Fix F2: **portal a `document.body`** + `pointer-events-auto` en el overlay (resuelve también H4: el z-[70] no funcionaba atrapado en el contexto de apilamiento z-30 del aside).
+- **H5 (aceptado):** el cable de emergencia quitaba nodos de React a mano (`remove` → riesgo de `NotFoundError: removeChild` en el siguiente unmount). Fix F4: plan nuclear solo como recarga — si React no desmontó el overlay en 300 ms, `location.replace('/dashboard')`.
+- **F3 (diagnóstico):** logger `[VOICE-UI] click "..." EN overlay | FUERA (atravesó)` — ahora distingue dónde cayó realmente el click.
+
+**Verificación E2E con hit-testing real (browser.click por coordenadas/refs, no click JS sintético):** login → SIN overlay fantasma; abrir modo voz → `elementFromPoint` cae EN overlay; click real en Salir del overlay → `/dashboard` logueado; reabrir → click en "Toca para Iniciar Escucha" → `🟢 Servicio: Hablando`. 43/43 tests de voz. La tesis de la extensión queda REFUTADA (los `200.js`/`M_ID`/`css:2:1` son ruido de extensión, sin relación causal).
+
+---
+
 ### Hotfix 26-10-2026 (II) — CAUSA RAÍZ del modo voz muerto: Rules of Hooks + "Salir" deslogueaba (commit post-hotfix)
 
 Con los logs en vivo del usuario sobre el deploy (bundle `index-DzkVst9a.js`) se confirmó: clicks llegan al documento pero el ciclo era **abrir → cerrar → árbol React muerto → deslogueo**. Tres causas encadenadas, todas reales:

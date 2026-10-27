@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { X, Mic, MicOff, Check, AlertCircle, Sparkles, Volume2, RotateCcw } from 'lucide-react'
 import VoiceOrb from './VoiceOrb'
@@ -54,7 +55,8 @@ export default function MostradorMode({
     if (!isOpen) return
     const listener = (e) => {
       const label = e.target?.textContent?.trim().slice(0, 30) || e.target?.tagName || '?'
-      console.log(`[VOICE-UI] click capturado en fase-documento: "${label}" (voiceState=${voiceState})`)
+      const enOverlay = !!e.target?.closest?.('[data-voice-overlay]')
+      console.log(`[VOICE-UI] click "${label}" ${enOverlay ? 'EN overlay' : 'FUERA (atravesó)'} (voiceState=${voiceState})`)
     }
     document.addEventListener('click', listener, true)
     return () => document.removeEventListener('click', listener, true)
@@ -69,12 +71,11 @@ export default function MostradorMode({
     if (!isOpen) return
     const salir = () => {
       try { window.__voiceSalirAlDashboard?.() } catch { /* React muerto: seguimos con el plan nuclear */ }
-      try {
-        // Plan nuclear: quitar el overlay del DOM a mano y navegar con recarga dura.
-        // El token sigue en localStorage, así que /dashboard carga logueado y recién nacido.
-        document.querySelectorAll('[data-voice-overlay="1"]').forEach((n) => n.remove())
-        if (!location.pathname.startsWith('/dashboard')) location.assign('/dashboard')
-      } catch { /* no-op */ }
+      // Si React no desmontó el overlay en ~300 ms (árbol muerto), recarga dura.
+      // NUNCA quitar nodos de React a mano (removeChild posterior → NotFoundError).
+      setTimeout(() => {
+        if (document.querySelector('[data-voice-overlay="1"]')) location.replace('/dashboard')
+      }, 300)
     }
     const btn = document.createElement('button')
     btn.id = 'voice-emergency-exit'
@@ -157,11 +158,16 @@ export default function MostradorMode({
     }
   }
 
-  return (
+  // Todos los hooks ya corrieron arriba: este retorno es legal (Rules of Hooks).
+  // Sin esta condición el overlay se pintaba SIEMPRE (por eso solo loguear ya
+  // mostraba la orbe sin que nadie la abriera).
+  if (!isOpen) return null
+
+  return createPortal(
     <div
       tabIndex={-1}
       data-voice-overlay="1"
-      className="fixed inset-0 z-[70] bg-slate-950 flex flex-col justify-between p-4 md:p-6 text-white select-none animate-in fade-in duration-200 outline-none"
+      className="pointer-events-auto fixed inset-0 z-[70] bg-slate-950 flex flex-col justify-between p-4 md:p-6 text-white select-none animate-in fade-in duration-200 outline-none"
     >
       {/* Barra superior de control */}
       <div className="flex items-center justify-between border-b border-slate-800/80 pb-3 gap-2">
@@ -350,6 +356,7 @@ export default function MostradorMode({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
