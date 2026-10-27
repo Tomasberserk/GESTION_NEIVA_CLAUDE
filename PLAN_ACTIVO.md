@@ -549,6 +549,21 @@ clientes potenciales, NO se procede con nada más del plan (ni graphify update, 
 
 **Verificación E2E en Chromium:** ciclo `READY → SPEAKING (botón omitir visible) → LISTENING → ERROR (mic denegado en entorno automatizado, con botón Reintentar) → reactivar → SPEAKING...` sin storm (6 errores de consola en total, 1 por denegación). Suite de voz 43/43 ✅ y `npm run build` limpio.
 
+### Hotfix 26-10-2026 (II) — CAUSA RAÍZ del modo voz muerto: Rules of Hooks + "Salir" deslogueaba (commit post-hotfix)
+
+Con los logs en vivo del usuario sobre el deploy (bundle `index-DzkVst9a.js`) se confirmó: clicks llegan al documento pero el ciclo era **abrir → cerrar → árbol React muerto → deslogueo**. Tres causas encadenadas, todas reales:
+
+1. **Rules of Hooks (causa raíz del zombi):** `MostradorMode` tenía `if (!isOpen) return null` ANTES de sus `useEffect` (526cb9a introdujo hooks en un componente con early-return). Al cerrar el modal, React cuenta menos hooks → crash del árbol → pestaña zombi donde el orbe no enciende nunca más. Fix: todos los hooks y la destructuración de `voiceAgent || {}` movidos antes del retorno condicional.
+2. **"Salir" sacaba de la sesión:** el botón `Salir` del modal navegaba y el estado resultante terminaba en `/login` con token borrado (confluencia del crash + los interceptores 401). Fix: handler dedicado `salirAlDashboard()` (`desactivarModoVoz` + `onClose` + `navigate('/dashboard', {replace:true})`); Escape usa el mismo camino. Petición explícita del usuario: "que me vuelva a redirigir al dashboard".
+3. **Conflicto de z-index:** el Sidebar es `fixed z-50` y el overlay del modo voz también `z-50` — riesgo de solape de capas (el Header además tiene su propio botón "Salir" de logout). Fix: overlay del modo voz subido a `z-[70]`.
+4. **Pill en ERROR mostraba "🟢 Activo":** prioridad de la pill reordenada — `isError → 🔴 Servicio: Error` tiene precedencia sobre estados activos.
+
+**Verificación E2E (26-10, ciclo que antes mataba la app):** abrir modo voz → click en "Salir" del overlay → aterriza en `/dashboard`, token intacto, sin crash → reabrir modo voz → click en el orbe → sesión activa (`READY → LISTENING → ERROR` por mic denegado en sandbox: esperado), pill refleja estados, "Reintentar" disponible.
+
+**Pendiente usuario:** mantener `deploy auto` en Vercel con este commit; probar en el dominio HTTPS (sin emulación de dispositivo ni Save-Data); los `200.js M_ID ×8` siguen siendo extensión de Chrome, no del proyecto.
+
+---
+
 ### Hotfix 26-10-2026 — Indicador de servicio, Reiniciar y diagnóstico zombi (commit 526cb9a + fix import)
 
 Continuación del blindaje del Modo Voz tras el reporte del usuario (orbe siempre "Listo", clicks muertos):

@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { X, Mic, MicOff, Check, AlertCircle, Sparkles, Volume2, RotateCcw } from 'lucide-react'
 import VoiceOrb from './VoiceOrb'
 import { VoiceTurnState } from '../../services/voice/VoiceTurnManager'
@@ -12,8 +13,9 @@ export default function MostradorMode({
   onClose,
   voiceAgent,
 }) {
-  if (!isOpen) return null
-
+  // ⚠️ Rules of Hooks: TODOS los hooks deben correr en cada render, sin retornos
+  // condicionales antes. Un early-return previo crasheaba el árbol al cerrar el
+  // modal ("Rendered fewer hooks than expected" → pestaña zombi, orbe muerto).
   const {
     voiceState,
     transcript,
@@ -28,7 +30,16 @@ export default function MostradorMode({
     cancelarOperacion,
     seleccionarOpcion,
     isActive,
-  } = voiceAgent
+  } = voiceAgent || {}
+
+  const navigate = useNavigate()
+
+  // "Salir" cierra el modo voz y regresa al Dashboard (nunca cierra la sesión).
+  const salirAlDashboard = () => {
+    desactivarModoVoz()
+    onClose()
+    navigate('/dashboard', { replace: true })
+  }
 
   const preview = lastResponse?.preview
   const clarification = lastResponse?.clarification
@@ -55,8 +66,7 @@ export default function MostradorMode({
     if (!isOpen) return
     const onKey = (e) => {
       if (e.key === 'Escape') {
-        desactivarModoVoz()
-        onClose()
+        salirAlDashboard()
         return
       }
       // No robar Enter/Espacio a los botones enfocados: ellos ya disparan su propio onClick
@@ -102,7 +112,7 @@ export default function MostradorMode({
   return (
     <div
       tabIndex={-1}
-      className="fixed inset-0 z-50 bg-slate-950 flex flex-col justify-between p-4 md:p-6 text-white select-none animate-in fade-in duration-200 outline-none"
+      className="fixed inset-0 z-[70] bg-slate-950 flex flex-col justify-between p-4 md:p-6 text-white select-none animate-in fade-in duration-200 outline-none"
     >
       {/* Barra superior de control */}
       <div className="flex items-center justify-between border-b border-slate-800/80 pb-3 gap-2">
@@ -117,14 +127,15 @@ export default function MostradorMode({
           {/* Indicador inequívoco de servicio PRENDIDO / APAGADO */}
           <span
             className={`hidden sm:inline-flex px-2.5 py-1 rounded-full text-[10px] md:text-xs font-bold uppercase tracking-wider border ${
-              isActive
-                ? 'bg-emerald-950 border-emerald-600 text-emerald-300'
-                : 'bg-slate-900 border-slate-700 text-slate-400'
+              isError ? 'bg-red-950 border-red-600 text-red-300' :
+              isActive ? 'bg-emerald-950 border-emerald-600 text-emerald-300' : 'bg-slate-900 border-slate-700 text-slate-400'
             }`}
           >
-            {isActive
-              ? isSpeakingNow ? '🟢 Servicio: Hablando' : isListeningNow ? '🟢 Servicio: Escuchando' : '🟢 Servicio: Activo'
-              : isError ? '🔴 Servicio: Error' : '⚪ Servicio: Apagado'}
+            {isError
+              ? '🔴 Servicio: Error'
+              : isActive
+                ? isSpeakingNow ? '🟢 Servicio: Hablando' : isListeningNow ? '🟢 Servicio: Escuchando' : '🟢 Servicio: Activo'
+                : '⚪ Servicio: Apagado'}
           </span>
 
           {/* Reiniciar sesión de voz (siempre disponible, kit de emergencia) */}
@@ -138,10 +149,7 @@ export default function MostradorMode({
           </button>
 
           <button
-            onClick={() => {
-              desactivarModoVoz()
-              onClose()
-            }}
+            onClick={salirAlDashboard}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 active:scale-95 transition-all"
           >
             <X className="w-4 h-4" />
