@@ -1,182 +1,144 @@
-# Landing Copy Borrador (H0) — Narrativa al nuevo ICP
+# Landing Copy — H0 APROBADO (ajustes del dueño 2026-10-24)
 
-> **Estado:** BORRADOR para revisión del dueño. **Verificación de H0 = tu visto bueno** (marcar ✅ lo aprobado, rayar lo que no).
-> **Base:** Redefinición de Alcance 2026-10-19 (ICP microempresarial ampliado) + copy actual de
-> `frontend/src/pages/LandingPage.jsx` (Sprint 10, dark-first ya construido visualmente).
-> **Regla de oro heredada del Sprint 8.2:** no se promete al público ninguna función que no exista
-> todavía en la app, cero lenguaje absoluto, cero jerga técnica.
+> **Estado:** ✅ H0 VERIFICADO — el dueño aprobó con ajustes. Copys listos para aplicar en `LandingPage.jsx` (H1/H2).
+> **Decisión dueño:** Hero **Opción A** · badge/checks SÍ · propuesta de valor SÍ (baja "cajero") ·
+> público **universal** · pasos OK (scroll-telling **condicional**) · FAQ SÍ · CTA SÍ.
 
 ---
 
-## 1. El ICP en una frase (como guion para TODO el copy)
+## 0. REBRAND — Neiva → GIN (decisión del dueño)
 
-> Persona con un negocio pequeño o emprendimiento que **hoy lleva el stock y las cuentas en cuaderno,
-> Excel o memoria**. No tiene ni quiere página web. Solo quiere **anotar, contar unidades, guardar
-> el registro y ver desde el celular cómo va su negocio**, sin exponer nada al público.
+**De aquí en adelante el producto se llama GIN — Gestión de Inventario Inteligente.**
+Cobertura **global**: se elimina TODO lo que hable de "Neiva" o de localidad (el mensaje de
+localidad ya no sirve como ancla de confianza — el claim es universal).
 
-Palabra clave rectora: **"deja de llevarlo en la cabeza"** (memoria/libreta → registro confiable).
+Para el landing (H0.5 — nueva tarea):
+- Header: "Gestión Neiva" → **GIN** · subbrand: "Comercio local y popular" → **"Gestión de Inventario Inteligente"**
+- Footer: mismo reemplazo + tagline "Herramienta digital para pequeños comercios" (sin ciudad)
+- Hero: check "Diseñado para el comercio popular de Neiva" → ELIMINADO (los checks nuevos no lo llevan)
+- Badge: "…de Neiva y el Huila" → "Para comercios pequeños, emprendimientos y negocios familiares"
+- Sección Economía Popular: quitar menciones a Neiva/lansación local — el texto queda sobre el
+  comercio pequeño universal
+- Redes/community: los handles ya son `gestion.inventario.inteligente` (GIN) ✅ — solo ajusta textos
+- FAQ: respuesta de "¿a quién está dirigido?" queda universal (ver §5)
 
-## 2. O cosa para correr con escrituras ancla / [Producto] a toda luz del
-> ❌ **[NO PUBLICAR: depende de Modo Lite]**
+**Fuera del landing (task separada, NO bloquea el rebuild):** rebrand en toda la app
+(login, registro, íconos, metadatos, backend `empresa` naming) — task RB-APP en el plan.
 
-## Nota crítica de honestidad comercial.
+## 1. Copy de seguro (versión del hero, aprobada)
 
-El **Modo Lite "Solo Stock" no existe todavía** (está aprobado como Sprint 10.5, pendiente de construir).
-Por la regla del Sprint 8.2 (no prometer lo no construido), el landing público NO menciona "Modo Lite"
-como botón o plan hasta que exista. Lo que SÍ puede decir el público (ya es verdad hoy): el POS actual
-permite anotar entradas/salidas, stock y consultas desde el celular. La promesa Lite marketing queda
-reservada para cuando la pieza salga a producción.
-
-## 3. HERO — Titulares
-
-**Vigente hoy:** *"Ayudamos a los pequeños comerciantes a entender y controlar su negocio con tranquilidad"*
-
-**Opción A (RECOMENDADA — ancla al dolor al nuevo ICP y conserva el tono):**
+**Titular (Opción A — CONFIRMADA):**
 > **Anota tu stock y tus cuentas desde el celular, y deja de llevarlas en la memoria**
 
-Subcopy: *"Tu negocio no necesita página web ni sistemas complicados. Necesita un registro confiable:
-qué tienes, qué se movió y cómo va. Gestión Neiva guarda tus números y te los muestra desde donde estés."*
+**Subcopy (CONFIRMADO — es también el guion del video):**
+> *"Tu negocio no necesita página web ni sistemas complicados. Necesita un registro confiable:
+> qué tienes, qué se movió y cómo va. GIN guarda tus números y te los muestra desde donde estés."*
 
-**Opción B (ralentiza el foco al balance):**
-> **Cuánto tienes, cuánto se movió, cuánto te queda — tu negocio, contado y claro**
+### Badge del hero ✅
+"Para comercios pequeños, emprendimientos y negocios familiares"
 
-Subcopy: *"Anota lo que entra y lo que sale. Tu stock se descuenta solo y tus números quedan guardados,
-no en la memoria ni en hojas sueltas."*
-
-**Opción C (continuidad con el copy actual, mínima cirugía):**
-> Ayudamos a los pequeños comerciantes y emprendedores a llevar sus cuentas con
-> <span>**confianza**</span> *(cambia "tranquilidad" → "confianza" y el verbo es más activo)*
-
----
-
-### Badge del hero (ni más, ni menos o kanales)
-
-**Vigente:** "Para tenderos, micromercados y negocios familiares"
-**Propuesto:** "Para comercios pequeños, emprendimientos y negocios familiares de Neiva y el Huila"
-*(agrupa al ICP ampliado sin perder localidad — la localidad es un activo de confianza)*
-
-### Los 3 checks del hero
-
-**Vigente:** sin conocimientos técnicos / venta por peso / diseñado para el comercio popular.
-**Propuesto (alineado al no-exponer y al celular):**
+### Los 3 checks del hero ✅
 1. ✅ Sin conocimientos técnicos y funciona en el celular
 2. ✅ Tu registro es privado: solo tú y tu equipo lo ven
 3. ✅ Desde cualquier parte: mira cómo va tu negocio sin estar en la tienda
 
 ---
 
-## 4. PROPUESTA DE VALOR (sección 4 del landing)
+## 2. PROPUESTA DE VALOR ✅ (aprobada con ajuste)
 
-**Titular vigente:** *"Menos tiempo intentando recordar qué pasó. Más claridad para saber qué está ocurriendo."*
-✅ **SE CONSERVA** — ya es pura ICP-code (el nombre delческую, perfect a todo su fortaleza y natural).
+- Titular: *"Menos tiempo intentando recordar qué pasó. Más claridad para saber qué está ocurriendo."* ✅ conserva
+- Seis tarjetas: stock, granel, ganancia real, vencimientos, historial/Excel ✅; y la de
+  **colaboradores se reescribe** (baja la palabra "cajero"):
 
-**Las 6 tarjetas — cambios:**
-
-| Tarjeta | Veredicto | Ajuste |
-|---|---|---|
-| Control de productos y stock | ✅ conserva | Sin cambio — es LA promesa del ICP |
-| Venta por peso y granel | ✅ conserva | Sin cambio (diferencial real de mostrador) |
-| Ganancia real del negocio | ✅ conserva | Sin cambio (la pregunta que más diría el cuentachas: "qué me dejo de bolsillo") |
-| Alertas de vencimiento | ✅ conserva | Sin cambio |
-| Acceso para tus colaboradores | 🔸 ajusta | Reescribir: "Anotar entre varios" → suar fámilia o socio ayuda a registrar movimientos, sin acceso a tus reportes privados. El copy nuevo debe eliminar la palabra "cajero" (queаешь tendero-POS, no requiere un equipo de ventas) |
-| Historial y exportación | ✅ conserva | Sin cambio — Excel respetable |
-
-*La tarjeta "Modo Lite" se agrega aquí cuando el producto exista [NO PUBLICAR antes].*
-
-**Subcopy de intro de tarjeta "Control de..." (opcional, refuerzo ICP):**
-> "Sabrás cuántas unidades o libras quedan tras cada venta. Con las ventas anotadas, el sistema te
-> adapta el saldo que te queda sin contar a ojo."
+> **Anota entre varios** — *Un familiar o socio puede registrar movimientos contigo,
+> sin acceso a tus reportes privados ni a tus precios de costo.*
 
 ---
 
-## 5. ¿A QUIÉNES AYUDAMOS? (sección 5 — AQUÍ VIVE EL CAMBIO MÁS GRANDE)
+## 3. ¿A QUIÉNES AYUDAMOS? ✅ (versión universal del dueño)
 
-El listado actual está bien pero **podría ámbar lafran integral del ICP ampliado.** Propuesta:
+**NO va la lista por áreas** (papelerías/ferreterías/talleres — quedó descartada).
+El dueño decidió: **una sola definición universal** — negocios/emprendimientos de cualquier
+área que solo necesiten lo que el sistema promete.
 
-**Titular:** "Pensado para los negocios que dan vida a nuestras calles y barrios" ✅ conserva.
-**Subcopy:** "Hablamos de personas y familias que atienden con dedicación a sus vecinos — y de todo
-emprendimiento que apenas empieza y quiere llevar sus cuentas en orden desde el primer día."
+> **Titular:** "Pensado para cualquier negocio que solo quiere tener sus cuentas en orden"
+> **Subcopy:** "Tiendas, servicios, comida, papelerías, ferreterías, talleres, ventas desde casa:
+> da igual el área. Si tu negocio necesita anotar qué tienes, qué se movió y cómo va,
+> GIN está hecho para ti."
 
-**El listado de 4 queda así:**
-
-1. **Tiendas de barrio** — s surtido seco maravillosos y bebidas bonito... *(texto AI resplandurious?)*
-2. **Ahora sí: ventajacín de gestión en papelería / ferretería / talleres / comida** ✅ nuevo ICP
-3. **Panaderías y cafeterías** ✅ conserva (ya estaba)
-4. **Negocios familiares y micromercados** ✅ conserva
-
-**El punto 2 es el nuevo, con este texto:**
-> **Papelerías, ferreterías, talleres y emprendimientos nuevos:** *si apenas estás empezando o tu
-> negocio es sencillo, lo que necesitas no es un sistema grande: es tener tus productos, precios y
-> unidades anotados en un solo lugar.*
+*(Nota técnica: la sección "quienes" pierde el listado de 4 y pasa a statement + 3 chips de ejemplos
+— el rediseño lo ejecuta A/G.)*
 
 ---
 
-## 6. PASOS REALES (4 pasos del scroll-telling)
-
-**Vigente:** Crea tu cuenta → Agrega tus productos → Registra tus ventas → Consulta tus números.
-
-**Propuesto (encaja el ICP "anotar/contar/mirar" — la misma estructura, verbos re-orientados):**
+## 4. PASOS REALES ✅ (aprobados — con condición)
 
 1. **Crea tu cuenta** — "Pon el nombre de tu negocio y tus datos básicos. Nada de configuraciones grandes."
 2. **Anota qué tienes** — "Escribe cada producto con su precio y cuántas unidades tienes. Ahí empieza tu registro."
 3. **Anota cada movimiento** — "Cuando algo se vende o llega mercancía nueva, lo registras en segundos. El stock se ajusta solo."
 4. **Mira cómo va tu negocio** — "Desde el celular, en cualquier momento: cuánto hay, cuánto vendió, cuánto ganaste."
 
-*(El stress-telling `pasosScrollTelling` del código usa estos mismos objetos — el cambio es directo en la constante.)*
+⚠️ **Condición del dueño:** el **scroll-telling visual (FrameSequence) queda condicional** — si al ver
+la demo no lo convence, se retira la sección y los 4 pasos pasan a presentation estática clásica.
+**No se invierte más en F2.1/F2.2 hasta que los pasos multimedia clave estén listos para demo.**
 
 ---
 
-## 7. FAQ — preguntas nuevas del ICP (agregar 3, conservar 7)
-
-**Nuevas, en la voz del ICP:**
+## 5. FAQ ✅ — 3 preguntas nuevas (aprobadas) + ajustes a las vigentes
 
 > **Q: Mi negocio es pequeño y gano poco, ¿esto es para mí?**
-> A: Sí. Gestión Neiva está hecho justo para eso: negocios que apenas empiezan o que no son
-> grandes. No necesitas un equipo ni procesos complicados — solo el deseo de tener tus números ordenados.
+> A: Sí. GIN está hecho justo para eso: negocios que apenas empiezan o que son pequeños.
+> No necesitas un equipo ni procesos complicados — solo el deseo de tener tus números ordenados.
 
 > **Q: ¿La información de mi negocio se ve al público en algún lado?**
 > A: No. Tu registro es privado: solo tú y las personas que tú autorices pueden consultarlo.
 > Nada del inventario ni de las ventas se publica en ningún lugar.
 
 > **Q: Yo hoy lo llevo en un cuaderno, ¿puedo migrarlo?**
-> A: Sí. Empieza con lo básico: agrega tus productos más vendidos con sus cantidades. No necesitas
-> trasladar todo el cuaderno de una vez — anota lo vivo y el registro crece con tu rutina.
+> A: Sí. Empieza con lo básico: agrega tus productos más vendidos con sus cantidades.
+> No necesitas trasladar todo el cuaderno de una vez — el registro crece con tu rutina.
 
-**Se CONSERVAN tal cual (vigentes):** ¿Qué es exactamente Gestión Neiva?* / ¿A quién está dirigido?*
-*(leve ajuste: la respuesta amplia "tenderos" → "comerciantes, emprendedores y negocios familiares")* /
-¿Necesito conocimientos técnicos? / ¿Desde el celular? / ¿Cómo se protege la información? / ¿Necesito
-lector de código de barras? / ¿Cómo empiezo?
+**Ajuste universal en las vigentes:**
+- "¿A quién está dirigido?" → *"A comercios, emprendimientos y negocios familiares de cualquier
+  área: tiendas, servicios, comida, ventas desde casa. Si necesitas llevar el registro de tu
+  stock y tus cuentas, GIN es para ti."*
+- "¿Qué es exactamente...?" → ajusta a GIN: *"Es una herramienta digital sencilla que te ayuda a
+  registrar lo que entra y lo que sale, saber qué productos tienes disponibles y conocer tu
+  ganancia real, sin cuadernos ni cuentas manuales."*
+- "Entrar a mi tienda" (header CTA login) → **"Entrar a mi cuenta"** (universal, no tienda-cebolla).
 
----
-
-## 8. SECCIONES QUE SE CONSERVAN SIN TOCAR
-
-- **El problema (01/02/03)** — la narrativa de libretas/surtido/ganancia sigue 100% válida para el ICP.
-- **Alfabetización digital** — es el diferenciador; aplica idéntico al emprendedor nuevo.
-- **Economía popular (full-bleed nocturna)** — alma del landing; solo se agrega una línea al subcopy:
-  *"y también a quienes hoy están empezando con su primer negocio."*
-- **Historias reales (panel honesto)** — intacta, incl. el "no vamos a inventar testimonios".
-- **Redes / Facebook / WhatsApp / CTA final** — el ancla de WhatsApp ya es ICP-friendly.
+**Se CONSERVAN:** conocimientos técnicos ✅ · desde el celular ✅ · privacidad ✅ · lector de
+código de barras ✅ · cómo empiezo ✅
 
 ---
 
-## 9. CTA (re-ajuste mayor inclusive... pequeño)
+## 6. CTA ✅ (aprobada)
 
-**Vigente:** "Crea tu cuenta y comienza" / botón CTA final.
-**Propuesto:** **"Empieza a anotar tu negocio hoy"** — coachado y correlacionado al nuevo main-job.
-Y el secundario (opción): "Ver cómo funciona en 1 minuto" (mantiene el video tutorial como cierre).
+- Botones hero y cierre: **"Empieza a anotar tu negocio hoy"**
+- Secundario: "Ver cómo funciona en 1 minuto" (video de GIN narrado, ver §7)
+
+## 7. El VIDEO — qué se mantiene y qué cambia
+
+✅ Seconda de video: de demo de UI a **montaje narrado con ~6 fotos reales generadas con Gemini**
+(una "vida diaria del negocio de GIN", en global). El dueño aprobó este flujo (ver
+`docs/media/video_gin/STORYBOARD.md` — 6 shots con prompts, guion de voz y plan de montaje).
+El copy de video que el dueño dictó, es LA voz:
+
+> "Tu negocio no necesita página web ni sistemas complicados. Necesita un registro confiable:
+> qué tienes, qué se movió y cómo va. Gestión de Inventario Inteligente — GIN — guarda tus
+> números y te los muestra desde donde estés."
+
+Poster del video en landing: título "Aprende a usar GIN".
 
 ---
 
-## Checklist de aprobación del dueño (verificación H0)
+## Checklist de aprobación del dueño — RESULTADO 2026-10-24
 
-- [ ] Hero: elegir A / B / C (o rayar y proponer)
-- [ ] Badge + 3 checks del hero
-- [ ] Propuesta de valor: ajustar colaboradores (baja "cajero") y opinar tarjetas
-- [ ] ¿A quiénes ayudamos: OK con el punto nuevo de papelerías/ferreterías/talleres/emprendidos?
-- [ ] Pasos reales: OK con el nuevo ver-registrar-anotar
-- [ ] FAQ: OK con las 3 preguntas nuevas
-- [ ] CTA: OK con "Empieza a anotar tu negocio hoy"
-
-**Pendiente no bloqueante:** si H0 se aprueba tal cual, H1/H2 (jerga/placeholders) y F0 (tokens)
-siguen según el orden copy-primero ya confirmado.
+- [x] Hero: **Opción A** ✅
+- [x] Badge + 3 checks del hero ✅
+- [x] Propuesta de valor: reescribir "colaboradores" ✅ / tarjetas sin otro cambio
+- [x] ¿Quiénes: universal ✅ (sin listado por áreas)
+- [x] Pasos reales OK ✅ — scroll-telling **condicional** (si la demo no lo convence, se retira)
+- [x] FAQ: 3 preguntas nuevas ✅ + universalización
+- [x] CTA: "Empieza a anotar tu negocio hoy" ✅
+- [x] **NUEVO: rebrand GIN global (quitar Neiva en el landing)** + video con 6 fotos Gemini

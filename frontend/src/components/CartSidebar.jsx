@@ -10,9 +10,11 @@ export default function CartSidebar() {
   const { registrar } = useVentas()
   const [procesando, setProcesando] = useState(false)
   const [mensaje, setMensaje] = useState(null)
+  const [confirmando, setConfirmando] = useState(false)
 
   const checkout = async () => {
     if (!carrito.length) return
+    setConfirmando(false)
     setProcesando(true)
     setMensaje(null)
     try {
@@ -158,7 +160,7 @@ export default function CartSidebar() {
             <span className="text-violet-600">${total.toLocaleString('es-CO', { maximumFractionDigits: 0 })}</span>
           </div>
           <button
-            onClick={checkout}
+            onClick={() => setConfirmando(true)}
             disabled={!carrito.length || procesando}
             className="w-full bg-violet-600 hover:bg-violet-700 disabled:bg-gray-200 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition-colors"
           >
@@ -174,6 +176,65 @@ export default function CartSidebar() {
           )}
         </div>
       </div>
+
+      {/* Modal de confirmación previa al cobro: evita registrar ventas por toques accidentales */}
+      {confirmando && carrito.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div className="p-5 text-center border-b border-gray-100">
+              <div className="text-4xl mb-2">🧾</div>
+              <h3 className="font-bold text-lg text-gray-800">¿Confirmar esta venta?</h3>
+              <p className="text-xs text-gray-500 mt-1">
+                Se descontará el stock y quedará registrada en tu historial
+              </p>
+            </div>
+
+            <div className="px-5 py-3 max-h-56 overflow-y-auto text-sm">
+              {carrito.map(item => (
+                <div key={item.id} className="flex justify-between items-center py-1.5 border-b border-dashed border-gray-100 last:border-0">
+                  <span className="text-gray-700 truncate pr-2">
+                    {item.cantidad} × {item.nombre}
+                  </span>
+                  <span className="font-semibold text-gray-800 shrink-0">
+                    ${(item.precio_venta * item.cantidad).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="mx-5 mb-1 flex justify-between items-center bg-violet-50 rounded-lg px-4 py-2.5">
+              <span className="text-sm text-gray-600">Total a cobrar</span>
+              <span className="font-extrabold text-xl text-violet-700">
+                ${total.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+              </span>
+            </div>
+
+            <div className="p-4 grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setConfirmando(false)}
+                disabled={procesando}
+                className="py-2.5 rounded-lg border border-gray-300 text-gray-600 font-semibold text-sm hover:bg-gray-50 active:scale-95 transition-all disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={checkout}
+                disabled={procesando}
+                className="py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                {procesando ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    Cobrando...
+                  </>
+                ) : (
+                  '✓ Confirmar venta'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
