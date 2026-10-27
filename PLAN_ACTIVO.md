@@ -823,6 +823,19 @@ teclado + LCP), YA que el guion usa las tomas reales. Luego QA1 (Gemini) del lan
 - Typos corregidos en `pasosScrollTelling`: «Sabras»→«Sabrás», «reinversion»→«reinversión».
 - **Verificación:** `grep Neiva|Huila|tendero|Sabras|reinversion|cajero|Entrar a mi Tienda`
   sobre LandingPage.jsx → **0 matches**; `cd frontend && npm run build` → ✅ built in 52.7s.
+
+**2026-10-27 — PIVOT del video: fotos → CLIPS Veo (decisión del dueño):**
+- Las 6 imágenes del V1 quedan **descartadas**: al dueño no le gustó el look (tiendas sucias,
+  de barrio maluco). También: clips de Gemini limitan a ~10 s c/u, así que se pasó de
+  generar fotos a generar **clips de video de 10 s** (los que pida el storyboard).
+- Reglas nuevas del dueño: tiendas **normales, bonitas y limpias**; varios dueños/negocios
+  distintos para mostrar universalidad; los **4 personajes de la apertura cierran el video**
+  (consistencia cronológica).
+- Nuevo doc fuente: `docs/media/video_gin/STORYBOARD_VIDEO.md` — casting fijo de 4
+  protagonistas (MARÍA tienda, DON CARLOS ferretería, ANA cafetería, JUAN papelería) +
+  6 clips de 10 s (V1–V6) con prompts Veo en EN, VO por clip y plan de montaje (~45–55 s).
+- El guion de voz dictado por el dueño queda intacto (marcado con ⭐ en el doc); líneas puente
+  nuevas quedan pendientes de su OK.
 - **Pendiente:** V1 (6 imágenes del video vía puente Antigravity/Gemini — requiere IDE abierta;
   `antigravity_status()` falló con "Antigravity no está abierto"). V2 montaje tras V1.
 - **H0 verificado:** Hero **Opción A**; badge/checks/propuesta/FAQ/CTA aprobados; "¿a quiénes
