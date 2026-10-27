@@ -61,6 +61,54 @@ export default function MostradorMode({
     // voiceState se re-evalúa en cada render por el closure del listener
   })
 
+  // 🔴 CABLE DE EMERGENCIA (independiente de React): un botón creado con DOM puro,
+  // colgado directo de document.body con listeners nativos (click/mousedown/touchend).
+  // Funciona aunque el sistema de eventos sintéticos de React esté muerto (pestaña
+  // zombi, hooks crasheados o una extensión de Chrome tragándose los clicks).
+  useEffect(() => {
+    if (!isOpen) return
+    const salir = () => {
+      try { window.__voiceSalirAlDashboard?.() } catch { /* React muerto: seguimos con el plan nuclear */ }
+      try {
+        // Plan nuclear: quitar el overlay del DOM a mano y navegar con recarga dura.
+        // El token sigue en localStorage, así que /dashboard carga logueado y recién nacido.
+        document.querySelectorAll('[data-voice-overlay="1"]').forEach((n) => n.remove())
+        if (!location.pathname.startsWith('/dashboard')) location.assign('/dashboard')
+      } catch { /* no-op */ }
+    }
+    const btn = document.createElement('button')
+    btn.id = 'voice-emergency-exit'
+    btn.textContent = '✕ Cerrar modo voz'
+    btn.title = 'Cierre de emergencia: funciona aunque la app esté congelada'
+    btn.style.cssText =
+      'position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:2147483647;' +
+      'background:#dc2626;color:#fff;border:0;border-radius:999px;' +
+      'padding:10px 20px;font:700 13px system-ui,sans-serif;cursor:pointer;' +
+      'box-shadow:0 4px 14px rgba(0,0,0,.5)'
+    let disparado = false
+    const disparar = (e) => {
+      if (disparado) return
+      disparado = true
+      e.preventDefault()
+      e.stopImmediatePropagation()
+      setTimeout(salir, 0)
+    }
+    // Tres tipos de evento: si una extensión traga 'click', mousedown/touchend pasan igual
+    btn.addEventListener('click', disparar)
+    btn.addEventListener('mousedown', disparar)
+    btn.addEventListener('touchend', disparar)
+    document.body.appendChild(btn)
+    return () => {
+      btn.remove()
+    }
+  }, [isOpen])
+
+  // Puente para el cable de emergencia: el handler de cierre sano de React
+  useEffect(() => {
+    window.__voiceSalirAlDashboard = () => salirAlDashboard()
+    return () => delete window.__voiceSalirAlDashboard
+  })
+
   // Activación por teclado: Escape = salir, Enter/Espacio = acción principal del estado
   useEffect(() => {
     if (!isOpen) return
@@ -112,6 +160,7 @@ export default function MostradorMode({
   return (
     <div
       tabIndex={-1}
+      data-voice-overlay="1"
       className="fixed inset-0 z-[70] bg-slate-950 flex flex-col justify-between p-4 md:p-6 text-white select-none animate-in fade-in duration-200 outline-none"
     >
       {/* Barra superior de control */}
