@@ -735,6 +735,26 @@ la tabla migrará a sus IDs según `docs/04_PROTOCOLO_UNIVERSAL_MODELO_AGNOSTICO
 
 ## Bitácora Sprint 9 — Despliegue
 
+### 2026-10-26 — Fix frontend.prod: MIME "text/html" en chunks JS al entrar como cajero
+
+- **Síntoma:** al acceder como cajero, consola con `Failed to load module script: MIME type "text/html"`
+  para `usuarioService-*.js`, `Ventas-*.js`, etc. Página en blanco.
+- **Diagnóstico (verificado contra producción):** pedidos a `https://gestion-neiva-claude.vercel.app
+  /assets/UsuarioService...` devolvían **HTML del index**, no JS. El `index.html` servido referencia
+  `/assets/index-8yrwzbVS.js` (deploy nuevo, con `Ventas-BVkBLE4v.js`), pero el navegador pedía
+  chunks con hashes viejos (`index-BRtgzhqd.js`, `Ventas-Bu47AtJ6.js`) → caché de navegador de un
+  `index.html` de un deploy anterior. Los chunks antiguos ya no existen; el `rewrite /(.*) →
+  /index.html` de Vercel devolvía HTML ⇒ error MIME estricto de módulos.
+- **El deploy NO estaba roto:** `assets/index-8yrwzbVS.js` responde JS válido con todo el map de
+  chunks nuevos. Era un problema client-side de caché antigua.
+- **Hardening en `frontend/vercel.json`:** headers explícitos — `/assets/(.*)` → `immutable, 1 año`;
+  `/(.*)` → `max-age=0, must-revalidate` (el `index.html` nunca queda pegado tras un deploy).
+- **Acción usuario inmediata:** recarga forzada (Ctrl+Shift+R) o limpiar caché del dominio.
+- **Propuesta pendiente (no implementada):** fallback de recuperación en runtime ante chunks
+  faltantes por deploy en caliente (retry de `import()` con reload una vez) — útil para clientes ya
+  con la pestaña abierta durante un deploy.
+- **Pendiente:** redeploy (o push) para que los headers del `vercel.json` queden activos en Vercel.
+
 ### 2026-10-23bis — HERO CINEMÁTICO AUTOPLAY (corrección de concepto, commit f5e06a5)
 
 **Feedback del dueño:** el spot NO debe ser scroll-scrub; debe **presentarse solo** en el
