@@ -180,7 +180,8 @@ def obtener_actividad_ventas(
 ) -> list[models.Venta]:
     """
     Retorna la actividad de ventas de un día comercial en Colombia (America/Bogota).
-    Usa intervalo semiabierto [inicio, fin) y orden determinista (fecha_venta ASC, id ASC).
+    Usa intervalo semiabierto [inicio, fin) y orden LIFO (fecha_venta DESC, id DESC):
+    las ventas más recientes aparecen primero (petición del dueño 28-10).
     Valida pertenencia multi-tenant estricta si se filtra por usuario_id.
     """
     if not fecha:
@@ -228,5 +229,5 @@ def obtener_actividad_ventas(
     if usuario_id:
         query = query.filter(models.Venta.usuario_id == usuario_id)
 
-    return query.order_by(models.Venta.fecha_venta.asc(), models.Venta.id.asc()).all()
+    return query.order_by(models.Venta.fecha_venta.desc(), models.Venta.id.desc()).all()
 

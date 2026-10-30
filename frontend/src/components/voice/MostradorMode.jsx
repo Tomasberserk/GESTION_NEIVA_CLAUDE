@@ -77,15 +77,27 @@ export default function MostradorMode({
         if (document.querySelector('[data-voice-overlay="1"]')) location.replace('/dashboard')
       }, 300)
     }
+    // Micro-hoja de estilos para el hover del botón nativo (los inline no soportan :hover)
+    if (!document.getElementById('voice-exit-style')) {
+      const s = document.createElement('style')
+      s.id = 'voice-exit-style'
+      s.textContent =
+        '#voice-emergency-exit:hover{background-color:#334155;color:#fff}' +
+        '#voice-emergency-exit:active{transform:scale(.96)}'
+      document.head.appendChild(s)
+    }
     const btn = document.createElement('button')
     btn.id = 'voice-emergency-exit'
-    btn.textContent = '✕ Cerrar modo voz'
-    btn.title = 'Cierre de emergencia: funciona aunque la app esté congelada'
+    btn.setAttribute('aria-label', 'Cerrar modo voz')
+    btn.title = 'Cerrar modo voz y volver al Dashboard'
+    btn.innerHTML = '<span style="color:#f87171;font-weight:700">✕</span><span>Cerrar</span>'
+    // Diseño integrado a la barra superior: mismo look que Reiniciar, avatar ✕ en rojo
     btn.style.cssText =
-      'position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:2147483647;' +
-      'background:#dc2626;color:#fff;border:0;border-radius:999px;' +
-      'padding:10px 20px;font:700 13px system-ui,sans-serif;cursor:pointer;' +
-      'box-shadow:0 4px 14px rgba(0,0,0,.5)'
+      'position:fixed;top:12px;right:16px;z-index:2147483647;' +
+      'display:inline-flex;align-items:center;gap:6px;background:rgba(30,41,59,.85);' +
+      'color:#cbd5e1;border:1px solid #334155;border-radius:8px;padding:6px 12px;' +
+      'font:500 12px/1 system-ui,-apple-system,sans-serif;cursor:pointer;' +
+      'transition:background-color .15s,color .15s,transform .1s'
     let disparado = false
     const disparar = (e) => {
       if (disparado) return
@@ -203,13 +215,8 @@ export default function MostradorMode({
             <span className="hidden sm:inline">Reiniciar</span>
           </button>
 
-          <button
-            onClick={salirAlDashboard}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 active:scale-95 transition-all"
-          >
-            <X className="w-4 h-4" />
-            <span>Salir</span>
-          </button>
+          {/* Espacio reservado para el botón nativo "Cerrar modo voz" (DOM puro, brazo derecho de la barra) */}
+          <div className="w-[120px] shrink-0" aria-hidden="true" />
         </div>
       </div>
 

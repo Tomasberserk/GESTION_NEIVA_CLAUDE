@@ -549,6 +549,16 @@ clientes potenciales, NO se procede con nada más del plan (ni graphify update, 
 
 **Verificación E2E en Chromium:** ciclo `READY → SPEAKING (botón omitir visible) → LISTENING → ERROR (mic denegado en entorno automatizado, con botón Reintentar) → reactivar → SPEAKING...` sin storm (6 errores de consola en total, 1 por denegación). Suite de voz 43/43 ✅ y `npm run build` limpio.
 
+### Fix 30-10-2026 — Orden LIFO en Actividad del Día + un solo botón de cierre (petición del dueño)
+
+Tras la primera prueba E2E real del dueño con ventas por voz (flujo LISTENING→PROCESSING→venta exitosa ✅):
+
+- **Ventas más recientes primero:** `venta_service.obtener_actividad_ventas` cambió `fecha_venta ASC → DESC` (y `id ASC → id DESC` como desempate). El dueño reportó ver las ventas "de forma ascendente a la hora" — ahora la más reciente encabeza la Actividad del Día. Verificación: 3 ventas demo (09:30/10:30/11:30) → endpoint lista 11:30, 10:30, 09:30. 86/86 tests backend.
+- **Un solo botón de cierre:** se eliminó el botón "Salir" de la barra superior del modo voz; el cierre nativo (DOM puro, id `voice-emergency-exit`) quedó como ÚNICO control de cierre, rediseñado para pertenecer a la barra: posición arriba-derecha (donde estaba Salir), estilo slate coherente con Reiniciar (`bg-slate-800/85`, borde `#334155`, hover `#334155`/blanco vía micro-stylesheet `#voice-exit-style`), texto "✕ Cerrar" con la ✕ en rojo como affordance, espacio reservado en la barra (`w-[120px]`) para que no se pisen. Conserva sus tres listeners nativos (click/mousedown/touchend) y el plan nuclear de los 300 ms.
+- Dato del owner's video (28-10): en su móvil (`isMobile:true`) el agente detectó `BackendSTTProvider` como primario — caminos móviles ya activos en prod.
+
+---
+
 ### Fix definitivo 26-10-2026 (III) — Hallazgos de auditoría externa: portal + condición + pointer-events (commits post-48b9c0c)
 
 Auditoría (Gemini, formato de prompt en `docs/traspaso/PROMPT_AUDITORIA_MODO_VOZ.md`) refutó la tesis de la extensión y encontró **dos defectos deterministas** del propio código, ambos introducidos/compuestos en `48b9c0c`:
