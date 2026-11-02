@@ -559,6 +559,36 @@ Tras la primera prueba E2E real del dueño con ventas por voz (flujo LISTENING�
 
 ---
 
+### Fix 02-11-2026 — "Acá no me vuelve nada": entrega tardía, anti-sueño y medición de latencia
+
+**Evidencia (video real del dueño, 02-11, 130s, 1480×766):** se extrajeron 65 frames + audio transcrito (faster-whisper). En la consola visible del video aparece la secuencia mortal del turno:
+
+```
+[VOICE-TURN] SEND_MESSAGE turnId=2 → POST /agente/mensaje (Render)
+⏳ >15s
+[VOICE-TURN] Watchdog PROCESSING expiró (15s). Reseteando a READY
+[agentService] HTTP 200 ← el backend SÍ respondió
+[VOICE-LIFECYCLE] IGNORED_STALE_CALLBACK event=onSendMessage_resolved_after_invalidation
+                  callbackTurn=2 activeTurn=2 state=READY
+```
+
+**Diagnóstico:** no era que el backend no respondiera — el propio frontend **descartaba la respuesta por llegada tardía** (guard post-asíncrono `state !== PROCESSING` + `turnFinalized=true` del watchdog). El dueño oía silencio y concluía "no me vuelve nada".
+
+**Correcciones:**
+- **P1 — Ventana de entrega tardía** (`VoiceTurnManager.js`): al expirar el watchdog PROCESSING ya NO se invalida el turno; se guarda `pendingLateResponse {turnId, sessionGen}` y el orbe pasa a READY. Cuando la respuesta resuelve, si el turno sigue siendo el activo y ningún turno nuevo arrancó (`_enVentanaTardia`), **se entrega y se habla igual** (`LATE_RESPONSE` en consola). Si el dueño inició otro turno (`iniciarEscucha`/`_invalidateCurrentTurn`), la ventana se cierra y la respuesta vieja se descarta como antes. Nuevo `sendSeq` desambigua dobles envíos del mismo `turnId` (p. ej. confirmación manual durante la ventana tardía). `enviarMensajeManual` libera `turnFinalized` para permitir el envío manual durante la ventana.
+- **P2 — Anti-sueño Render** (`useVoiceAgent.js`): heartbeat `GET /health` cada 4 min mientras el modo voz está montado + latido inmediato al entrar (precalienta cold start). Render free duerme el servicio tras ~15 min sin tráfico → cold start de decenas de segundos, sospechoso #1 de latencias >10s. Funciona también en dev (proxy `/api` reescribe a `/health`).
+- **P3 — Medición por fase** (`app/routers/agente.py`): la respuesta de `/agente/mensaje` ahora incluye `tiempos: {total_ms, fuente}` medido en el router; el frontend lo loguea como `[VOICE-TURN] TIEMPOS_BACKEND backend_total_ms=… frontend_roundtrip_ms=…`. Test nuevo en `test_agente_produccion.py` T-01 valida presencia/tipo.
+
+**Verificación:**
+- Harness Node del FSM (`tmp_vtm_test.mjs`, bundle esbuild de `VoiceTurnManager.js`): **4/4 ✅** — T1 respuesta tardía se entrega y habla; T2 turno nuevo descarta tardía vieja; T3 flujo normal intacto; T4 envío manual en ventana tardía desambiguado por `sendSeq`.
+- Backend: **86/86 pytest** (86 originales + assertion `tiempos` en T-01 → 16/16 en `test_agente_produccion.py`).
+- E2E local `POST /api/agente/mensaje` (:8002): `tiempos: {'total_ms': 0, 'fuente': 'backend'}` en respuesta IDLE (plan PRO temporal revertido a BASIC tras la prueba).
+- `npm run build` limpio (15.29s).
+
+**Pendiente (P4, opcional):** streaming LLM→TTS para que el habla empiece con la primera frase en vez de esperar el texto completo.
+
+---
+
 ### Fix definitivo 26-10-2026 (III) — Hallazgos de auditoría externa: portal + condición + pointer-events (commits post-48b9c0c)
 
 Auditoría (Gemini, formato de prompt en `docs/traspaso/PROMPT_AUDITORIA_MODO_VOZ.md`) refutó la tesis de la extensión y encontró **dos defectos deterministas** del propio código, ambos introducidos/compuestos en `48b9c0c`:

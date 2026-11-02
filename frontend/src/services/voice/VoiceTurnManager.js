@@ -78,6 +78,14 @@ export class VoiceTurnManager {
     this.stopRequestTimer = null
     this.processingWatchdogTimer = null
     this.speakingWatchdogTimer = null
+    // Ventana de entrega tardía: tras expirar el watchdog PROCESSING guardamos
+    // el turno activo para ACEPTAR la respuesta del backend si llega más tarde
+    // (antes se descartaba como "stale callback" y el dueño oía silencio).
+    this.pendingLateResponse = null
+    // Secuencia incremental por cada envío: desambigua dobles envíos del mismo turnId.
+    this.sendSeq = 0
+    // Duración del watchdog de PROCESSING (test puede acortarla).
+    this.processingWatchdogMs = 15000
 
     this._bindProviders()
     console.log('[VOICE-DEBUG][VoiceTurnManager] Instanciación completa. Estado inicial:', this.state, 'Proveedor activo:', this.activeProviderType)
@@ -88,6 +96,22 @@ export class VoiceTurnManager {
     if (sessionGen !== null && sessionGen !== this.sessionGeneration) return false
     if (providerGen !== null && providerGen !== this.providerGeneration) return false
     return true
+  }
+
+  /**
+   * ¿Está abierta la ventana de entrega tardía para este turno?
+   * (watchdog PROCESSING ya expiró pero el backend aún puede responder).
+   */
+  _enVentanaTardia(turnId, sessionGen = null) {
+    const win = this.pendingLateResponse
+    return !!win && win.turnId === turnId && (sessionGen === null || win.sessionGen === sessionGen)
+  }
+
+  _cerrarVentanaTardia(turnId = null) {
+    if (this.pendingLateResponse && (turnId === null || this.pendingLateResponse.turnId === turnId)) {
+      console.log(`[VOICE-TURN] VENTANA_TARDIA cerrada turnId=${this.pendingLateResponse.turnId}`)
+      this.pendingLateResponse = null
+    }
   }
 
   _logLifecycle(event, details = {}) {
@@ -108,6 +132,7 @@ export class VoiceTurnManager {
     this.turnFinalized = false
     this.isTranscribing = false
     this.interimTranscript = ''
+    this._cerrarVentanaTardia()
     this._limpiarTimers()
     if (this.currentSTT) {
       try { this.currentSTT.cancel(this.currentTurnId) } catch (_) {}
@@ -478,6 +503,7 @@ export class VoiceTurnManager {
     this._limpiarTimers()
     const turnId = ++this.turnCounter
     this.currentTurnId = turnId
+    this._cerrarVentanaTardia() // un turno nuevo invalida respuestas pendientes de turnos viejos
     const sessionGen = this.sessionGeneration
     this.providerGeneration = ++this.providerCounter
     this.currentSTT.generation = this.providerGeneration
@@ -549,6 +575,7 @@ export class VoiceTurnManager {
 
     console.log(`[VOICE-TURN] SEND_MESSAGE turnId=${this.currentTurnId} texto="${texto.trim()}"`)
     const t0 = Date.now()
+    const seq = ++this.sendSeq
 
     try {
       if (!this.onSendMessage) {
@@ -557,10 +584,22 @@ export class VoiceTurnManager {
 
       const res = await this.onSendMessage(texto.trim())
 
-      // Guard post-asíncrono obligatorio: si el turno fue invalidado o cambiado mientras se esperaba la respuesta
-      if (!this._isTurnActive(turnId, sessionGen) || this.state !== VoiceTurnState.PROCESSING) {
+      // Guard post-asíncrono obligatorio: si el turno fue invalidado, cambió de turno,
+      // hubo un envío más nuevo (seq) o el estado se movió — PERO la respuesta tardía
+      // se ACEPTA si el watchdog apenas expiró y ningún turno nuevo arrancó.
+      const entregaTardia = this.state !== VoiceTurnState.PROCESSING && this._enVentanaTardia(turnId, sessionGen)
+      if (
+        !this._isTurnActive(turnId, sessionGen) ||
+        seq !== this.sendSeq ||
+        (this.state !== VoiceTurnState.PROCESSING && !entregaTardia)
+      ) {
+        this._cerrarVentanaTardia(turnId)
         this._logStaleCallback('onSendMessage_resolved_after_invalidation', { turnId, sessionGen })
         return
+      }
+      this._cerrarVentanaTardia()
+      if (entregaTardia) {
+        console.log(`[VOICE-TURN] LATE_RESPONSE turnId=${turnId}: la respuesta llegó tras el watchdog — se entrega igual ✅`)
       }
 
       if (this.processingWatchdogTimer) {
@@ -571,6 +610,11 @@ export class VoiceTurnManager {
       const latency = Date.now() - t0
       console.log(`[VOICE-TURN] AGENT_RESPONSE turnId=${this.currentTurnId} latency=${latency}ms:`, res)
       voiceTelemetry.recordBackendResponse(latency)
+      if (res && res.tiempos) {
+        console.log(
+          `[VOICE-TURN] TIEMPOS_BACKEND turnId=${this.currentTurnId} backend_total_ms=${res.tiempos.total_ms} frontend_roundtrip_ms=${latency}`
+        )
+      }
 
       if (this.onAgentResponse) {
         this.onAgentResponse(res)
@@ -588,9 +632,16 @@ export class VoiceTurnManager {
       // Reproducir audio con la respuesta
       this.reproducirRespuesta(respuestaTexto, esConfirmacion ? VoiceTurnState.CONFIRMING : VoiceTurnState.READY)
     } catch (err) {
-      if (!this._isTurnActive(turnId, sessionGen) || this.state !== VoiceTurnState.PROCESSING) {
+      const entregaTardia = this.state !== VoiceTurnState.PROCESSING && this._enVentanaTardia(turnId, sessionGen)
+      if (
+        !this._isTurnActive(turnId, sessionGen) ||
+        seq !== this.sendSeq ||
+        (this.state !== VoiceTurnState.PROCESSING && !entregaTardia)
+      ) {
+        this._cerrarVentanaTardia(turnId)
         return
       }
+      this._cerrarVentanaTardia()
       if (this.processingWatchdogTimer) {
         clearTimeout(this.processingWatchdogTimer)
         this.processingWatchdogTimer = null
@@ -608,6 +659,12 @@ export class VoiceTurnManager {
       console.warn('[VOICE-TURN] enviarMensajeManual ignorado: ya se está procesando un turno')
       return
     }
+    // Si hay una respuesta tardía pendiente del backend, se vuelve obsoleta:
+    // el usuario ya no la espera, escribió/habló algo nuevo.
+    this._cerrarVentanaTardia()
+    // El turno asociado ya marcó turnFinalized=true en su primer envío; un envío
+    // manual dentro de la ventana tardía es un envío NUEVO legítimo (seq lo desambigua).
+    this.turnFinalized = false
     const turnId = this.currentTurnId
     const sessionGen = this.sessionGeneration
     console.log(`[VOICE-DEBUG][VoiceTurnManager] enviarMensajeManual llamado turnId=${turnId} con:`, texto)
@@ -844,13 +901,15 @@ export class VoiceTurnManager {
         return
       }
       if (this.state === VoiceTurnState.PROCESSING) {
-        console.warn(`[VOICE-TURN] Watchdog PROCESSING expiró (15s) turnId=${turnId}. Reseteando a READY...`)
+        console.warn(
+          `[VOICE-TURN] Watchdog PROCESSING expiró (${Math.round(this.processingWatchdogMs / 1000)}s) turnId=${turnId}. Orbe vuelve a LISTO pero se abre ventana de entrega tardía: si la respuesta del backend llega, SE HABLA igual.`
+        )
         if (this.currentSTT) this.currentSTT.cancel(turnId)
         this.isTranscribing = false
-        this.turnFinalized = true
-        this._setState(VoiceTurnState.READY)
+        this.pendingLateResponse = { turnId, sessionGen: targetSessionGen }
+        this._setState(VoiceTurnState.READY, { esperandoRespuestaTardia: true })
       }
-    }, 15000)
+    }, this.processingWatchdogMs)
   }
 
   _limpiarTimers() {

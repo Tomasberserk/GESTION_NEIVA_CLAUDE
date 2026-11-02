@@ -5,6 +5,7 @@ al AgentOrchestrator, validando la identidad del usuario y empresa mediante JWT.
 """
 
 import os
+import time
 from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from pydantic import BaseModel, Field
@@ -38,6 +39,9 @@ class MensajeAgenteRespuesta(BaseModel):
     preview: dict[str, Any] | None = None
     resultado: dict[str, Any] | None = None
     idempotente: bool = False
+    # Medición de latencias por fase (parte de abajo): el frontend la loguea
+    # para diagnosticar Times >10s reportados por el dueño.
+    tiempos: dict[str, Any] | None = None
 
 
 @router.post(
@@ -52,6 +56,7 @@ async def enviar_mensaje(
     current_user: models.Usuario = Depends(require_pro_entitlement),
 ):
     """Procesa un comando en lenguaje natural, manteniendo sesión y FSM."""
+    t_total = time.perf_counter()
     try:
         resultado = await _orchestrator.procesar_mensaje(
             mensaje=payload.mensaje,
@@ -59,6 +64,10 @@ async def enviar_mensaje(
             db=db,
             conversation_id=payload.conversation_id,
         )
+        total_ms = int((time.perf_counter() - t_total) * 1000)
+        if isinstance(resultado, dict):
+            resultado["tiempos"] = {"total_ms": total_ms, "fuente": "backend"}
+        print(f"[VOICE-BACKEND] /mensaje total_ms={total_ms} mensaje={payload.mensaje[:50]!r}", flush=True)
         return resultado
     except SessionStoreUnavailableError as exc:
         raise HTTPException(

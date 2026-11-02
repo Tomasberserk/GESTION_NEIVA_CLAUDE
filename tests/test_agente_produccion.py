@@ -100,6 +100,10 @@ def test_t01_producto_ambiguo_genera_clarification(client):
     assert "clarification" in data and data["clarification"] is not None
     assert len(data["clarification"]["options"]) >= 2
     assert "clarification_id" in data["clarification"]
+    # P3 (latencia): el backend reporta tiempos por fase para diagnosticar >10s
+    assert data.get("tiempos") is not None, "falta el bloque 'tiempos' en la respuesta"
+    assert isinstance(data["tiempos"].get("total_ms"), int)
+    assert data["tiempos"]["total_ms"] >= 0
 
 
 # ---------------------------------------------------------------------------

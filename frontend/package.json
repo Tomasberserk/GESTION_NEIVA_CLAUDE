@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:voice": "esbuild src/services/voice/VoiceTurnManager.js --bundle --format=esm --outfile=tests/voice/.cache/vtm.mjs --define:import.meta.env={} && node tests/voice/lateResponse.test.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.0.5",

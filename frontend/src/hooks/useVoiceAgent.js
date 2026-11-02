@@ -53,6 +53,30 @@ export function useVoiceAgent() {
     }
   }, [])
 
+  // [VOICE-HEARTBEAT] Anti-sueño: Render free duerme el servicio tras ~15 min sin
+  // tráfico → cold start de decenas de segundos (causa #1 de las respuestas >10s).
+  // Mientras el hook del modo voz esté vivo, latimos /health cada 4 min y el
+  // primer latido al montar también precalienta el cold start.
+  useEffect(() => {
+    const BASE = import.meta.env.VITE_API_URL || '/api'
+    const raiz = BASE.replace(/\/api\/?$/, '')
+    let cancelado = false
+    const latir = () => {
+      const t = Date.now()
+      fetch(`${raiz}/health`, { method: 'GET' })
+        .then((r) => {
+          if (!cancelado) console.log(`[VOICE-HEARTBEAT] /health → ${r.status} (${Date.now() - t}ms)`)
+        })
+        .catch(() => {})
+    }
+    latir()
+    const id = setInterval(latir, 4 * 60 * 1000)
+    return () => {
+      cancelado = true
+      clearInterval(id)
+    }
+  }, [])
+
   const activarModoVoz = useCallback(async (saludar = true) => {
     console.log('[VOICE-DEBUG][useVoiceAgent] activarModoVoz disparado por usuario, saludar:', saludar)
     setTranscript('')
