@@ -559,6 +559,29 @@ Tras la primera prueba E2E real del dueño con ventas por voz (flujo LISTENING�
 
 ---
 
+### Fix 02-11-2026 (II) — Modo Voz en Móvil: Garbage Collection de TTS, watchdog dinámico anti-congelamiento, reanudación fluida y visor de logs táctil
+
+**Síntoma reportado por el dueño (móvil):**
+- El primer registro vocal funciona (escucha, procesa y confirma la venta).
+- Tras la operación, el orbe se queda congelado en "Hablando..." sin salir del estado.
+- Cuando finalmente sale del estado hablando (a los 15s de watchdog), el orbe queda en "Listo" (apagado en gris) y el tap no reactiva la escucha fluidamente. Al estar en celular, no había visibilidad de consola.
+
+**Causas de raíz resueltas:**
+1. **Chromium Bug #679437 en Android Chrome (GC de TTS):** La `SpeechSynthesisUtterance` era una variable local en `SpeechSynthesisProvider.speak()`. En Android Chrome, el Garbage Collector de V8 la recolectaba durante la reproducción, cancelando la emisión de `onend` y `onerror`. Fix: referencia fuerte anclada en `this._activeUtterance` y en `window.__activeVoiceUtterance` con liberación explícita en `onend`, `onerror` y `cancel()`.
+2. **Watchdog TTS estático de 15 segundos (`VoiceTurnManager.js`):** Al fallar `onend`, el orbe se quedaba 15 segundos enteros congelado en `SPEAKING`. Fix: watchdog TTS adaptativo proporcional al texto (`Math.max(3000, Math.min(9000, Math.round((cleanLen / 11) * 1000) + 1800))`). Frases cortas de venta se recuperan solas en ~3.5s si el sintetizador no reporta el fin.
+3. **Desbloqueo de escucha en estados desfasados (`iniciarEscucha`):** Si `this.currentSTT?.isActive()` quedó con flags pendientes mientras el manager está en `READY` o `IDLE`, se fuerza un `currentSTT.cancel()` limpio para no bloquear la reanudación de la escucha.
+4. **Tap fluido en el Orbe (`handleOrbClick` en `MostradorMode.jsx`):**
+   - En `READY` o `IDLE`: tap en el orbe llama de inmediato a `iniciarEscucha()` (no destruye ni recrea la sesión).
+   - En `SPEAKING` o `SETTLING`: tap en el orbe omite el audio y pasa de inmediato a escuchar.
+   - Auto-activación al abrir el modal si el servicio está en `IDLE`.
+5. **Visor de Telemetría y Logs en Vivo para Móvil (`📜 Logs`):** Botón en la barra superior de `MostradorMode` con panel flotante colapsable que muestra en tiempo real los últimos 25 eventos `[VOICE-TURN]`, `[VOICE-STT]`, `[VOICE-TTS]` con hora exacta para diagnóstico remoto sin DevTools.
+
+**Verificación:**
+- `npm run test:voice` (Harness FSM 4/4 pasando en 17ms).
+- `npm run build` en `frontend/` limpio en 8.06s.
+
+---
+
 ### Fix 02-11-2026 — "Acá no me vuelve nada": entrega tardía, anti-sueño y medición de latencia
 
 **Evidencia (video real del dueño, 02-11, 130s, 1480×766):** se extrajeron 65 frames + audio transcrito (faster-whisper). En la consola visible del video aparece la secuencia mortal del turno:

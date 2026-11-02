@@ -163,6 +163,13 @@ export function useVoiceAgent() {
     }
   }, [])
 
+  const iniciarEscucha = useCallback(() => {
+    console.log('[VOICE-DEBUG][useVoiceAgent] iniciarEscucha disparado')
+    if (managerRef.current) {
+      managerRef.current.iniciarEscucha()
+    }
+  }, [])
+
   return {
     voiceState,
     transcript,
@@ -170,6 +177,7 @@ export function useVoiceAgent() {
     errorMessage,
     activarModoVoz,
     desactivarModoVoz,
+    iniciarEscucha,
     detenerYEnviar,
     omitirRespuesta,
     reiniciarSesion,

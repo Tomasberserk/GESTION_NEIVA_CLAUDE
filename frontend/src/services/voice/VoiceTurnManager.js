@@ -471,6 +471,17 @@ export class VoiceTurnManager {
   async iniciarEscucha() {
     const dev = detectDeviceCapabilities()
 
+    // Si el provider quedó desfasado con flags viejos mientras el manager ya está en READY o IDLE,
+    // forzar reseteo de recursos del provider para no bloquear la escucha.
+    if ((this.state === VoiceTurnState.READY || this.state === VoiceTurnState.IDLE) && this.currentSTT?.isActive?.()) {
+      console.warn('[VOICE-LIFECYCLE] Provider en estado activo desfasado respecto al manager. Forzando reset...', {
+        isListening: this.currentSTT?.isListening,
+        isStarting: this.currentSTT?.isStarting,
+        isActive: this.currentSTT?.isActive?.(),
+      })
+      try { this.currentSTT.cancel(this.currentTurnId) } catch (_) {}
+    }
+
     // Guard de lifecycle estricto contra reentrancia
     if (
       this.state === VoiceTurnState.LISTENING ||
@@ -684,12 +695,14 @@ export class VoiceTurnManager {
     this._setState(VoiceTurnState.SPEAKING)
     this.tts.speak(texto)
 
-    // Watchdog anti-bloqueo: si el navegador nunca dispara utterance.onend
-    // (bug conocido de Chrome con voces sin cargar o síntesis pausada),
-    // forzamos la recuperación al estado siguiente tras 15 segundos.
+    // Watchdog anti-bloqueo dinámico adaptativo:
+    // Estimación ~11 caracteres por segundo en español + 1.8s de buffer.
+    // Frase corta (30 chars) -> ~4.5s. Frase larga -> máx 9s (nunca 15s congelados).
     if (this.speakingWatchdogTimer) {
       clearTimeout(this.speakingWatchdogTimer)
     }
+    const cleanLen = (texto || '').length
+    const ttsWatchdogMs = Math.max(3000, Math.min(9000, Math.round((cleanLen / 11) * 1000) + 1800))
     const sessionGen = this.sessionGeneration
     this.speakingWatchdogTimer = setTimeout(() => {
       this.speakingWatchdogTimer = null
@@ -700,9 +713,10 @@ export class VoiceTurnManager {
       if (this.state !== VoiceTurnState.SPEAKING) {
         return
       }
-      console.warn(`[VOICE-LIFECYCLE] Watchdog TTS expiró (15s) en SPEAKING turnId=${turnId}: forzando recuperación al estado ${siguienteEstado}`)
+      console.warn(`[VOICE-LIFECYCLE] Watchdog TTS expiró (${Math.round(ttsWatchdogMs / 1000)}s) en SPEAKING turnId=${turnId}: forzando recuperación al estado ${siguienteEstado}`)
+      this.tts.cancel()
       this._iniciarVentanaSettling(turnId)
-    }, 15000)
+    }, ttsWatchdogMs)
   }
 
   /**

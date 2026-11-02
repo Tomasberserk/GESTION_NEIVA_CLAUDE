@@ -13,6 +13,7 @@ export class SpeechSynthesisProvider {
     this.onStart = null
     this.onEnd = null
     this.onError = null
+    this._activeUtterance = null
 
     this._initVoices()
   }
@@ -89,6 +90,13 @@ export class SpeechSynthesisProvider {
     }
 
     const utterance = new SpeechSynthesisUtterance(cleanText)
+    // Retener referencia fuerte para evitar que el Garbage Collector de V8
+    // en Android Chrome la recolecte a mitad de reproducción (Chromium Bug 679437)
+    this._activeUtterance = utterance
+    if (typeof window !== 'undefined') {
+      window.__activeVoiceUtterance = utterance
+    }
+
     if (this.selectedVoice) {
       utterance.voice = this.selectedVoice
       utterance.lang = this.selectedVoice.lang || 'es-CO'
@@ -100,6 +108,16 @@ export class SpeechSynthesisProvider {
     utterance.rate = 1.05
     utterance.pitch = 1.0
 
+    const limpiarRef = () => {
+      this.isSpeaking = false
+      if (this._activeUtterance === utterance) {
+        this._activeUtterance = null
+      }
+      if (typeof window !== 'undefined' && window.__activeVoiceUtterance === utterance) {
+        window.__activeVoiceUtterance = null
+      }
+    }
+
     utterance.onstart = () => {
       this.isSpeaking = true
       if (this.onStart) {
@@ -108,14 +126,14 @@ export class SpeechSynthesisProvider {
     }
 
     utterance.onend = () => {
-      this.isSpeaking = false
+      limpiarRef()
       if (this.onEnd) {
         this.onEnd()
       }
     }
 
     utterance.onerror = (event) => {
-      this.isSpeaking = false
+      limpiarRef()
       // No disparar error fatal si fue una cancelación intencional
       if (event.error !== 'interrupted' && event.error !== 'canceled') {
         if (this.onError) {
@@ -128,9 +146,10 @@ export class SpeechSynthesisProvider {
     }
 
     try {
+      this.resume()
       this.synth.speak(utterance)
     } catch {
-      this.isSpeaking = false
+      limpiarRef()
       if (this.onEnd) this.onEnd()
     }
   }
@@ -144,5 +163,9 @@ export class SpeechSynthesisProvider {
       }
     }
     this.isSpeaking = false
+    this._activeUtterance = null
+    if (typeof window !== 'undefined') {
+      window.__activeVoiceUtterance = null
+    }
   }
 }

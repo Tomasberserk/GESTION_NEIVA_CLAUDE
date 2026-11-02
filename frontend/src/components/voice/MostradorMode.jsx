@@ -1,7 +1,7 @@
-import React, { useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { X, Mic, MicOff, Check, AlertCircle, Sparkles, Volume2, RotateCcw } from 'lucide-react'
+import { X, Mic, MicOff, Check, AlertCircle, Sparkles, Volume2, RotateCcw, Terminal } from 'lucide-react'
 import VoiceOrb from './VoiceOrb'
 import { VoiceTurnState } from '../../services/voice/VoiceTurnManager'
 
@@ -24,6 +24,7 @@ export default function MostradorMode({
     errorMessage,
     activarModoVoz,
     desactivarModoVoz,
+    iniciarEscucha,
     detenerYEnviar,
     omitirRespuesta,
     reiniciarSesion,
@@ -34,6 +35,46 @@ export default function MostradorMode({
   } = voiceAgent || {}
 
   const navigate = useNavigate()
+
+  const [mostrarLogs, setMostrarLogs] = useState(false)
+  const [logsRecientes, setLogsRecientes] = useState([])
+
+  // Interceptor de logs para visibilidad en celulares (sin DevTools)
+  useEffect(() => {
+    if (!isOpen) return
+    const origLog = console.log
+    const origWarn = console.warn
+    const origError = console.error
+
+    const interceptar = (tipo, args) => {
+      const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')
+      if (msg.includes('[VOICE-') || msg.includes('VoiceTurnManager')) {
+        const timestamp = new Date().toLocaleTimeString('es-CO', { hour12: false })
+        setLogsRecientes(prev => [{ id: Date.now() + Math.random(), time: timestamp, tipo, msg }, ...prev.slice(0, 24)])
+      }
+    }
+
+    console.log = (...args) => { origLog(...args); interceptar('info', args) }
+    console.warn = (...args) => { origWarn(...args); interceptar('warn', args) }
+    console.error = (...args) => { origError(...args); interceptar('error', args) }
+
+    return () => {
+      console.log = origLog
+      console.warn = origWarn
+      console.error = origError
+    }
+  }, [isOpen])
+
+  // Auto-activación si el modal se abre y el servicio está en IDLE
+  useEffect(() => {
+    if (isOpen && voiceState === VoiceTurnState.IDLE) {
+      console.log('[MostradorMode] Modal abierto en IDLE: auto-activando sesión de voz...')
+      if (typeof activarModoVoz === 'function') {
+        activarModoVoz(true)
+      }
+    }
+  }, [isOpen, voiceState, activarModoVoz])
+
 
   // "Salir" cierra el modo voz y regresa al Dashboard (nunca cierra la sesión).
   const salirAlDashboard = () => {
@@ -156,13 +197,19 @@ export default function MostradorMode({
     if (voiceState === VoiceTurnState.LISTENING || voiceState === VoiceTurnState.SPEECH_DETECTED) {
       detenerYEnviar()
     } else if (voiceState === VoiceTurnState.READY) {
-      activarModoVoz(false)
+      if (typeof iniciarEscucha === 'function') {
+        iniciarEscucha()
+      } else {
+        activarModoVoz(false)
+      }
+    } else if (voiceState === VoiceTurnState.IDLE) {
+      activarModoVoz(true)
     } else if (voiceState === VoiceTurnState.PROCESSING) {
       console.log('[MostradorMode] Usuario tocó el orbe durante PROCESSING: reseteando sesión...')
       desactivarModoVoz()
       setTimeout(() => activarModoVoz(false), 200)
     } else if (voiceState === VoiceTurnState.SPEAKING || voiceState === VoiceTurnState.SETTLING) {
-      console.log('[MostradorMode] Usuario tocó el orbe durante SPEAKING: omitiendo audio...')
+      console.log('[MostradorMode] Usuario tocó el orbe durante SPEAKING: omitiendo audio y reanudando escucha...')
       omitirRespuesta()
     } else if (isError) {
       console.log('[MostradorMode] Usuario tocó el orbe durante ERROR: reintentando...')
@@ -204,6 +251,20 @@ export default function MostradorMode({
                 ? isSpeakingNow ? '🟢 Servicio: Hablando' : isListeningNow ? '🟢 Servicio: Escuchando' : '🟢 Servicio: Activo'
                 : '⚪ Servicio: Apagado'}
           </span>
+
+          {/* Botón de Diagnósticos / Logs para móvil */}
+          <button
+            onClick={() => setMostrarLogs(prev => !prev)}
+            title="Ver bitácora de eventos del modo voz"
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+              mostrarLogs
+                ? 'bg-cyan-950 border-cyan-500 text-cyan-300'
+                : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border-slate-700'
+            }`}
+          >
+            <Terminal className="w-3.5 h-3.5" />
+            <span className="text-[11px]">Logs</span>
+          </button>
 
           {/* Reiniciar sesión de voz (siempre disponible, kit de emergencia) */}
           <button
@@ -332,6 +393,53 @@ export default function MostradorMode({
           </div>
         )}
       </div>
+
+
+      {/* Panel flotante de diagnóstico para móvil */}
+      {mostrarLogs && (
+        <div className="absolute inset-x-2 top-16 bottom-20 z-50 bg-slate-900/95 border border-slate-700 rounded-2xl p-3 flex flex-col backdrop-blur-md shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+          <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-xs text-slate-300">
+            <span className="font-bold flex items-center gap-1.5 text-cyan-400">
+              <Terminal className="w-3.5 h-3.5" /> Diagnóstico de Voz en Vivo (Móvil)
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setLogsRecientes([])}
+                className="text-[10px] text-slate-400 hover:text-white px-2 py-0.5 rounded bg-slate-800 border border-slate-700"
+              >
+                Limpiar
+              </button>
+              <button
+                onClick={() => setMostrarLogs(false)}
+                className="text-slate-400 hover:text-white p-1"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto mt-2 space-y-1 font-mono text-[11px] text-left">
+            {logsRecientes.length === 0 ? (
+              <p className="text-slate-500 italic p-4 text-center">No hay eventos recientes aún. Habla o interactúa con el orbe.</p>
+            ) : (
+              logsRecientes.map(l => (
+                <div
+                  key={l.id}
+                  className={`p-1.5 rounded border text-[10.5px] leading-relaxed break-all ${
+                    l.tipo === 'error'
+                      ? 'bg-rose-950/60 border-rose-800 text-rose-300'
+                      : l.tipo === 'warn'
+                        ? 'bg-amber-950/60 border-amber-800 text-amber-300'
+                        : 'bg-slate-950/60 border-slate-800 text-slate-300'
+                  }`}
+                >
+                  <span className="text-slate-500 mr-1.5">[{l.time}]</span>
+                  <span>{l.msg}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Barra Inferior: Activación / Estado */}
       <div className="pt-3 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
