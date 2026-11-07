@@ -1,0 +1,26 @@
+flowchart TB
+    subgraph Users["Users of Gestión Neiva"]
+        Tendero["Tendero (Store Owner)<br/>Manages catalog, pricing, reports & voice assistant"]
+        Cajero["Cajero (Cashier)<br/>Scans barcodes & executes POS checkout"]
+        SuperAdmin["Platform SuperAdmin<br/>Manages tenant accounts, plans & support tickets"]
+    end
+
+    subgraph System["SaaS Platform"]
+        GestionNeiva["Gestión Neiva (TiendApp)<br/>Single Deployable Modular Monolith<br/>FastAPI + PostgreSQL + React SPA"]
+    end
+
+    subgraph External["External Services"]
+        Groq["Groq Cloud API<br/>Whisper Large v3 (Fast STT ~150ms)"]
+        Gemini["Google Gemini API<br/>Gemini 1.5 / 2.0 Flash (LLM intent & STT fallback)"]
+        WhatsApp["Meta WhatsApp Cloud API<br/>Account linking & async notifications"]
+        Hosting["Cloud Infrastructure<br/>Render (API), Vercel (SPA), Supabase (PostgreSQL)"]
+    end
+
+    Tendero -->|Manages store & speaks voice commands| GestionNeiva
+    Cajero -->|Scans products & processes sales| GestionNeiva
+    SuperAdmin -->|Resolves tickets & audits tenants| GestionNeiva
+
+    GestionNeiva -->|Sends voice audio for STT| Groq
+    GestionNeiva -->|Sends prompts for conversational intent| Gemini
+    GestionNeiva -->|Verifies phone numbers| WhatsApp
+    GestionNeiva -->|Deploys and persists state on| Hosting

@@ -1,0 +1,19 @@
+flowchart TB
+    subgraph Client["Browser Client (Mobile & Desktop)"]
+        SPA["React 19 SPA (Vite + Tailwind v4)<br/>Serves POS, Inventory, VoiceTurnManager & Reports"]
+    end
+
+    subgraph Server["Single Deployable Monolith (Render)"]
+        API["FastAPI Modular Monolith Process<br/>Hosts 6 Bounded Contexts, Uvicorn ASGI on Port 8000"]
+        StaticFiles["Static Media Storage (/media)<br/>Product Photos & Assets"]
+    end
+
+    subgraph Data["Persistence Infrastructure"]
+        Postgres[("PostgreSQL 16 Database<br/>Supabase Managed Instance<br/>Row-Level Multi-Tenancy (empresa_id)")]
+        Redis[("Redis 7 Cache<br/>In-Memory Session Store & FSM State")]
+    end
+
+    SPA -->|HTTPS /api/v1 REST calls with Bearer JWT| API
+    SPA -->|Fetches product images| StaticFiles
+    API -->|Reads / Writes with connection pool| Postgres
+    API -->|Session tokens & voice rate limits| Redis

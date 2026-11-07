@@ -1,0 +1,513 @@
+openapi: 3.0.3
+info:
+  title: Gestión Neiva (TiendApp) API
+  description: Sistema POS SaaS Multi-Tenant para Micro-Comercios de Barrio en Neiva
+  version: 2.1.0
+servers:
+  - url: /api/v1
+    description: Current Environment Base Path
+
+paths:
+  # ---------------------------------------------------------------------------
+  # auth_tenancy
+  # ---------------------------------------------------------------------------
+  /token:
+    post:
+      tags: [auth_tenancy]
+      summary: Iniciar sesión y obtener token JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200':
+          description: Token generado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/registro-completo:
+    post:
+      tags: [auth_tenancy]
+      summary: Registro simultáneo de Empresa y Usuario Administrador
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nombre_comercial, nit_o_cedula, email, password]
+              properties:
+                nombre_comercial: { type: string }
+                nit_o_cedula: { type: string }
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '201':
+          description: Empresa y usuario registrados
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+
+  /me:
+    get:
+      tags: [auth_tenancy]
+      summary: Obtener perfil del usuario autenticado
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsuarioPerfil'
+
+  /usuarios/empleados:
+    get:
+      tags: [auth_tenancy]
+      summary: Listar cajeros y empleados de la tienda
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UsuarioPerfil'
+    post:
+      tags: [auth_tenancy]
+      summary: Crear un nuevo cajero (valida límite de cajeros del plan)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, nombre]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+                nombre: { type: string }
+      responses:
+        '201':
+          description: Empleado creado exitosamente
+
+  # ---------------------------------------------------------------------------
+  # inventario
+  # ---------------------------------------------------------------------------
+  /productos:
+    get:
+      tags: [inventario]
+      summary: Listar catálogo de productos de la empresa
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: query
+          in: query
+          schema: { type: string }
+        - name: categoria
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Producto'
+    post:
+      tags: [inventario]
+      summary: Crear nuevo producto en el catálogo
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductoCrear'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Producto'
+
+  /productos/{producto_id}:
+    get:
+      tags: [inventario]
+      summary: Obtener producto por ID
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: producto_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Producto'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [inventario]
+      summary: Actualizar datos de producto
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: producto_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductoCrear'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Producto'
+    delete:
+      tags: [inventario]
+      summary: Baja lógica de producto (is_active = False)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: producto_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Producto desactivado
+
+  # ---------------------------------------------------------------------------
+  # pos_ventas
+  # ---------------------------------------------------------------------------
+  /ventas/{empresa_id}:
+    post:
+      tags: [pos_ventas]
+      summary: Registrar y cobrar venta rápida POS (Transacción ACID con FOR UPDATE)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: empresa_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [detalles]
+              properties:
+                detalles:
+                  type: array
+                  items:
+                    type: object
+                    required: [producto_id, cantidad]
+                    properties:
+                      producto_id: { type: string, format: uuid }
+                      cantidad: { type: number, format: float }
+      responses:
+        '201':
+          description: Venta registrada y stock descontado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VentaResumen'
+        '422':
+          description: Stock insuficiente o producto no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      tags: [pos_ventas]
+      summary: Listar ventas históricas de la empresa
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: empresa_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VentaResumen'
+
+  # ---------------------------------------------------------------------------
+  # soporte_crm
+  # ---------------------------------------------------------------------------
+  /soporte/tickets:
+    get:
+      tags: [soporte_crm]
+      summary: Listar tickets de soporte del tendero
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SoporteTicket'
+    post:
+      tags: [soporte_crm]
+      summary: Abrir nuevo ticket de soporte
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [asunto, mensaje]
+              properties:
+                asunto: { type: string }
+                mensaje: { type: string }
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SoporteTicket'
+
+  /soporte/tickets/{ticket_id}/responder:
+    post:
+      tags: [soporte_crm]
+      summary: Responder a un hilo de soporte abierto
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: ticket_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mensaje]
+              properties:
+                mensaje: { type: string }
+      responses:
+        '200':
+          description: Mensaje agregado al ticket
+
+  # ---------------------------------------------------------------------------
+  # agente_ia
+  # ---------------------------------------------------------------------------
+  /agente/mensaje:
+    post:
+      tags: [agente_ia]
+      summary: Procesar comando en lenguaje natural (FSM + LLM)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mensaje, conversation_id]
+              properties:
+                mensaje: { type: string }
+                conversation_id: { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgenteRespuesta'
+        '403':
+          description: Función reservada para planes Pro/Premium
+
+  /agente/transcribir-audio:
+    post:
+      tags: [agente_ia]
+      summary: Transcribir audio de voz vía Groq Whisper
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                audio: { type: string, format: binary }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  texto: { type: string }
+
+  # ---------------------------------------------------------------------------
+  # reportes_analytics
+  # ---------------------------------------------------------------------------
+  /reportes/ventas/excel/{empresa_id}:
+    get:
+      tags: [reportes_analytics]
+      summary: Exportar ventas a hoja de cálculo Excel (.xlsx)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: empresa_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Archivo binario Excel
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+
+  /dashboard/{empresa_id}:
+    get:
+      tags: [reportes_analytics]
+      summary: Métricas de ventas, stock crítico y alertas de vencimiento
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: empresa_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardResumen'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    TokenResponse:
+      type: object
+      properties:
+        access_token: { type: string }
+        token_type: { type: string, example: bearer }
+
+    UsuarioPerfil:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string }
+        nombre: { type: string }
+        rol: { type: string, enum: [admin, tendero] }
+        empresa_id: { type: string, format: uuid }
+
+    Producto:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        empresa_id: { type: string, format: uuid }
+        codigo_barras: { type: string }
+        nombre: { type: string }
+        precio_costo: { type: number }
+        precio_venta: { type: number }
+        cantidad_actual: { type: number }
+        unidad_medida: { type: string }
+        fecha_vencimiento: { type: string, format: date, nullable: true }
+        is_active: { type: boolean }
+
+    ProductoCrear:
+      type: object
+      required: [codigo_barras, nombre, precio_costo, precio_venta, cantidad_actual]
+      properties:
+        codigo_barras: { type: string }
+        nombre: { type: string }
+        precio_costo: { type: number }
+        precio_venta: { type: number }
+        cantidad_actual: { type: number }
+        unidad_medida: { type: string, default: unidad }
+        fecha_vencimiento: { type: string, format: date }
+
+    VentaResumen:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        empresa_id: { type: string, format: uuid }
+        fecha_venta: { type: string, format: date-time }
+        total: { type: number }
+        usuario_id: { type: string, format: uuid, nullable: true }
+        vendedor_nombre_snapshot: { type: string, nullable: true }
+
+    SoporteTicket:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        empresa_id: { type: string, format: uuid }
+        usuario_id: { type: string, format: uuid }
+        asunto: { type: string }
+        estado: { type: string, enum: [abierto, respondido, cerrado] }
+
+    AgenteRespuesta:
+      type: object
+      properties:
+        texto_respuesta: { type: string }
+        accion_ejecutada: { type: string, nullable: true }
+        conversation_id: { type: string }
+
+    DashboardResumen:
+      type: object
+      properties:
+        total_ventas_hoy: { type: number }
+        cantidad_transacciones_hoy: { type: integer }
+        productos_stock_bajo: { type: integer }
+        productos_por_vencer: { type: integer }
+
+    ErrorResponse:
+      type: object
+      required: [error, message]
+      properties:
+        error: { type: string, example: INSUFFICIENT_STOCK }
+        message: { type: string }
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              field: { type: string }
+              message: { type: string }
+
+  responses:
+    Unauthorized:
+      description: Token inválido o ausente
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Recurso no encontrado o perteneciente a otro comercio
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

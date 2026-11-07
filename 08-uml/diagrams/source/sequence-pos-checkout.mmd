@@ -1,0 +1,33 @@
+sequenceDiagram
+    autonumber
+    actor Cajero as Cajero / POS Client
+    participant Controller as POS Router (/api/v1/ventas)
+    participant VentasFacade as pos_ventas (VentasFacade)
+    participant InventarioFacade as inventario (InventarioFacade)
+    participant DB as PostgreSQL 16 (ACID Transaction)
+
+    Cajero->>Controller: POST /ventas/{empresa_id} {items: [{producto_id, cantidad}]}
+    Controller->>Controller: Validate JWT & tenant_id (empresa_id)
+    Controller->>VentasFacade: procesar_venta(empresa_id, cajero_id, items)
+
+    critical ACID Transaction Scope
+        VentasFacade->>DB: BEGIN TRANSACTION
+        VentasFacade->>InventarioFacade: validar_y_descontar_stock_atomic(empresa_id, items)
+        Note over InventarioFacade,DB: Sort product IDs alphabetically to eliminate deadlocks
+        InventarioFacade->>DB: SELECT * FROM productos WHERE id IN (...) FOR UPDATE
+        
+        alt Stock Sufficient for all items (BR-01)
+            InventarioFacade->>DB: UPDATE productos SET cantidad_actual = cantidad_actual - cantidad WHERE id = ...
+            InventarioFacade-->>VentasFacade: Return [SnapshotProductoDTO(id, nombre, precio_venta)]
+            VentasFacade->>DB: INSERT INTO ventas (empresa_id, usuario_id, total, vendedor_nombre_snapshot)
+            VentasFacade->>DB: INSERT INTO detalles_venta (venta_id, producto_id, cantidad, precio_unitario, subtotal)
+            VentasFacade->>DB: COMMIT TRANSACTION
+            VentasFacade-->>Controller: VentaResumenDTO(venta_id, total, fecha)
+            Controller-->>Cajero: 201 Created (Sale Confirmed, Stock Decremented)
+        else Insufficient Stock on any item (BR-01 Violation)
+            InventarioFacade-->>VentasFacade: Raise InsufficientStockException(producto_id, stock, solicitado)
+            VentasFacade->>DB: ROLLBACK TRANSACTION
+            VentasFacade-->>Controller: 422 Unprocessable Entity
+            Controller-->>Cajero: 422 Error JSON ("Stock insuficiente para [Producto]")
+        end
+    end

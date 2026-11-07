@@ -1,0 +1,99 @@
+[importlinter]
+root_package = app
+
+# ---------------------------------------------------------------------------
+# Contrato 1: Las partes internas de auth_tenancy son estrictamente privadas
+# ---------------------------------------------------------------------------
+[importlinter:contract:auth-tenancy-internals-are-private]
+name = Modulos externos acceden a auth_tenancy solo via api
+type = forbidden
+allow_indirect_imports = True
+source_modules =
+    app.inventario
+    app.pos_ventas
+    app.soporte_crm
+    app.agente_ia
+    app.reportes_analytics
+forbidden_modules =
+    app.auth_tenancy.internal
+
+# ---------------------------------------------------------------------------
+# Contrato 2: Las partes internas de inventario son estrictamente privadas
+# ---------------------------------------------------------------------------
+[importlinter:contract:inventario-internals-are-private]
+name = Modulos externos acceden a inventario solo via api
+type = forbidden
+allow_indirect_imports = True
+source_modules =
+    app.auth_tenancy
+    app.pos_ventas
+    app.soporte_crm
+    app.agente_ia
+    app.reportes_analytics
+forbidden_modules =
+    app.inventario.internal
+
+# ---------------------------------------------------------------------------
+# Contrato 3: Las partes internas de pos_ventas son estrictamente privadas
+# ---------------------------------------------------------------------------
+[importlinter:contract:pos-ventas-internals-are-private]
+name = Modulos externos acceden a pos_ventas solo via api
+type = forbidden
+allow_indirect_imports = True
+source_modules =
+    app.auth_tenancy
+    app.inventario
+    app.soporte_crm
+    app.agente_ia
+    app.reportes_analytics
+forbidden_modules =
+    app.pos_ventas.internal
+
+# ---------------------------------------------------------------------------
+# Contrato 4: Las partes internas de soporte_crm son estrictamente privadas
+# ---------------------------------------------------------------------------
+[importlinter:contract:soporte-crm-internals-are-private]
+name = Modulos externos acceden a soporte_crm solo via api
+type = forbidden
+allow_indirect_imports = True
+source_modules =
+    app.auth_tenancy
+    app.inventario
+    app.pos_ventas
+    app.agente_ia
+    app.reportes_analytics
+forbidden_modules =
+    app.soporte_crm.internal
+
+# ---------------------------------------------------------------------------
+# Contrato 5: Las partes internas de agente_ia son estrictamente privadas
+# ---------------------------------------------------------------------------
+[importlinter:contract:agente-ia-internals-are-private]
+name = Modulos externos acceden a agente_ia solo via api
+type = forbidden
+allow_indirect_imports = True
+source_modules =
+    app.auth_tenancy
+    app.inventario
+    app.pos_ventas
+    app.soporte_crm
+    app.reportes_analytics
+forbidden_modules =
+    app.agente_ia.internal
+
+# ---------------------------------------------------------------------------
+# Contrato 6: La capa platform nunca depende de los modulos de negocio
+# ---------------------------------------------------------------------------
+[importlinter:contract:platform-is-independent]
+name = Platform no debe importar ningun modulo de negocio
+type = forbidden
+allow_indirect_imports = False
+source_modules =
+    app.platform
+forbidden_modules =
+    app.auth_tenancy
+    app.inventario
+    app.pos_ventas
+    app.soporte_crm
+    app.agente_ia
+    app.reportes_analytics

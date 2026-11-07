@@ -1,0 +1,31 @@
+sequenceDiagram
+    autonumber
+    actor Tendero as Tendero (Voice User)
+    participant UI as Frontend (VoiceTurnManager.js)
+    participant STTRoute as Backend (/agente/transcribir-audio)
+    participant Whisper as Groq Whisper Cloud
+    participant AgentRoute as Backend (/agente/mensaje)
+    participant Orchestrator as AgenteIaFacade & FSM Orchestrator
+    participant LLM as Google Gemini / Groq LLM
+    participant CommandStore as DB (agent_commands)
+    participant DomainFacade as InventarioFacade / VentasFacade
+
+    Tendero->>UI: Speaks: "Llegaron 10 kilos de arroz a 3500"
+    UI->>UI: Captures Audio stream (WebM/Opus)
+    UI->>STTRoute: POST /agente/transcribir-audio (audio binary)
+    STTRoute->>Whisper: whisper-large-v3 transcription
+    Whisper-->>STTRoute: Transcribed text: "Llegaron 10 kilos de arroz a 3500"
+    STTRoute-->>UI: {texto: "Llegaron 10 kilos de arroz a 3500"}
+
+    UI->>AgentRoute: POST /agente/mensaje {mensaje, conversation_id}
+    AgentRoute->>Orchestrator: procesar_mensaje(conversation_id, mensaje)
+    Orchestrator->>LLM: Parse intent and extract parameters {action: REABASTECER, item: "arroz", qty: 10, cost: 3500}
+    LLM-->>Orchestrator: Intent JSON output
+    Orchestrator->>CommandStore: INSERT INTO agent_commands (command_id, status=PENDIENTE) per BR-12
+    Orchestrator->>DomainFacade: reabastecer_stock(empresa_id, "arroz", 10, 3500)
+    DomainFacade-->>Orchestrator: Stock updated successfully
+    Orchestrator->>CommandStore: UPDATE agent_commands SET status=EJECUTADO
+    Orchestrator-->>AgentRoute: {texto_respuesta: "Listo, agregué 10 kilos de arroz al inventario.", accion: "REABASTECER"}
+    AgentRoute-->>UI: 200 OK Response JSON
+    UI->>UI: Updates product table in React state
+    UI-->>Tendero: Speaks audio feedback via TTS: "Listo, agregué 10 kilos de arroz..."
