@@ -35,12 +35,15 @@ def _obtener_producto_activo(
 
 def _validar_codigo_barras_unico(
     codigo_barras: str,
+    empresa_id: UUID,
     db: Session,
     excluir_id: UUID | None = None,
 ) -> None:
-    """Lanza 409 si el código de barras ya está en uso por otro producto."""
+    """Raise 409 if the barcode is already in use by an active product within the same tenant."""
     query = db.query(models.Producto).filter(
-        models.Producto.codigo_barras == codigo_barras
+        models.Producto.codigo_barras == codigo_barras,
+        models.Producto.empresa_id == empresa_id,
+        models.Producto.is_active.is_(True),
     )
     if excluir_id:
         query = query.filter(models.Producto.id != excluir_id)
@@ -66,8 +69,34 @@ def crear_producto(data: ProductoCrear, db: Session, commit: bool = True) -> mod
             detail="Empresa no encontrada",
         )
 
-    # pre-check: código de barras único
-    _validar_codigo_barras_unico(data.codigo_barras, db)
+    # pre-check: código de barras único por empresa activa
+    _validar_codigo_barras_unico(data.codigo_barras, data.empresa_id, db)
+
+    # Si existe un producto inactivo (soft-deleted) con el mismo código de barras, reactivarlo
+    producto_inactivo = (
+        db.query(models.Producto)
+        .filter(
+            models.Producto.empresa_id == data.empresa_id,
+            models.Producto.codigo_barras == data.codigo_barras,
+            models.Producto.is_active.is_(False),
+        )
+        .first()
+    )
+    if producto_inactivo:
+        producto_inactivo.nombre = data.nombre
+        producto_inactivo.precio_costo = data.precio_costo
+        producto_inactivo.precio_venta = data.precio_venta
+        producto_inactivo.cantidad_actual = data.cantidad_actual
+        producto_inactivo.unidad_medida = data.unidad_medida
+        producto_inactivo.fecha_vencimiento = data.fecha_vencimiento
+        producto_inactivo.categoria = data.categoria
+        producto_inactivo.is_active = True
+        if commit:
+            db.commit()
+            db.refresh(producto_inactivo)
+        else:
+            db.flush()
+        return producto_inactivo
 
     producto = models.Producto(
         empresa_id=data.empresa_id,
@@ -169,9 +198,11 @@ def actualizar_producto(
 ) -> models.Producto:
     producto = _obtener_producto_activo(producto_id, empresa_id, db)
 
-    # pre-check: nuevo código de barras no colisiona con otro producto
+    # pre-check: nuevo código de barras no colisiona con otro producto de la misma empresa
     if data.codigo_barras and data.codigo_barras != producto.codigo_barras:
-        _validar_codigo_barras_unico(data.codigo_barras, db, excluir_id=producto_id)
+        _validar_codigo_barras_unico(
+            data.codigo_barras, empresa_id, db, excluir_id=producto_id
+        )
 
     # Solo actualiza los campos que el cliente envió (PATCH semántica)
     for campo, valor in data.model_dump(exclude_unset=True).items():

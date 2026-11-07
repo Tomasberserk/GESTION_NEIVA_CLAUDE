@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app import models
@@ -27,7 +27,7 @@ def crear_producto(
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(get_current_user_admin),
 ):
-    # empresa_id siempre viene del JWT, no del body — previene spoofing multi-tenant
+    # empresa_id always comes from verified JWT to prevent multi-tenant spoofing
     return producto_service.crear_producto(
         data.model_copy(update={"empresa_id": current_user.empresa_id}), db
     )
@@ -35,20 +35,24 @@ def crear_producto(
 
 @router.get("", response_model=InventarioAdminRespuesta | InventarioCajeroRespuesta)
 def listar_productos(
+    page: int = Query(1, ge=1, description="Page number (1-indexed)"),
+    limit: int = Query(100, ge=1, le=100, description="Items per page (max 100)"),
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(get_current_user),
 ):
     res = producto_service.obtener_productos_empresa(current_user.empresa_id, db)
+    offset = (page - 1) * limit
+    items = res["inventario"][offset : offset + limit]
     if current_user.rol == models.RolUsuario.ADMIN:
         return InventarioAdminRespuesta(
             tienda=res["tienda"],
             total_items=res["total_items"],
-            inventario=[ProductoAdminOut.model_validate(p) for p in res["inventario"]],
+            inventario=[ProductoAdminOut.model_validate(p) for p in items],
         )
     return InventarioCajeroRespuesta(
         tienda=res["tienda"],
         total_items=res["total_items"],
-        inventario=[ProductoCajeroOut.model_validate(p) for p in res["inventario"]],
+        inventario=[ProductoCajeroOut.model_validate(p) for p in items],
     )
 
 
