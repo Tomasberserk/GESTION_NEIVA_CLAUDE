@@ -1,119 +1,122 @@
+"""Database seed script for local development and evaluation environments."""
 import random
-import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
+
 from app.database import SessionLocal
-from app.models import Empresa, Producto, Venta, DetalleVenta, Usuario, RolUsuario
-from passlib.context import CryptContext
+from app.models import DetalleVenta, Empresa, Producto, RolUsuario, Usuario, Venta
+from app.services import auth_service, entitlement_service
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-def seed():
+def seed() -> None:
+    """Populate initial demo store, admin user, catalog products, and sample sales."""
     db = SessionLocal()
-    
-    # 1. Obtener o crear una empresa
-    empresa = db.query(Empresa).first()
-    if not empresa:
-        empresa = Empresa(nombre_comercial="Tienda La Principal", nit_o_cedula="123456789")
-        db.add(empresa)
-        db.commit()
-        db.refresh(empresa)
-        
-        # Crear un usuario administrador si se creó la empresa nueva
-        hash_pw = pwd_context.hash("admin123")
-        admin = Usuario(email="admin@admin.com", hashed_password=hash_pw, empresa_id=empresa.id, rol=RolUsuario.ADMIN)
-        db.add(admin)
-        db.commit()
-
-    print(f"Usando empresa: {empresa.nombre_comercial} (ID: {empresa.id})")
-
-    # 2. Productos a insertar (30 productos típicos de tienda de barrio)
-    nombres_productos = [
-        "Arroz Diana x 500g", "Frijol Bola Roja x 500g", "Aceite Gourmet 1L", "Sal Refisal 1kg", "Azúcar Manuelita 1kg",
-        "Leche Alquería 1L", "Pan Bimbo Blanco", "Huevos AAA (Canasta 30)", "Café Águila Roja 250g", "Chocolate Corona",
-        "Galletas Saltín Noel", "Gaseosa Coca-Cola 2L", "Jugo Hit Mora 500ml", "Agua Brisa 600ml", "Cerveza Poker Lata",
-        "Detergente Ariel 1kg", "Jabón Rey 250g", "Crema Dental Colgate", "Papel Higiénico Familia (4 rollos)", "Shampoo Savital 500ml",
-        "Margarina Rama 250g", "Salsa de Tomate Fruco", "Mayonesa Fruco", "Atún Van Camp's en Aceite", "Sardinas en Salsa de Tomate",
-        "Pasta Doria (Spaghetti)", "Lentejas x 500g", "Harina Pan Amarilla", "Queso Campesino", "Jamón Zenú x 200g"
-    ]
-
-    productos_creados = []
-    
-    print("Borrando productos y ventas anteriores de la empresa...")
-    db.query(Venta).filter(Venta.empresa_id == empresa.id).delete()
-    db.query(Producto).filter(Producto.empresa_id == empresa.id).delete()
-    db.commit()
-
-    print("Creando 15 productos...")
-    for idx, nombre in enumerate(nombres_productos[:15]):
-        costo = random.randint(1000, 15000)
-        # Margen aleatorio entre 15% y 35%
-        venta = int(costo * (1 + random.uniform(0.15, 0.35)))
-        stock = random.randint(10, 100)
-        
-        prod = Producto(
-            empresa_id=empresa.id,
-            nombre=nombre,
-            codigo_barras=f"770{random.randint(1000000000, 9999999999)}",
-            precio_costo=costo,
-            precio_venta=venta,
-            cantidad_actual=stock,
-            foto_url=f"https://picsum.photos/seed/{idx+1}/200/200"  # Imagen placeholder
-        )
-        db.add(prod)
-        productos_creados.append(prod)
-    
-    db.commit()
-    for p in productos_creados:
-        db.refresh(p)
-    print("¡Productos creados exitosamente!")
-
-    # 3. Crear 20 ventas aleatorias
-    print("Creando 20 ventas...")
-    now = datetime.now()
-    
-    for i in range(20):
-        # Fecha aleatoria en los últimos 7 días
-        dias_restar = random.randint(0, 7)
-        horas_restar = random.randint(0, 23)
-        fecha_venta = now - timedelta(days=dias_restar, hours=horas_restar)
-        
-        nueva_venta = Venta(
-            empresa_id=empresa.id,
-            fecha_venta=fecha_venta,
-            total=0 # Se actualiza luego de los detalles
-        )
-        db.add(nueva_venta)
-        db.commit()
-        db.refresh(nueva_venta)
-        
-        # Seleccionar entre 1 y 5 productos aleatorios para esta venta
-        num_productos_venta = random.randint(1, 5)
-        productos_venta = random.sample(productos_creados, num_productos_venta)
-        
-        total_venta = 0
-        for p in productos_venta:
-            cantidad_comprada = random.randint(1, 4)
-            # Reducir stock
-            p.cantidad_actual -= cantidad_comprada
-            
-            subtotal = p.precio_venta * cantidad_comprada
-            total_venta += subtotal
-            
-            detalle = DetalleVenta(
-                venta_id=nueva_venta.id,
-                producto_id=p.id,
-                cantidad=cantidad_comprada,
-                precio_unitario=p.precio_venta,
-                subtotal=subtotal
+    try:
+        company = db.query(Empresa).first()
+        if not company:
+            company = Empresa(
+                nombre_comercial="Tienda La Principal",
+                nit_o_cedula="900123456-7",
+                is_active=True,
             )
-            db.add(detalle)
-            
-        nueva_venta.total = total_venta
+            entitlement_service.inicializar_trial(company)
+            db.add(company)
+            db.commit()
+            db.refresh(company)
+
+            hashed_pw = auth_service.hash_password("Admin123!")
+            admin = Usuario(
+                nombre="Administrador Demo",
+                email="admin@demo.com",
+                hashed_password=hashed_pw,
+                empresa_id=company.id,
+                rol=RolUsuario.ADMIN,
+                is_active=True,
+            )
+            db.add(admin)
+            db.commit()
+
+        print(f"Using company: {company.nombre_comercial} (ID: {company.id})")
+
+        product_names = [
+            "Arroz Diana x 500g", "Frijol Bola Roja x 500g", "Aceite Gourmet 1L",
+            "Sal Refisal 1kg", "Azúcar Manuelita 1kg", "Leche Alquería 1L",
+            "Pan Bimbo Blanco", "Huevos AAA (Canasta 30)", "Café Águila Roja 250g",
+            "Chocolate Corona", "Galletas Saltín Noel", "Gaseosa Coca-Cola 2L",
+            "Jugo Hit Mora 500ml", "Agua Brisa 600ml", "Cerveza Poker Lata",
+        ]
+
+        print("Clearing previous sample sales and products for company...")
+        db.query(Venta).filter(Venta.empresa_id == company.id).delete()
+        db.query(Producto).filter(Producto.empresa_id == company.id).delete()
         db.commit()
-        
-    print("¡14 ventas creadas exitosamente!")
-    
-    db.close()
+
+        created_products: list[Producto] = []
+        print("Creating 15 sample products...")
+        for idx, name in enumerate(product_names):
+            cost = Decimal(str(random.randint(1000, 15000)))
+            price = Decimal(str(int(float(cost) * (1 + random.uniform(0.15, 0.35)))))
+            stock = Decimal(str(random.randint(25, 100)))
+
+            prod = Producto(
+                empresa_id=company.id,
+                nombre=name,
+                codigo_barras=f"770{random.randint(1000000000, 9999999999)}",
+                precio_costo=cost,
+                precio_venta=price,
+                cantidad_actual=stock,
+                unidad_medida="unidad",
+                foto_url=f"https://picsum.photos/seed/{idx + 1}/200/200",
+                is_active=True,
+            )
+            db.add(prod)
+            created_products.append(prod)
+
+        db.commit()
+        for prod in created_products:
+            db.refresh(prod)
+
+        print("Creating 20 sample sales...")
+        now = datetime.now(timezone.utc)
+        for _ in range(20):
+            sale_date = now - timedelta(
+                days=random.randint(0, 7),
+                hours=random.randint(0, 23),
+            )
+            sale = Venta(
+                empresa_id=company.id,
+                fecha_venta=sale_date,
+                total=Decimal("0.00"),
+                vendedor_nombre_snapshot="Administrador Demo",
+                is_active=True,
+            )
+            db.add(sale)
+            db.flush()
+
+            selected_products = random.sample(created_products, random.randint(1, 5))
+            sale_total = Decimal("0.00")
+            for prod in selected_products:
+                qty = Decimal(str(random.randint(1, 3)))
+                prod.cantidad_actual -= qty
+                subtotal = prod.precio_venta * qty
+                sale_total += subtotal
+                detail = DetalleVenta(
+                    venta_id=sale.id,
+                    producto_id=prod.id,
+                    cantidad=qty,
+                    precio_unitario=prod.precio_venta,
+                    subtotal=subtotal,
+                    is_active=True,
+                )
+                db.add(detail)
+
+            sale.total = sale_total
+            db.commit()
+
+        print("Seed completed successfully: 15 products and 20 sales created.")
+    finally:
+        db.close()
+
 
 if __name__ == "__main__":
     seed()
