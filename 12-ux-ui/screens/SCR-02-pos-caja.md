@@ -6,7 +6,7 @@
 |---|---|
 | Screen | Terminal de Ventas POS (`/ventas`) |
 | Serves | `HU-04`, `HU-05`, `HU-06` |
-| Route | `frontend/src/pages/Ventas.jsx` |
+| Route | `frontend/src/pages/Inventario.jsx` + `frontend/src/components/pos/CartSidebar.jsx` (Global POS Drawer in `Layout.jsx`) |
 
 ## States
 
