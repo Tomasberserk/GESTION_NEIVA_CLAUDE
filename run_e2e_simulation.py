@@ -1,174 +1,226 @@
 """
-Simulador de Pruebas End-to-End (E2E) — Gestión Neiva Cloud
-Ejecuta el ciclo de vida completo de un comercio real:
-1. Healthcheck de la API
-2. Registro de Empresa + Usuario Admin
-3. Creación de Productos en Inventario
-4. Simulación de Venta POS (Descuento de stock + Factura + Detalle)
-5. Simulación de WhatsApp IA (Vinculación + Comando de Reabastecimiento)
-6. Validación de Métricas en el Dashboard
+End-to-End (E2E) Business Journey Simulator — Gestion Neiva Cloud
+Executes the complete multi-tenant store lifecycle:
+1. Deep API Healthcheck (/api/v1/health)
+2. Store & Admin Registration (/api/v1/auth/registro-completo)
+3. Product Catalog Creation (/api/v1/productos)
+4. Atomic POS Checkout (/api/v1/ventas/{empresa_id})
+5. In-App Conversational AI Agent Restock FSM (/api/v1/agente/mensaje)
+6. Consolidated Financial Dashboard Verification (/api/v1/dashboard/{empresa_id})
 """
 import os
-import sys
-from unittest.mock import patch
-
-# Configurar DB local SQLite antes de importar la app
-os.environ["DATABASE_URL"] = "sqlite:///./test_e2e.db"
-
 import uuid
-from decimal import Decimal
+
+os.environ["DATABASE_URL"] = "sqlite:///./test_e2e.db"
+os.environ.setdefault("SECRET_KEY", "e2e-simulation-secret-key-not-for-production")
+
 from fastapi.testclient import TestClient
+from sqlalchemy import CHAR, TypeDecorator
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
 from app.database import Base, engine
 from app.main import app
-from app.services import gemini_voice
+from app.services.agente.session_store import InMemorySessionStore, set_session_store_instance
 
-def run_e2e():
+
+class _SQLiteGUID(TypeDecorator):
+    """Platform-independent GUID type for SQLite E2E runs."""
+
+    impl = CHAR
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == "postgresql":
+            return dialect.type_descriptor(PG_UUID())
+        return dialect.type_descriptor(CHAR(32))
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        if dialect.name == "postgresql":
+            return str(value)
+        if not isinstance(value, uuid.UUID):
+            return str(uuid.UUID(value)).replace("-", "")
+        return str(value).replace("-", "")
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return value
+        if not isinstance(value, uuid.UUID):
+            return uuid.UUID(str(value))
+        return value
+
+
+def run_e2e() -> None:
+    """Execute the full E2E store workflow and assert every stage."""
     print("=" * 70)
-    print("INICIANDO PRUEBAS END-TO-END (E2E) -- GESTION NEIVA CLOUD")
+    print("STARTING END-TO-END (E2E) SIMULATION — GESTION NEIVA CLOUD")
     print("=" * 70)
 
-    # Limpiar y crear tablas en SQLite local para la simulación
+    for table in Base.metadata.tables.values():
+        for column in table.columns:
+            if isinstance(column.type, PG_UUID):
+                column.type = _SQLiteGUID()
+
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
+    set_session_store_instance(InMemorySessionStore())
 
-    client = TestClient(app)
+    try:
+        with TestClient(app) as client:
+            # 1. Deep Healthcheck
+            print("\n[1] Verifying API healthcheck (/api/v1/health)...")
+            res = client.get("/api/v1/health")
+            assert res.status_code == 200, f"Healthcheck failed: {res.text}"
+            print(f"   [OK] API Status: {res.json()}")
 
-    # 1. Healthcheck
-    print("\n[1] Verificando estado de la API (/health)...")
-    res = client.get("/health")
-    assert res.status_code == 200, f"Error en healthcheck: {res.text}"
-    print(f"   [OK] API Status OK: {res.json()}")
+            # 2. Store & Admin Registration
+            print("\n[2] Registering new store tenant and administrator user...")
+            random_id = str(uuid.uuid4())[:8]
+            email = f"store_neiva_{random_id}@comercio.co"
+            nit = f"900{random_id}-1"
 
-    # 2. Registro de Empresa + Admin
-    print("\n[2] Registrando nueva empresa y usuario administrador...")
-    random_id = str(uuid.uuid4())[:8]
-    email = f"tienda_neiva_{random_id}@comercio.co"
-    nit = f"900{random_id}-1"
-    
-    res_reg = client.post(
-        "/auth/registro-completo",
-        json={
-            "nombre_comercial": f"Supertienda Neiva {random_id}",
-            "nit_o_cedula": nit,
-            "email": email,
-            "password": "PasswordPro2026!",
-            "rol": "admin"
-        }
-    )
-    assert res_reg.status_code == 201, f"Error registrando empresa: {res_reg.text}"
-    data_auth = res_reg.json()
-    token = data_auth["access_token"]
-    empresa_id = data_auth["usuario"]["empresa_id"]
-    headers = {"Authorization": f"Bearer {token}"}
-    print(f"   [OK] Empresa creada correctamente. ID: {empresa_id}")
-    print(f"   [OK] Usuario admin autenticado. Token JWT generado.")
+            res_reg = client.post(
+                "/api/v1/auth/registro-completo",
+                json={
+                    "nombre_comercial": f"Supertienda Neiva {random_id}",
+                    "nit_o_cedula": nit,
+                    "email": email,
+                    "password": "PasswordPro2026!",
+                    "rol": "admin",
+                },
+            )
+            assert res_reg.status_code == 201, f"Store registration failed: {res_reg.text}"
+            data_auth = res_reg.json()
+            token = data_auth["access_token"]
+            empresa_id = data_auth["usuario"]["empresa_id"]
+            headers = {"Authorization": f"Bearer {token}"}
+            print(f"   [OK] Store tenant created. ID: {empresa_id}")
+            print("   [OK] Administrator authenticated and JWT issued.")
 
-    # 3. Creación de productos en inventario
-    print("\n[3] Cargando inventario inicial de productos...")
-    res_prod1 = client.post(
-        "/productos",
-        json={
-            "nombre": "Cafe Especial Huila 500g",
-            "codigo_barras": f"7701{random_id}",
-            "precio_costo": 12000.0,
-            "precio_venta": 18500.0,
-            "cantidad_actual": 20.0,
-            "unidad_medida": "unidad"
-        },
-        headers=headers
-    )
-    assert res_prod1.status_code == 201, f"Error al crear producto 1: {res_prod1.text}"
-    prod1 = res_prod1.json()
-    prod1_id = prod1["id"]
-    print(f"   [OK] Producto 1 creado: {prod1['nombre']} | Stock: {prod1['cantidad_actual']} | Precio: ${prod1['precio_venta']}")
+            # 3. Product Catalog Creation
+            print("\n[3] Loading initial product inventory...")
+            res_prod1 = client.post(
+                "/api/v1/productos",
+                json={
+                    "nombre": "Cafe Especial Huila 500g",
+                    "codigo_barras": f"7701{random_id}",
+                    "precio_costo": 12000.0,
+                    "precio_venta": 18500.0,
+                    "cantidad_actual": 20.0,
+                    "unidad_medida": "unidad",
+                },
+                headers=headers,
+            )
+            assert res_prod1.status_code == 201, f"Failed creating product 1: {res_prod1.text}"
+            prod1 = res_prod1.json()
+            prod1_id = prod1["id"]
+            print(
+                f"   [OK] Product 1 created: {prod1['nombre']} | "
+                f"Stock: {prod1['cantidad_actual']} | Price: ${prod1['precio_venta']}"
+            )
 
-    res_prod2 = client.post(
-        "/productos",
-        json={
-            "nombre": "Achiras Tradicionales 200g",
-            "codigo_barras": f"7702{random_id}",
-            "precio_costo": 4500.0,
-            "precio_venta": 7000.0,
-            "cantidad_actual": 50.0,
-            "unidad_medida": "unidad"
-        },
-        headers=headers
-    )
-    assert res_prod2.status_code == 201, f"Error al crear producto 2: {res_prod2.text}"
-    prod2 = res_prod2.json()
-    prod2_id = prod2["id"]
-    print(f"   [OK] Producto 2 creado: {prod2['nombre']} | Stock: {prod2['cantidad_actual']} | Precio: ${prod2['precio_venta']}")
+            res_prod2 = client.post(
+                "/api/v1/productos",
+                json={
+                    "nombre": "Achiras Tradicionales 200g",
+                    "codigo_barras": f"7702{random_id}",
+                    "precio_costo": 4500.0,
+                    "precio_venta": 7000.0,
+                    "cantidad_actual": 50.0,
+                    "unidad_medida": "unidad",
+                },
+                headers=headers,
+            )
+            assert res_prod2.status_code == 201, f"Failed creating product 2: {res_prod2.text}"
+            prod2 = res_prod2.json()
+            prod2_id = prod2["id"]
+            print(
+                f"   [OK] Product 2 created: {prod2['nombre']} | "
+                f"Stock: {prod2['cantidad_actual']} | Price: ${prod2['precio_venta']}"
+            )
 
-    # 4. Probar venta POS
-    print("\n[4] Ejecutando venta POS (Punto de Venta)...")
-    res_venta = client.post(
-        f"/ventas/{empresa_id}",
-        json={
-            "detalles": [
-                {"producto_id": prod1_id, "cantidad": 3.0},
-                {"producto_id": prod2_id, "cantidad": 5.0}
-            ]
-        },
-        headers=headers
-    )
-    assert res_venta.status_code == 201, f"Error al registrar venta: {res_venta.text}"
-    venta = res_venta.json()
-    total_esperado = (3 * 18500.0) + (5 * 7000.0)
-    print(f"   [OK] Venta procesada exitosamente. ID Venta: {venta['venta_id']}")
-    print(f"   [OK] Total cobrado: ${venta['total']} (Esperado: ${total_esperado})")
+            # 4. Atomic POS Sale Checkout
+            print("\n[4] Executing atomic POS sale checkout...")
+            res_venta = client.post(
+                f"/api/v1/ventas/{empresa_id}",
+                json={
+                    "detalles": [
+                        {"producto_id": prod1_id, "cantidad": 3.0},
+                        {"producto_id": prod2_id, "cantidad": 5.0},
+                    ]
+                },
+                headers=headers,
+            )
+            assert res_venta.status_code == 201, f"POS sale failed: {res_venta.text}"
+            venta = res_venta.json()
+            expected_total = (3 * 18500.0) + (5 * 7000.0)
+            assert float(venta["total"]) == expected_total
+            print(f"   [OK] Sale processed. Sale ID: {venta['venta_id']}")
+            print(f"   [OK] Total charged: ${venta['total']} (Expected: ${expected_total})")
 
-    # Verificar descuento de stock post-venta
-    res_inv = client.get("/productos", headers=headers)
-    assert res_inv.status_code == 200
-    prods_actualizados = {p["id"]: p["cantidad_actual"] for p in res_inv.json()["inventario"]}
-    assert prods_actualizados[prod1_id] == 17.0, f"Stock no desconto bien en Prod 1: {prods_actualizados[prod1_id]}"
-    assert prods_actualizados[prod2_id] == 45.0, f"Stock no desconto bien en Prod 2: {prods_actualizados[prod2_id]}"
-    print("   [OK] Stock actualizado correctamente en BD: Cafe=17.0 (era 20), Achiras=45.0 (era 50)")
+            res_inv = client.get("/api/v1/productos", headers=headers)
+            assert res_inv.status_code == 200
+            updated_stock = {p["id"]: p["cantidad_actual"] for p in res_inv.json()["inventario"]}
+            assert updated_stock[prod1_id] == 17.0
+            assert updated_stock[prod2_id] == 45.0
+            print("   [OK] Stock deducted atomically: Cafe=17.0 (was 20), Achiras=45.0 (was 50)")
 
-    # 5. Probar Vinculación y Reabastecimiento por WhatsApp IA
-    print("\n[5] Probando integracion con WhatsApp IA (Vinculacion & Reabastecimiento)...")
-    res_cod = client.get("/api/whatsapp/vinculacion/codigo", headers=headers)
-    assert res_cod.status_code == 200
-    codigo_vinc = res_cod.json()["codigo"]
-    print(f"   [OK] Codigo de vinculacion generado para admin: {codigo_vinc}")
+            # 5. In-App Conversational AI Agent Restock FSM
+            print("\n[5] Testing In-App Conversational AI Agent restock workflow...")
+            conv_id = f"e2e_conv_{random_id}"
+            res_agent_preview = client.post(
+                "/api/v1/agente/mensaje",
+                json={
+                    "mensaje": "hoy me reabasteci de 10 Cafe Especial Huila 500g, pero el precio costo incremento y ahora vale 12500",
+                    "conversation_id": conv_id,
+                },
+                headers=headers,
+            )
+            assert res_agent_preview.status_code == 200, res_agent_preview.text
+            preview_body = res_agent_preview.json()
+            assert preview_body["estado"] == "READY_TO_CONFIRM", preview_body
+            print(f"   [OK] Agent FSM preview ready: state={preview_body['estado']}")
 
-    # Simular mensaje de WhatsApp VINCULAR
-    from app.routers.whatsapp_webhook import _process_whatsapp_message
-    phone_test = "+573009998877"
-    
-    print(f"   [MSG] Simulando mensaje WhatsApp: 'VINCULAR {codigo_vinc}'...")
-    _process_whatsapp_message(phone_test, {"type": "text", "text": {"body": f"VINCULAR {codigo_vinc}"}})
-    
-    # Verificar vinculación en estado
-    res_est = client.get("/api/whatsapp/estado", headers=headers)
-    assert res_est.json()["vinculado"] is True
-    print(f"   [OK] Numero {phone_test} vinculado exitosamente a la empresa.")
+            res_agent_confirm = client.post(
+                "/api/v1/agente/mensaje",
+                json={"mensaje": "sí", "conversation_id": conv_id},
+                headers=headers,
+            )
+            assert res_agent_confirm.status_code == 200, res_agent_confirm.text
+            confirm_body = res_agent_confirm.json()
+            assert confirm_body["estado"] == "EXECUTED", confirm_body
+            print(f"   [OK] Agent FSM restock executed: state={confirm_body['estado']}")
 
-    # Simular mensaje WhatsApp reabastecer (Mockeando Gemini IA si no hay API key en local)
-    print("   [MSG] Simulando comando de voz/texto WhatsApp: 'Reabastecer 10 unidades de Cafe Especial Huila'...")
-    mock_intent = {"action": "reabastecer", "product_name": "Cafe Especial Huila 500g", "quantity": 10.0, "unit": "unidad"}
-    
-    with patch.object(gemini_voice, "parse_text_intent", return_value=mock_intent):
-        _process_whatsapp_message(phone_test, {"type": "text", "text": {"body": "Reabastecer 10 unidades de Cafe Especial Huila"}})
+            res_inv2 = client.get("/api/v1/productos", headers=headers)
+            final_cafe_stock = next(
+                p["cantidad_actual"]
+                for p in res_inv2.json()["inventario"]
+                if p["id"] == prod1_id
+            )
+            assert final_cafe_stock == 27.0, f"Restock failed: {final_cafe_stock}"
+            print("   [OK] Cafe stock updated by AI Agent: 27.0 (was 17.0)")
 
-    # Verificar stock post-reabastecimiento por WhatsApp
-    res_inv2 = client.get("/productos", headers=headers)
-    stock_cafe_final = [p["cantidad_actual"] for p in res_inv2.json()["inventario"] if p["id"] == prod1_id][0]
-    assert stock_cafe_final == 27.0, f"Reabastecimiento no sumo stock: {stock_cafe_final}"
-    print(f"   [OK] Stock de Cafe reabastecido por IA WhatsApp: 27.0 (era 17)")
+            # 6. Financial Dashboard Metrics
+            print("\n[6] Validating consolidated metrics on Financial Dashboard...")
+            res_dash = client.get(f"/api/v1/dashboard/{empresa_id}", headers=headers)
+            assert res_dash.status_code == 200, f"Dashboard error: {res_dash.text}"
+            dash = res_dash.json()
+            print(f"   [OK] Sales today: {dash['ventas_hoy']}")
+            print(f"   [OK] Revenue today: ${dash['ingresos_hoy']}")
 
-    # 6. Métrica de Dashboard
-    print("\n[6] Validando metricas consolidadas en el Dashboard...")
-    res_dash = client.get(f"/dashboard/{empresa_id}", headers=headers)
-    assert res_dash.status_code == 200, f"Error en Dashboard: {res_dash.text}"
-    dash = res_dash.json()
-    print(f"   [OK] Ventas hoy: {dash['ventas_hoy']}")
-    print(f"   [OK] Ingresos hoy: ${dash['ingresos_hoy']}")
+            print("\n" + "=" * 70)
+            print("ALL END-TO-END (E2E) TESTS PASSED SUCCESSFULLY! (100% OK)")
+            print("=" * 70)
+    finally:
+        Base.metadata.drop_all(bind=engine)
+        engine.dispose()
+        if os.path.exists("./test_e2e.db"):
+            try:
+                os.remove("./test_e2e.db")
+            except OSError:
+                pass
 
-    print("\n" + "=" * 70)
-    print("TODAS LAS PRUEBAS END-TO-END PASARON CON EXITO! (100% OK)")
-    print("=" * 70)
 
 if __name__ == "__main__":
     run_e2e()

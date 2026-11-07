@@ -93,3 +93,87 @@ def test_auditoria_de_seguridad_logging(client):
         log_content = f.read()
         assert "LOGIN_FAILED" in log_content
         assert "intruso@test.com" in log_content
+
+
+def test_aislamiento_multitenant_codigo_barras_y_soft_delete(client):
+    """
+    Verify that barcode uniqueness is strictly scoped per tenant (empresa_id)
+    and only applies to active products (is_active=True).
+    """
+    reg_a = client.post(
+        "/auth/registro-completo",
+        json={
+            "nombre_comercial": "Tienda Tenant A",
+            "nit_o_cedula": "900111222-1",
+            "email": "tenanta@tienda.com",
+            "password": "Password123!",
+            "rol": "admin",
+        },
+    )
+    assert reg_a.status_code == 201
+    headers_a = {"Authorization": f"Bearer {reg_a.json()['access_token']}"}
+
+    reg_b = client.post(
+        "/auth/registro-completo",
+        json={
+            "nombre_comercial": "Tienda Tenant B",
+            "nit_o_cedula": "900333444-2",
+            "email": "tenantb@tienda.com",
+            "password": "Password123!",
+            "rol": "admin",
+        },
+    )
+    assert reg_b.status_code == 201
+    headers_b = {"Authorization": f"Bearer {reg_b.json()['access_token']}"}
+
+    shared_barcode = "7702004003509"
+    prod_payload = {
+        "nombre": "Leche Entera 1L",
+        "codigo_barras": shared_barcode,
+        "precio_costo": 3000,
+        "precio_venta": 4200,
+        "cantidad_actual": 15,
+        "unidad_medida": "unidad",
+    }
+
+    # Tenant A registers the barcode -> 201 Created
+    res_a1 = client.post("/productos", json=prod_payload, headers=headers_a)
+    assert res_a1.status_code == 201
+    prod_a_id = res_a1.json()["id"]
+
+    # Tenant A tries to register duplicate barcode -> 409 Conflict
+    res_a_dup = client.post("/productos", json=prod_payload, headers=headers_a)
+    assert res_a_dup.status_code == 409
+
+    # Tenant B registers the exact same EAN barcode -> 201 Created (isolated tenant)
+    res_b1 = client.post("/productos", json=prod_payload, headers=headers_b)
+    assert res_b1.status_code == 201
+
+    # Tenant A soft-deletes the product and re-registers the same barcode -> 201 Created
+    del_a = client.delete(f"/productos/{prod_a_id}", headers=headers_a)
+    assert del_a.status_code == 200
+    res_a2 = client.post("/productos", json=prod_payload, headers=headers_a)
+    assert res_a2.status_code == 201
+
+
+def test_deep_health_check_and_correlation_id(client, monkeypatch):
+    """
+    Validate deep /health probe (DB + Redis), /api/v1 prefix routing,
+    and X-Correlation-ID propagation in responses and error payloads.
+    """
+    custom_cid = "cid-test-123456789"
+    res = client.get("/api/v1/health", headers={"X-Correlation-ID": custom_cid})
+    assert res.status_code == 200
+    assert res.headers.get("X-Correlation-ID") == custom_cid
+    body = res.json()
+    assert body["status"] == "ok"
+    assert body["db"] == "connected"
+
+    # Simulate Redis requirement failure -> 503 Service Unavailable
+    monkeypatch.setenv("HEALTH_REQUIRE_REDIS", "true")
+    monkeypatch.setenv("REDIS_URL", "redis://127.0.0.1:6399/0")
+    res_degraded = client.get("/health")
+    assert res_degraded.status_code == 503
+    assert res_degraded.json()["status"] == "degraded"
+
+
