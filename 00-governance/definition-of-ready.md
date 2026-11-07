@@ -20,6 +20,11 @@ Ready does not mean the feature is already implemented or fully coded. It means 
 understands the business requirement and edge cases well enough to begin coding without
 stopping to ask what is expected.
 
+## Operational verification
+
+- Verified automatically in the GitHub Actions CI pipeline (`.github/workflows/ci.yml`).
+- Reviewed by the engineering team under the Monolith Governance Framework v2.1.0.
+
 ---
 
 **Related:** [`./definition-of-done.md`](./definition-of-done.md) · [`../04-requirements/user-stories.md`](../04-requirements/user-stories.md)

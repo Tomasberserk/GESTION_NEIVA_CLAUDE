@@ -3,7 +3,19 @@
 ## Secrets management
 
 | Rule | Detail |
-|---|---|
+|## Ownership
+
+- **Security Owner:** Tomás Barrera Ortiz (`@Tomasberserk`) — Tech Lead & Security Officer.
+- **Deputy Reviewers:** Santiago Javela Ospino (`@SantiagoJavelaOspino`) and Juan Pablo Doria Caviedes (`@Doritotes444`).
+- **Incident Escalation:** Any credential leak or multi-tenant isolation anomaly must be reported to the Security Owner within 1 hour for immediate key rotation and token revocation.
+
+---|## Ownership
+
+- **Security Owner:** Tomás Barrera Ortiz (`@Tomasberserk`) — Tech Lead & Security Officer.
+- **Deputy Reviewers:** Santiago Javela Ospino (`@SantiagoJavelaOspino`) and Juan Pablo Doria Caviedes (`@Doritotes444`).
+- **Incident Escalation:** Any credential leak or multi-tenant isolation anomaly must be reported to the Security Owner within 1 hour for immediate key rotation and token revocation.
+
+---|
 | Zero secrets in source control | Enforced by pre-commit checks and CI secrets detection |
 | Local development | Developers copy `.env.example` to `.env`; real production keys are prohibited |
 | Staging and production | Secrets injected directly via Render and Vercel platform environment stores |
@@ -23,6 +35,12 @@
 - **Payload Validation:** 100% of request bodies are parsed through strict Pydantic v2 schemas.
 - **SQL Injection Prevention:** All queries use SQLAlchemy ORM parameterized statements; raw concatenated SQL strings are strictly forbidden.
 - **CORS Allowlist:** Restricted to authorized production domains (`*.vercel.app`) and local development ports (5173/5174).
+
+## Ownership
+
+- **Security Owner:** Tomás Barrera Ortiz (`@Tomasberserk`) — Tech Lead & Security Officer.
+- **Deputy Reviewers:** Santiago Javela Ospino (`@SantiagoJavelaOspino`) and Juan Pablo Doria Caviedes (`@Doritotes444`).
+- **Incident Escalation:** Any credential leak or multi-tenant isolation anomaly must be reported to the Security Owner within 1 hour for immediate key rotation and token revocation.
 
 ---
 

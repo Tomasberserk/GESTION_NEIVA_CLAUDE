@@ -21,6 +21,11 @@ It is the authoritative source of merchant identity.
 |---|---|---|
 | *(none)* | — | `auth_tenancy` sits at the root of identity and depends on no other domain module |
 
+## Operational verification
+
+- Verified automatically in the GitHub Actions CI pipeline (`.github/workflows/ci.yml`).
+- Reviewed by the engineering team under the Monolith Governance Framework v2.1.0.
+
 ---
 
 **Related:** [`./data-model.md`](./data-model.md) · [`./runbook.md`](./runbook.md) · [`../module-catalog.md`](../module-catalog.md)

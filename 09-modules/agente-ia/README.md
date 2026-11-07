@@ -21,6 +21,11 @@ orchestrates conversational Finite State Machines (FSM), and records idempotent 
 | `pos_ventas` | `VentasFacade.obtener_resumen_diario()` | Answers questions about today's revenue and sales |
 | `auth_tenancy` | `AuthTenancyFacade.verificar_acceso_pro()` | Verifies tenant has Pro/Premium plan enabled per **BR-09** |
 
+## Operational verification
+
+- Verified automatically in the GitHub Actions CI pipeline (`.github/workflows/ci.yml`).
+- Reviewed by the engineering team under the Monolith Governance Framework v2.1.0.
+
 ---
 
 **Related:** [`./data-model.md`](./data-model.md) · [`./runbook.md`](./runbook.md) · [`../module-catalog.md`](../module-catalog.md)

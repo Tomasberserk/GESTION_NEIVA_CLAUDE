@@ -21,6 +21,11 @@ A user story is considered Done only when every criterion below is verified in C
 - **`pos_ventas` module:** Minimum 90% line coverage (**NFR-07**) due to financial criticality.
 - Pull requests falling below these thresholds are blocked automatically by the CI pipeline.
 
+## Operational verification
+
+- Verified automatically in the GitHub Actions CI pipeline (`.github/workflows/ci.yml`).
+- Reviewed by the engineering team under the Monolith Governance Framework v2.1.0.
+
 ---
 
 **Related:** [`./definition-of-ready.md`](./definition-of-ready.md) · [`./documentation-rules.md`](./documentation-rules.md)
