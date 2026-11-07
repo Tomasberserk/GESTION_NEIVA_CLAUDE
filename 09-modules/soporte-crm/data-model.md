@@ -22,6 +22,11 @@
 
 Stored as a plain UUID column without a database foreign key constraint per **ADR-004**.
 
+## Operational verification
+
+- Verified automatically in the GitHub Actions CI pipeline (`.github/workflows/ci.yml`).
+- Reviewed by the engineering team under the Monolith Governance Framework v2.1.0.
+
 ---
 
 **Related:** [`./README.md`](./README.md) · [`../../06-data/models.md`](../../06-data/models.md)
