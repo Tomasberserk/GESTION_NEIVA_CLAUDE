@@ -1,70 +1,86 @@
-import uuid
+"""SQLAlchemy ORM models for Gestion Neiva multi-tenant POS SaaS."""
 import enum
+import uuid
+
 from sqlalchemy import (
-    Column, String, Numeric, Boolean, Date, Text,
-    DateTime, ForeignKey, Enum as SAEnum, Index, UniqueConstraint,
+    Boolean,
+    Column,
+    Date,
+    DateTime,
+    Enum as SAEnum,
+    ForeignKey,
+    Index,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import foreign, relationship
 from sqlalchemy.sql import func
 
 from app.database import Base
 
 
-# ---------------------------------------------------------------------------
-# Enums
-# ---------------------------------------------------------------------------
-
 class RolUsuario(str, enum.Enum):
-    ADMIN   = "admin"
+    """User role enum within a store tenant."""
+
+    ADMIN = "admin"
     TENDERO = "tendero"
 
 
 class PlanEmpresa(str, enum.Enum):
-    BASIC   = "basic"
-    PRO     = "pro"
-    MEDIUM  = "medium"
+    """Subscription plan tier for a store tenant."""
+
+    BASIC = "basic"
+    PRO = "pro"
+    MEDIUM = "medium"
     PREMIUM = "premium"
 
 
 class UnidadMedida(str, enum.Enum):
+    """Unit of measure for catalog products."""
+
     UNIDAD = "unidad"
-    GRAMO  = "gramo"
-    LIBRA  = "libra"
-    KILO   = "kilo"
-    CAJA   = "caja"
-    BULTO  = "bulto"
-    KG     = "kg"
-    LITRO  = "litro"
-    METRO  = "metro"
+    GRAMO = "gramo"
+    LIBRA = "libra"
+    KILO = "kilo"
+    CAJA = "caja"
+    BULTO = "bulto"
+    KG = "kg"
+    LITRO = "litro"
+    METRO = "metro"
 
 
 class CategoriaProducto(str, enum.Enum):
-    BEBIDAS   = "Bebidas"
-    SNACKS    = "Snacks"
-    ASEO      = "Aseo"
-    LACTEOS   = "Lacteos"
-    LIMPIEZA  = "Limpieza"
+    """Product category classification."""
+
+    BEBIDAS = "Bebidas"
+    SNACKS = "Snacks"
+    ASEO = "Aseo"
+    LACTEOS = "Lacteos"
+    LIMPIEZA = "Limpieza"
     PANADERIA = "Panaderia"
 
 
 class EstadoTicket(str, enum.Enum):
-    ABIERTO    = "abierto"
+    """Lifecycle status of a support ticket."""
+
+    ABIERTO = "abierto"
     RESPONDIDO = "respondido"
-    CERRADO    = "cerrado"
+    CERRADO = "cerrado"
 
 
 class RemitenteRol(str, enum.Enum):
+    """Sender role for a support ticket message."""
+
     SUPERADMIN = "superadmin"
-    USUARIO    = "usuario"
+    USUARIO = "usuario"
 
-
-# ---------------------------------------------------------------------------
-# AuditMixin
-# ---------------------------------------------------------------------------
 
 class AuditMixin:
-    """created_at/updated_at/is_active inherited by all main tables."""
+    """Standard audit and soft-delete fields inherited by all domain tables."""
+
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -79,11 +95,9 @@ class AuditMixin:
     is_active = Column(Boolean, default=True, server_default="true", nullable=False)
 
 
-# ---------------------------------------------------------------------------
-# Empresa (raíz del árbol multi-tenant)
-# ---------------------------------------------------------------------------
-
 class Empresa(AuditMixin, Base):
+    """Root multi-tenant company (store) entity owned by auth_tenancy."""
+
     __tablename__ = "empresas"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -96,21 +110,19 @@ class Empresa(AuditMixin, Base):
     )
     trial_expires_at = Column(DateTime(timezone=True), nullable=True)
 
-    usuarios          = relationship("Usuario",        back_populates="empresa", cascade="all, delete-orphan")
-    productos         = relationship("Producto",       back_populates="empresa", cascade="all, delete-orphan")
-    ventas            = relationship("Venta",          back_populates="empresa", cascade="all, delete-orphan")
-    soporte_tickets   = relationship("SoporteTicket",  back_populates="empresa", cascade="all, delete-orphan")
-    agent_commands    = relationship("AgentCommand",    back_populates="empresa", cascade="all, delete-orphan")
+    usuarios = relationship("Usuario", back_populates="empresa", cascade="all, delete-orphan")
+    productos = relationship("Producto", back_populates="empresa", cascade="all, delete-orphan")
+    ventas = relationship("Venta", back_populates="empresa", cascade="all, delete-orphan")
+    soporte_tickets = relationship("SoporteTicket", back_populates="empresa", cascade="all, delete-orphan")
+    agent_commands = relationship("AgentCommand", back_populates="empresa", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Empresa {self.nombre_comercial!r}>"
 
 
-# ---------------------------------------------------------------------------
-# Usuario
-# ---------------------------------------------------------------------------
-
 class Usuario(AuditMixin, Base):
+    """Store user account entity owned by auth_tenancy."""
+
     __tablename__ = "usuarios"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -130,7 +142,11 @@ class Usuario(AuditMixin, Base):
     telefono_whatsapp = Column(String(20), nullable=True, unique=True)
 
     empresa = relationship("Empresa", back_populates="usuarios")
-    ventas  = relationship("Venta", back_populates="usuario")
+    ventas = relationship(
+        "Venta",
+        primaryjoin="Usuario.id == foreign(Venta.usuario_id)",
+        back_populates="usuario",
+    )
 
     __table_args__ = (
         Index("idx_usuarios_email", "email"),
@@ -140,11 +156,9 @@ class Usuario(AuditMixin, Base):
         return f"<Usuario {self.email!r} nombre={self.nombre!r} rol={self.rol}>"
 
 
-# ---------------------------------------------------------------------------
-# Producto
-# ---------------------------------------------------------------------------
-
 class Producto(AuditMixin, Base):
+    """Catalog product entity owned by inventario."""
+
     __tablename__ = "productos"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -171,7 +185,12 @@ class Producto(AuditMixin, Base):
     foto_url = Column(String, nullable=True)
 
     empresa = relationship("Empresa", back_populates="productos")
-    detalles_venta = relationship("DetalleVenta", back_populates="producto", passive_deletes=True)
+    detalles_venta = relationship(
+        "DetalleVenta",
+        primaryjoin="Producto.id == foreign(DetalleVenta.producto_id)",
+        back_populates="producto",
+        passive_deletes=True,
+    )
 
     __table_args__ = (
         UniqueConstraint("empresa_id", "codigo_barras", name="uq_producto_empresa_barras"),
@@ -182,11 +201,9 @@ class Producto(AuditMixin, Base):
         return f"<Producto {self.nombre!r} stock={self.cantidad_actual}>"
 
 
-# ---------------------------------------------------------------------------
-# Venta
-# ---------------------------------------------------------------------------
-
 class Venta(AuditMixin, Base):
+    """POS sale header entity owned by pos_ventas (decoupled from usuarios FK per ADR-004)."""
+
     __tablename__ = "ventas"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -197,15 +214,16 @@ class Venta(AuditMixin, Base):
     )
     fecha_venta = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     total = Column(Numeric(10, 2), nullable=False, server_default="0.00")
-    usuario_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("usuarios.id", ondelete="SET NULL"),
-        nullable=True,
-    )
+    # Plain UUID reference without cross-module DB ForeignKey constraint (ADR-004 / DAT-03)
+    usuario_id = Column(UUID(as_uuid=True), nullable=True)
     vendedor_nombre_snapshot = Column(String(100), nullable=True)
 
-    empresa  = relationship("Empresa", back_populates="ventas")
-    usuario  = relationship("Usuario", back_populates="ventas")
+    empresa = relationship("Empresa", back_populates="ventas")
+    usuario = relationship(
+        "Usuario",
+        primaryjoin="foreign(Venta.usuario_id) == Usuario.id",
+        back_populates="ventas",
+    )
     detalles = relationship("DetalleVenta", back_populates="venta", cascade="all, delete-orphan")
 
     __table_args__ = (
@@ -217,11 +235,9 @@ class Venta(AuditMixin, Base):
         return f"<Venta id={self.id} total={self.total} usuario_id={self.usuario_id}>"
 
 
-# ---------------------------------------------------------------------------
-# DetalleVenta
-# ---------------------------------------------------------------------------
-
 class DetalleVenta(AuditMixin, Base):
+    """POS sale line item entity owned by pos_ventas (decoupled from productos FK per ADR-004)."""
+
     __tablename__ = "detalles_venta"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -230,31 +246,31 @@ class DetalleVenta(AuditMixin, Base):
         ForeignKey("ventas.id", ondelete="CASCADE"),
         nullable=False,
     )
-    producto_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("productos.id", ondelete="RESTRICT"),
-        nullable=False,
-    )
+    # Plain UUID reference without cross-module DB ForeignKey constraint (ADR-004 / DAT-03)
+    producto_id = Column(UUID(as_uuid=True), nullable=False)
     cantidad = Column(Numeric(10, 3), nullable=False)
     precio_unitario = Column(Numeric(10, 2), nullable=False)
     subtotal = Column(Numeric(10, 2), nullable=False)
 
-    venta    = relationship("Venta", back_populates="detalles")
-    producto = relationship("Producto", back_populates="detalles_venta")
+    venta = relationship("Venta", back_populates="detalles")
+    producto = relationship(
+        "Producto",
+        primaryjoin="foreign(DetalleVenta.producto_id) == Producto.id",
+        back_populates="detalles_venta",
+    )
 
     __table_args__ = (
         Index("idx_detalles_venta_venta_id", "venta_id"),
+        Index("idx_detalles_venta_producto_id", "producto_id"),
     )
 
     def __repr__(self) -> str:
         return f"<DetalleVenta venta={self.venta_id} producto={self.producto_id} qty={self.cantidad}>"
 
 
-# ---------------------------------------------------------------------------
-# SoporteTicket
-# ---------------------------------------------------------------------------
-
 class SoporteTicket(AuditMixin, Base):
+    """Customer support ticket entity owned by soporte_crm (decoupled from usuarios FK per ADR-004)."""
+
     __tablename__ = "soporte_tickets"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -263,11 +279,8 @@ class SoporteTicket(AuditMixin, Base):
         ForeignKey("empresas.id", ondelete="CASCADE"),
         nullable=False,
     )
-    usuario_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("usuarios.id", ondelete="RESTRICT"),
-        nullable=False,
-    )
+    # Plain UUID reference without cross-module DB ForeignKey constraint (ADR-004 / DAT-03)
+    usuario_id = Column(UUID(as_uuid=True), nullable=False)
     asunto = Column(String(150), nullable=False)
     estado = Column(
         SAEnum(EstadoTicket, name="estadoticket", values_callable=lambda x: [e.value for e in x]),
@@ -275,8 +288,12 @@ class SoporteTicket(AuditMixin, Base):
         server_default="abierto",
     )
 
-    empresa  = relationship("Empresa", back_populates="soporte_tickets")
-    usuario  = relationship("Usuario", foreign_keys=[usuario_id], viewonly=True)
+    empresa = relationship("Empresa", back_populates="soporte_tickets")
+    usuario = relationship(
+        "Usuario",
+        primaryjoin="foreign(SoporteTicket.usuario_id) == Usuario.id",
+        viewonly=True,
+    )
     mensajes = relationship(
         "SoporteMensaje",
         back_populates="ticket",
@@ -286,17 +303,16 @@ class SoporteTicket(AuditMixin, Base):
 
     __table_args__ = (
         Index("idx_soporte_tickets_empresa", "empresa_id"),
+        Index("idx_soporte_tickets_usuario", "usuario_id"),
     )
 
     def __repr__(self) -> str:
         return f"<SoporteTicket {self.asunto!r} estado={self.estado}>"
 
 
-# ---------------------------------------------------------------------------
-# SoporteMensaje
-# ---------------------------------------------------------------------------
-
 class SoporteMensaje(Base):
+    """Message within a customer support ticket thread owned by soporte_crm."""
+
     __tablename__ = "soporte_mensajes"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -323,22 +339,20 @@ class SoporteMensaje(Base):
         return f"<SoporteMensaje rol={self.remitente_rol!r}>"
 
 
-# ---------------------------------------------------------------------------
-# Agente IA — Transacciones e Idempotencia
-# ---------------------------------------------------------------------------
-
 class AgentCommand(AuditMixin, Base):
+    """Idempotent conversational AI agent command log owned by agente_ia."""
+
     __tablename__ = "agent_commands"
 
-    id              = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    empresa_id      = Column(UUID(as_uuid=True), ForeignKey("empresas.id", ondelete="CASCADE"), nullable=False)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    empresa_id = Column(UUID(as_uuid=True), ForeignKey("empresas.id", ondelete="CASCADE"), nullable=False)
     conversation_id = Column(String(100), nullable=False)
-    command_id      = Column(String(100), nullable=False)
-    action          = Column(String(50), nullable=False)
-    payload         = Column(Text, nullable=True)  # JSON string
-    status          = Column(String(30), nullable=False, default="PENDIENTE")  # PENDIENTE, EJECUTADO, RECHAZADO, INVALIDADO
-    result          = Column(Text, nullable=True)   # JSON string
-    executed_at     = Column(DateTime(timezone=True), nullable=True)
+    command_id = Column(String(100), nullable=False)
+    action = Column(String(50), nullable=False)
+    payload = Column(Text, nullable=True)
+    status = Column(String(30), nullable=False, default="PENDIENTE")
+    result = Column(Text, nullable=True)
+    executed_at = Column(DateTime(timezone=True), nullable=True)
 
     empresa = relationship("Empresa", back_populates="agent_commands")
 
@@ -351,4 +365,3 @@ class AgentCommand(AuditMixin, Base):
 
     def __repr__(self) -> str:
         return f"<AgentCommand {self.command_id} [{self.status}]>"
-
