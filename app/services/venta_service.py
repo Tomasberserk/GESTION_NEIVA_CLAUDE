@@ -1,4 +1,5 @@
-from datetime import datetime, timezone, timedelta, date, time
+"""POS sales service orchestrating atomic checkout through module facades."""
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
 from uuid import UUID
@@ -8,7 +9,14 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 
 from app import models
+from app.auth_tenancy.api.facade import AuthTenancyFacade
+from app.inventario.api.facade import InventarioFacade
 from app.schemas.venta import VentaCrear, VentaResumen
+
+try:
+    COLOMBIA_TZ = ZoneInfo("America/Bogota")
+except Exception:
+    COLOMBIA_TZ = timezone(timedelta(hours=-5))
 
 
 def registrar_venta(
@@ -19,19 +27,17 @@ def registrar_venta(
     commit: bool = True,
 ) -> VentaResumen:
     """
-    Registra una venta completa en una transacción ACID.
+    Register a complete POS sale within a single ACID transaction.
 
-    Patrón: flush (obtener id) → por cada item: lock → validar → descontar
-            → agregar detalle → commit. Si algo falla: rollback total.
+    Delegates row locking and stock deduction to InventarioFacade to enforce
+    strict module boundary isolation (ADR-001, ADR-003, ARC-04).
     """
-    # 1. Multi-tenant: el usuario solo puede operar en su propia empresa
     if current_user.empresa_id != empresa_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permiso para operar en esta empresa",
         )
 
-    # 2. Crear el documento maestro de venta con total provisional = 0 y trazabilidad inmutable
     nueva_venta = models.Venta(
         empresa_id=empresa_id,
         total=Decimal("0.00"),
@@ -41,80 +47,37 @@ def registrar_venta(
         vendedor_nombre_snapshot=current_user.nombre or current_user.email,
     )
     db.add(nueva_venta)
-    # flush: escribe en la transacción activa sin hacer commit,
-    # para obtener el UUID asignado por PostgreSQL
     db.flush()
 
     total_venta = Decimal("0.00")
 
     try:
         for item in data.detalles:
-            # 3a. LOCK de fila: previene race conditions cuando dos ventas
-            #     simultáneas intentan usar el mismo producto
-            producto = (
-                db.query(models.Producto)
-                .filter(
-                    models.Producto.id == item.producto_id,
-                    models.Producto.empresa_id == empresa_id,
-                    models.Producto.is_active.is_(True),
-                )
-                .with_for_update()
-                .first()
+            stock_dto = InventarioFacade.validar_y_descontar_stock_atomic(
+                empresa_id=empresa_id,
+                producto_id=item.producto_id,
+                cantidad=item.cantidad,
+                db=db,
             )
+            total_venta += stock_dto.subtotal
 
-            if not producto:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=(
-                        f"Producto '{item.producto_id}' no encontrado "
-                        "o no pertenece a esta empresa"
-                    ),
-                )
-
-            # 3b. Validar stock DESPUÉS del lock (no antes), para evitar
-            #     que otro proceso modifique el stock entre la lectura y
-            #     el descuento
-            if producto.cantidad_actual < item.cantidad:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=(
-                        f"Stock insuficiente para '{producto.nombre}'. "
-                        f"Disponible: {producto.cantidad_actual}, "
-                        f"Solicitado: {item.cantidad}"
-                    ),
-                )
-
-            # 3c. Descontar stock
-            producto.cantidad_actual -= item.cantidad
-
-            # 3d. Calcular subtotal usando Decimal para evitar errores de
-            #     punto flotante en acumulación
-            subtotal = producto.precio_venta * item.cantidad
-            total_venta += subtotal
-
-            # 3e. Crear línea de detalle con precio_unitario congelado:
-            #     si el precio cambia mañana, esta venta conserva el precio
-            #     histórico del momento de la transacción
             detalle = models.DetalleVenta(
                 venta_id=nueva_venta.id,
                 producto_id=item.producto_id,
                 cantidad=item.cantidad,
-                precio_unitario=producto.precio_venta,
-                subtotal=subtotal,
+                precio_unitario=stock_dto.precio_unitario,
+                subtotal=stock_dto.subtotal,
             )
             db.add(detalle)
 
-        # 4. Actualizar el total en el documento maestro
         nueva_venta.total = total_venta
 
-        # 5. COMMIT o FLUSH según si el llamador controla la transacción externa
         if commit:
             db.commit()
         else:
             db.flush()
 
     except HTTPException:
-        # Rollback explícito: deshace el flush y todos los cambios en la sesión
         db.rollback()
         raise
     except Exception as exc:
@@ -137,18 +100,12 @@ def obtener_ventas_empresa(
     fecha_inicio: Optional[datetime] = None,
     fecha_fin: Optional[datetime] = None,
 ) -> list:
-    if not db.query(models.Empresa).filter(
-        models.Empresa.id == empresa_id,
-        models.Empresa.is_active.is_(True),
-    ).first():
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Empresa no encontrada",
-        )
+    """Return sales history for an active company within the requested date range."""
+    AuthTenancyFacade.ensure_active_company(empresa_id=empresa_id, db=db)
 
     ahora = datetime.now(timezone.utc)
     inicio = fecha_inicio or (ahora - timedelta(days=30))
-    fin    = fecha_fin   or ahora
+    fin = fecha_fin or ahora
 
     return (
         db.query(models.Venta)
@@ -166,12 +123,6 @@ def obtener_ventas_empresa(
     )
 
 
-try:
-    COLOMBIA_TZ = ZoneInfo("America/Bogota")
-except Exception:
-    COLOMBIA_TZ = timezone(timedelta(hours=-5))
-
-
 def obtener_actividad_ventas(
     admin_user: models.Usuario,
     db: Session,
@@ -179,39 +130,28 @@ def obtener_actividad_ventas(
     usuario_id: Optional[UUID] = None,
 ) -> list[models.Venta]:
     """
-    Retorna la actividad de ventas de un día comercial en Colombia (America/Bogota).
-    Usa intervalo semiabierto [inicio, fin) y orden LIFO (fecha_venta DESC, id DESC):
-    las ventas más recientes aparecen primero (petición del dueño 28-10).
-    Valida pertenencia multi-tenant estricta si se filtra por usuario_id.
+    Return chronological LIFO sales activity for a commercial day in Colombia (America/Bogota).
     """
     if not fecha:
         fecha_dt = datetime.now(COLOMBIA_TZ).date()
     else:
         try:
             fecha_dt = date.fromisoformat(fecha)
-        except ValueError:
+        except ValueError as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Formato de fecha inválido. Use YYYY-MM-DD",
-            )
+            ) from exc
 
     inicio = datetime.combine(fecha_dt, time.min, tzinfo=COLOMBIA_TZ)
     fin = inicio + timedelta(days=1)
 
     if usuario_id:
-        vendedor = (
-            db.query(models.Usuario)
-            .filter(
-                models.Usuario.id == usuario_id,
-                models.Usuario.empresa_id == admin_user.empresa_id,
-            )
-            .first()
+        AuthTenancyFacade.ensure_company_seller(
+            usuario_id=usuario_id,
+            empresa_id=admin_user.empresa_id,
+            db=db,
         )
-        if not vendedor:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Vendedor no encontrado en esta empresa",
-            )
 
     query = (
         db.query(models.Venta)
@@ -230,4 +170,3 @@ def obtener_actividad_ventas(
         query = query.filter(models.Venta.usuario_id == usuario_id)
 
     return query.order_by(models.Venta.fecha_venta.desc(), models.Venta.id.desc()).all()
-

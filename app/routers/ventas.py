@@ -17,21 +17,25 @@ router = APIRouter(prefix="/ventas", tags=["Ventas"])
 @router.get("/actividad", response_model=list[VentaRespuesta])
 @router.get("/actividad-hoy", response_model=list[VentaRespuesta])
 def actividad_ventas(
-    fecha: Optional[str] = Query(None, description="Fecha comercial YYYY-MM-DD (America/Bogota). Por defecto hoy."),
-    usuario_id: Optional[UUID] = Query(None, description="Filtrar por ID de vendedor"),
+    fecha: Optional[str] = Query(None, description="Commercial date YYYY-MM-DD (America/Bogota). Defaults to today."),
+    usuario_id: Optional[UUID] = Query(None, description="Filter by seller user ID"),
+    page: int = Query(1, ge=1, description="Page number (1-indexed)"),
+    limit: int = Query(100, ge=1, le=100, description="Items per page (max 100)"),
     db: Session = Depends(get_db),
     current_user: models.Usuario = Depends(get_current_user_admin),
 ):
     """
-    Timeline cronológico de ventas de un día comercial en Colombia (orden determinista).
-    Solo accesible para administradores de la empresa.
+    Chronological timeline of sales for a commercial day in Colombia.
+    Accessible only by company administrators.
     """
-    return venta_service.obtener_actividad_ventas(
+    items = venta_service.obtener_actividad_ventas(
         admin_user=current_user,
         db=db,
         fecha=fecha,
         usuario_id=usuario_id,
     )
+    offset = (page - 1) * limit
+    return items[offset : offset + limit]
 
 
 @router.post("/{empresa_id}", response_model=VentaResumen, status_code=status.HTTP_201_CREATED)
