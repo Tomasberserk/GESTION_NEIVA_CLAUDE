@@ -20,6 +20,11 @@ lookups, acquisition costs, sale prices, stock balances, and 15-day expiration a
 |---|---|---|
 | *(none)* | — | `inventario` owns its product data directly; tenant context is passed in arguments |
 
+## Operational verification
+
+- Verified automatically in the GitHub Actions CI pipeline (`.github/workflows/ci.yml`).
+- Reviewed by the engineering team under the Monolith Governance Framework v2.1.0.
+
 ---
 
 **Related:** [`./data-model.md`](./data-model.md) · [`./runbook.md`](./runbook.md) · [`../module-catalog.md`](../module-catalog.md)

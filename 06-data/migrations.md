@@ -22,7 +22,7 @@ Every schema change is tracked in `alembic/versions/` and applied sequentially v
 | 010 | `010_crear_tabla_agent_commands.py` | `agente_ia` | Creates `agent_commands` table for FSM idempotency |
 | 011 | `011_remover_modulos_erp.py` | `system` | **Pruned ERP tables permanently** (`compras`, `cxp`, `abonos`, `proveedores`) |
 | 012 | `012_rbac_nombre_usuario_y_trazabilidad_ventas.py` | `auth_tenancy`, `pos_ventas` | Adds `nombre` in usuarios and `vendedor_nombre_snapshot` in ventas |
-| 013 | `013_desacoplar_fks_entre_modulos.py` *(planned)* | `pos_ventas`, `soporte_crm` | Drops cross-module DB foreign keys per **ADR-004** |
+| 013 | `013_desacoplar_fks_entre_modulos.py` | `pos_ventas`, `soporte_crm` | Drops cross-module DB foreign keys per **ADR-004** and adds UUID lookup indexes |
 
 ## Rollback rules
 

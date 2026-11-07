@@ -20,6 +20,11 @@ and calculates register totals.
 | `inventario` | `InventarioFacade.validar_y_descontar_stock_atomic()` | Checks availability and locks items during checkout |
 | `auth_tenancy` | `AuthTenancyFacade.obtener_usuario()` | Validates cashier and fetches seller name snapshot |
 
+## Operational verification
+
+- Verified automatically in the GitHub Actions CI pipeline (`.github/workflows/ci.yml`).
+- Reviewed by the engineering team under the Monolith Governance Framework v2.1.0.
+
 ---
 
 **Related:** [`./data-model.md`](./data-model.md) · [`./runbook.md`](./runbook.md) · [`../module-catalog.md`](../module-catalog.md)

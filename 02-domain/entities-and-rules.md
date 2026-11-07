@@ -21,7 +21,7 @@
 4. **BR-04** — Checkout and stock reduction occur in a single ACID transaction protected by pessimistic row locking (`SELECT ... FOR UPDATE`).
 5. **BR-05** — Entities with transaction history (`Producto`, `Usuario`, `Empresa`) are never hard-deleted; only deactivated (`is_active = False`).
 6. **BR-06** — The sale total is derived from the sum of its items; no redundant mutable column overrides the lines.
-7. **BR-07** — Basic plan permits at most 1 active cashier; Pro permits up to 5; higher plans permit unlimited.
+7. **BR-07** — Basic plan permits at most 3 active cashiers (`MAX_CAJEROS_BASIC = 3`); Pro and higher plans permit unlimited active cashiers.
 8. **BR-08** — When `now() > trial_expires_at` without an active paid plan, write operations return 403 Forbidden.
 9. **BR-09** — Voice/AI endpoints (`/agente/*`) reject requests from tenants without Pro or Premium plans.
 10. **BR-10** — `codigo_barras` is unique per tenant (`uq_producto_empresa_barras`), allowing different stores to stock identical barcodes.

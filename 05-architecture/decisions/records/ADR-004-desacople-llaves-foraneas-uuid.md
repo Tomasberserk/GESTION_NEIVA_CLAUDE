@@ -49,6 +49,10 @@ and `soporte_tickets.usuario_id` validate through `AuthTenancyFacade`.
 | Cost | Deletions must be handled by application-level soft delete (`is_active = False`) |
 | Risk | Unchecked manual SQL scripts could leave orphan UUIDs; mitigated by ORM facade methods |
 
+## Revisit condition
+
+Revisit this decision if external BI tools require read-replica schemas with enforced referential constraints materialized via nightly ETL.
+
 ---
 
 **Related:** [`../../modular-monolith.md`](../../modular-monolith.md) · [`../../../06-data/database-conventions.md`](../../../06-data/database-conventions.md)

@@ -47,6 +47,10 @@ queries through `empresa_id`. Compound indexes `(empresa_id, ...)` guarantee que
 | Cost | All database queries must include the tenant filter |
 | Risk | An omitted `where(empresa_id=...)` could leak data; mitigated by automated security tests |
 
+## Revisit condition
+
+Revisit this decision if enterprise retail chains require physically dedicated PostgreSQL schemas or isolated database instances for regulatory compliance.
+
 ---
 
 **Related:** [`../../../02-domain/entities-and-rules.md`](../../../02-domain/entities-and-rules.md) · [`../../../06-data/models.md`](../../../06-data/models.md)

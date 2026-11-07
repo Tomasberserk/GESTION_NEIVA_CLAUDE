@@ -48,6 +48,10 @@ If stock is insufficient, the transaction rolls back with HTTP 422.
 | Cost | Requires short database transactions; external API calls cannot occur inside the lock |
 | Risk | Long-running queries on `productos` could block sales; mitigated by short transaction scopes |
 
+## Revisit condition
+
+Revisit this decision if concurrent checkout throughput per store exceeds 50 transactions per second and row-lock contention (`SELECT FOR UPDATE`) causes p95 latency > 300 ms.
+
 ---
 
 **Related:** [`../../../02-domain/entities-and-rules.md`](../../../02-domain/entities-and-rules.md) · [`../../../04-requirements/non-functional.md`](../../../04-requirements/non-functional.md)

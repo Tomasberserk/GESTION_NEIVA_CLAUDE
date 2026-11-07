@@ -50,6 +50,10 @@ complicate with network sagas.
 | Cost | Modules cannot cross-import internals; facades must be maintained explicitly |
 | Risk | Facades with excessive methods indicate an incorrectly drawn boundary |
 
+## Revisit condition
+
+Revisit this decision if a single module (such as `agente_ia` voice processing) exceeds 70% of CPU/memory utilization and requires independent horizontal autoscaling.
+
 ---
 
 **Related:** [`../../modular-monolith.md`](../../modular-monolith.md) · [`../../boundary-enforcement.md`](../../boundary-enforcement.md)

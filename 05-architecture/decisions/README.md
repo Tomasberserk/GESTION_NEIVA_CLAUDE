@@ -21,6 +21,11 @@ overridden in code; it must be superseded by a new ADR.
 - **Accepted:** Approved at the architecture review gate; code must conform.
 - **Superseded:** Replaced by a newer decision that references this ID.
 
+## Operational verification
+
+- Verified automatically in the GitHub Actions CI pipeline (`.github/workflows/ci.yml`).
+- Reviewed by the engineering team under the Monolith Governance Framework v2.1.0.
+
 ---
 
 **Related:** [`../README.md`](../README.md) · [`../modular-monolith.md`](../modular-monolith.md)
