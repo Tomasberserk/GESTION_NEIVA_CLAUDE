@@ -147,8 +147,8 @@ def registrar_usuario_con_empresa(
         log_security_event("REGISTRATION_WITH_COMPANY_ERROR", email, ip=ip, level="ERROR")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error durante el registro: {str(exc)}",
-        )
+            detail="Error interno durante el registro de la empresa y usuario",
+        ) from exc
 
 
 # ---------------------------------------------------------------------------

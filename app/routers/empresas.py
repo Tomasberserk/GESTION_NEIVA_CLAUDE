@@ -1,4 +1,5 @@
 import os
+import secrets
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
@@ -12,11 +13,10 @@ from app.services import empresa_service
 
 router = APIRouter(prefix="/empresas", tags=["Empresas"])
 
-_SUPERADMIN_KEY = os.getenv("SUPERADMIN_KEY")
 
-
-def _check_superadmin(x_superadmin_key: str = Header(alias="x-superadmin-key")):
-    if not _SUPERADMIN_KEY or x_superadmin_key != _SUPERADMIN_KEY:
+def _check_superadmin(x_superadmin_key: str = Header(default=None, alias="x-superadmin-key")):
+    key = os.getenv("SUPERADMIN_KEY")
+    if not key or not x_superadmin_key or not secrets.compare_digest(x_superadmin_key, key):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Clave de superadmin inválida",

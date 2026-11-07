@@ -1,4 +1,5 @@
 import os
+import secrets
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
@@ -20,11 +21,10 @@ router = APIRouter(prefix="/superadmin", tags=["SuperAdmin"])
 
 def _check_superadmin(x_superadmin_key: str = Header(default=None, alias="x-superadmin-key")):
     """
-    Verifica la clave de superadmin en cada request.
-    Se ejecuta en cada llamada para que monkeypatch.setenv funcione en tests.
+    Validate the SuperAdmin key on every request using constant-time comparison.
     """
     key = os.getenv("SUPERADMIN_KEY")
-    if not key or x_superadmin_key != key:
+    if not key or not x_superadmin_key or not secrets.compare_digest(x_superadmin_key, key):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Clave de superadmin inválida",
@@ -155,7 +155,7 @@ def eliminar_empresa(
     empresa = db.query(models.Empresa).filter(models.Empresa.id == empresa_id).first()
     if not empresa:
         raise HTTPException(status_code=404, detail="Empresa no encontrada")
-    db.delete(empresa)
+    empresa.is_active = False
     db.commit()
 
 
