@@ -200,6 +200,9 @@ CREATE TABLE detalles_venta (
 
 ### 2.2 Cálculos y Validaciones Críticas
 
+**Tabla 1**  
+*Registro estructurado de especificaciones técnicas ( Sección 1 )*
+
 | Paso | Responsable | Validación | Error Code | Observación |
 |------|-------------|-----------|-----------|-------------|
 | Stock disponible | Backend | `cantidad_actual >= cantidad_solicitada` | 400 Bad Request | Bloqueo con `with_for_update()` |
@@ -208,6 +211,8 @@ CREATE TABLE detalles_venta (
 | Producto existe | Backend | `producto_id` válido y pertenece empresa | 400 Bad Request | Inyección de SQL prevista |
 | Cantidad > 0 | Backend | `cantidad > 0` | 400 Bad Request | Validación Pydantic |
 | Autenticación JWT válida | Backend | Token no expirado, firma válida | 401 Unauthorized | OAuth2PasswordBearer |
+
+*Nota.* Especificación técnica sincronizada con la arquitectura vigente del proyecto. Fuente: Elaboración propia (2026).
 
 ### 2.3 Manejo de Errores 400 (Bad Request) - LECCIONES APRENDIDAS
 
@@ -373,11 +378,16 @@ useEffect(() => {
 
 ### 4.1 Autenticación
 
+**Tabla 2**  
+*Registro estructurado de especificaciones técnicas ( Sección 2 )*
+
 | Método | Endpoint | Autenticado | Body | Respuesta | Error Codes |
 |--------|----------|------------|------|-----------|------------|
 | POST | `/registro` | No | `{email, password, empresa_id, rol?}` | `{access_token, token_type, usuario}` | 400 (email duplicado), 404 (empresa no existe) |
 | POST | `/token` (Login) | No | `{email, password}` | `{access_token, token_type, usuario}` | 401 (credenciales incorrectas) |
 | GET | `/me` | Sí (JWT) | N/A | `{id, email, empresa_id, rol, fecha_creacion}` | 401 (token inválido) |
+
+*Nota.* Especificación técnica sincronizada con la arquitectura vigente del proyecto. Fuente: Elaboración propia (2026).
 
 **Headers requeridos en endpoints autenticados:**
 ```http
@@ -386,12 +396,20 @@ Authorization: Bearer {JWT_TOKEN}
 
 ### 4.2 Gestión de Empresas
 
+**Tabla 3**  
+*Registro estructurado de especificaciones técnicas ( Sección 3 )*
+
 | Método | Endpoint | Autenticado | Body | Respuesta |
 |--------|----------|------------|------|-----------|
 | POST | `/empresas/` | No | `{nombre_comercial, nit_o_cedula}` | `{mensaje, empresa}` |
 | GET | `/empresas/{id}` | No | N/A | `{id, nombre_comercial, nit_o_cedula, fecha_creacion}` |
 
+*Nota.* Especificación técnica sincronizada con la arquitectura vigente del proyecto. Fuente: Elaboración propia (2026).
+
 ### 4.3 Gestión de Productos (Admin)
+
+**Tabla 4**  
+*Registro estructurado de especificaciones técnicas ( Sección 4 )*
 
 | Método | Endpoint | Requerido | Body | Respuesta | Error Codes |
 |--------|----------|-----------|------|-----------|------------|
@@ -401,18 +419,30 @@ Authorization: Bearer {JWT_TOKEN}
 | DELETE | `/productos/{id}` | `rol=admin` | N/A | `{mensaje}` | 403, 404 |
 | POST | `/productos/{id}/imagen` | Sí (JWT) | `FormData: file` | `{mensaje, url_acceso}` | 404 (producto no existe) |
 
+*Nota.* Especificación técnica sincronizada con la arquitectura vigente del proyecto. Fuente: Elaboración propia (2026).
+
 ### 4.4 Transacciones de Ventas (POS)
+
+**Tabla 5**  
+*Registro estructurado de especificaciones técnicas ( Sección 5 )*
 
 | Método | Endpoint | Autenticado | Body | Respuesta | Error Codes |
 |--------|----------|------------|------|-----------|------------|
 | POST | `/ventas/{empresa_id}` | Sí | `{detalles: [{producto_id, cantidad}]}` | `{mensaje, total}` | 400 (stock insuficiente, producto no existe), 403 (no pertenece empresa) |
 | GET | `/ventas/{empresa_id}` | Sí | N/A | `[{id, fecha_venta, total, detalles: [{id, cantidad, precio_unitario, subtotal, producto_nombre}]}]` | 404 (empresa no existe) |
 
+*Nota.* Especificación técnica sincronizada con la arquitectura vigente del proyecto. Fuente: Elaboración propia (2026).
+
 ### 4.5 Reportes
+
+**Tabla 6**  
+*Registro estructurado de especificaciones técnicas ( Sección 6 )*
 
 | Método | Endpoint | Autenticado | Body | Respuesta |
 |--------|----------|------------|------|-----------|
 | GET | `/reportes/ventas/excel/{empresa_id}` | Sí | N/A | Archivo Excel (Content-Type: application/vnd.openxmlformats...) |
+
+*Nota.* Especificación técnica sincronizada con la arquitectura vigente del proyecto. Fuente: Elaboración propia (2026).
 
 ---
 
@@ -500,6 +530,9 @@ app.add_middleware(
 
 ### 5.3 Patrones Anti-Error Identificados
 
+**Tabla 7**  
+*Registro estructurado de especificaciones técnicas ( Sección 7 )*
+
 | Patrón | Previene | Ejemplo |
 |--------|----------|---------|
 | **Pre-validación** | 400 Duplicados/Nulos | `if db.query(...).first(): raise 400` |
@@ -509,6 +542,8 @@ app.add_middleware(
 | **Role-based Access** | 403 Forbidden | `Depends(get_current_user_admin)` |
 | **CORS Middleware** | 405 OPTIONS | `CORSMiddleware` en app |
 | **Pydantic Schema Validation** | 400 Tipos | `BaseModel` con tipos fuertes |
+
+*Nota.* Especificación técnica sincronizada con la arquitectura vigente del proyecto. Fuente: Elaboración propia (2026).
 
 ---
 
@@ -573,6 +608,9 @@ CLIENTE FRONTEND
 
 ## 🔐 7. SEGURIDAD: Medidas Implementadas
 
+**Tabla 8**  
+*Registro estructurado de especificaciones técnicas ( Sección 8 )*
+
 | Medida | Mecanismo | Beneficio |
 |--------|-----------|----------|
 | **JWT (Access Tokens)** | OAuth2PasswordBearer | Stateless auth, no requiere sesión |
@@ -582,6 +620,8 @@ CLIENTE FRONTEND
 | **CORS** | CORSMiddleware | Solo frontend autorizado puede acceder |
 | **Transaction Locks** | `.with_for_update()` | Previene race conditions en stock |
 | **ON DELETE CASCADE/RESTRICT** | Foreign keys | Integridad referencial |
+
+*Nota.* Especificación técnica sincronizada con la arquitectura vigente del proyecto. Fuente: Elaboración propia (2026).
 
 ---
 
@@ -673,3 +713,22 @@ La migración hacia una arquitectura orquestada por Claude Code debe **preservar
 
 **Fin del Documento**  
 *Autogenerado por Reverse Engineering - Mayo 5, 2026*
+
+---
+
+## Declaración de Uso de Inteligencia Artificial Generativa y Derechos de Autor (Norma APA 7.ª Edición)
+
+En cumplimiento de las políticas de integridad académica y propiedad intelectual del Servicio Nacional de Aprendizaje (SENA — Programa ADSO) y los estándares de citación de la American Psychological Association (APA, 7.ª ed., 2020), el equipo de desarrollo integrado por Tomás Barrera Ortiz (`@Tomasberserk`), Santiago Javela Ospino (`@SantiagoJavelaOspino`) y Juan Pablo Doria Caviedes (`@Doritotes444`) declara de manera explícita y transparente el uso ético y supervisado de herramientas de Inteligencia Artificial Generativa (IAG):
+
+1. **Alcance del apoyo con IA:** Los modelos de lenguaje fueron utilizados como asistentes de programación en pareja (*pair programming*), generación de código repetitivo (*boilerplate* de esquemas Pydantic y migraciones Alembic), estructuración inicial de plantillas documentales bajo el marco SDD (*Specification-Driven Development*), auditoría estática de seguridad OWASP y pruebas automatizadas. Toda la arquitectura de negocio, reglas de dominio del comercio minorista en Neiva (`BR-01` a `BR-12`), validación funcional y decisiones técnicas fueron diseñadas, verificadas y aprobadas íntegramente por los aprendices autores.
+2. **Modelos utilizados y atribución técnica:**
+   - *Anthropic Claude Sonnet 4.6 y Claude Haiku 4.5* (Anthropic, 2026): Asistencia en refactorización modular, generación de esquemas, contratos de fachada y coautoría declarada en metadatos de commits (`Co-Authored-By`).
+   - *Google Gemini 2.5 Flash / 3.6 Flash* (Google DeepMind, 2026): Procesamiento de lenguaje natural en el módulo `agente_ia`, análisis de contexto de repositorio y revisión de calidad documental.
+   - *Groq Cloud Whisper Large v3* (Groq Inc., 2026): Transcripción automática de voz a texto (STT) en tiempo real para el Modo Mostrador del punto de venta.
+   - *OpenAI ChatGPT (GPT-4o)* (OpenAI, 2026) y *Google Veo*: Consultoría de optimización de rendimiento frontend (`code-splitting`) y apoyo en guionización visual de la página de aterrizaje.
+3. **Derechos de autor y licencias de terceros:** El código fuente original de **Gestión Neiva (TiendApp POS SaaS)** es propiedad intelectual de sus autores humanos (Barrera Ortiz, Javela Ospino y Doria Caviedes, 2026). Las librerías de terceros (FastAPI, SQLAlchemy, React 19, TailwindCSS, Radix UI, Lucide Icons, ZXing) se utilizan bajo sus respectivas licencias de código abierto (MIT / Apache 2.0 / BSD), y los recursos fotográficos de demostración provienen de bancos libres de regalías (Pexels / Picsum Photos) conforme a sus términos de atribución.
+
+**Referencias de modelos IA (Formato APA 7):**
+- Anthropic. (2026). *Claude (Versiones Sonnet 4.6 y Haiku 4.5)* [Modelo de lenguaje grande]. https://www.anthropic.com
+- Google. (2026). *Gemini (Versión 2.5 Flash)* [Modelo multimodal de inteligencia artificial]. https://deepmind.google/technologies/gemini/
+- OpenAI. (2026). *ChatGPT (Versión GPT-4o)* [Modelo de lenguaje grande]. https://chat.openai.com

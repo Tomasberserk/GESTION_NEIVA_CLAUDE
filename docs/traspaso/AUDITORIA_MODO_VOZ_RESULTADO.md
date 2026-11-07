@@ -26,6 +26,9 @@ flowchart TD
   D2 --> E2["React ejecuta el onClick del elemento de abajo (p. ej. logout)"]
 ```
 
+**Tabla 1**  
+*Registro estructurado de especificaciones técnicas ( Sección 1 )*
+
 | # | Punto de corte | ¿Existe en el código? | Evidencia |
 |---|---|---|---|
 | P1 | **Hit-testing: `pointer-events: none` heredado** | **SÍ: corta siempre** | `AgentWidget.jsx:189` pone `pointer-events-none` en el `<aside>` cuando `!chatAbierto`. `AgentContext.jsx:78`: `abrirModoVoz` hace `setChatAbierto(false)`, así que **con el modo voz abierto el aside siempre es `pointer-events:none`**. El overlay (`MostradorMode.jsx:164`) no lo sobreescribe. El `<section>` del chat sí lo hace (`AgentWidget.jsx:194`, `pointer-events-auto`), lo que muestra que el patrón se conocía pero se olvidó en el overlay. |
@@ -34,16 +37,23 @@ flowchart TD
 | P4 | Listener de extensión en captura de `window`/`document` | No verificable en el repo. Ver §6 (refutada) | — |
 | P5 | Service worker | No existe | grep `serviceWorker` vacío |
 
+*Nota.* Especificación técnica sincronizada con la arquitectura vigente del proyecto. Fuente: Elaboración propia (2026).
+
 ---
 
 ## 2. Por qué `[VOICE-UI]` aparece "a veces"
 
 El listener solo se registra si `isOpen` (`MostradorMode.jsx:54`). En cambio, el overlay se pinta **siempre** (`MostradorMode.jsx:160`, sin condición desde `48b9c0c`). De ahí salen dos estados que se ven iguales en pantalla:
 
+**Tabla 2**  
+*Registro estructurado de especificaciones técnicas ( Sección 2 )*
+
 | Estado | ¿Overlay visible? | ¿`[VOICE-UI]` registrado? | ¿Botón `#voice-emergency-exit`? | Qué pasa con el click |
 |---|---|---|---|---|
 | **A**: recién logueado, o tras Escape / Salir / `cerrarModoVoz` (`modoVozAbierto=false`) | **Sí** (sin condición) | **No → no hay log** | **No** | Atraviesa el overlay hacia Header/Dashboard |
 | **B**: el usuario "tocó" sin saberlo el botón **Voz** del Header que está *debajo* del overlay (`Header.jsx:84`) → `isOpen=true` | Sí | **Sí → hay log** | Sí | Atraviesa igual. **El log muestra el texto del elemento de abajo** (p. ej. `"Voz"`, `"Caja / Mostrador"`, texto de una tarjeta del Dashboard), no `"Salir"` ni `"Reiniciar"` |
+
+*Nota.* Especificación técnica sincronizada con la arquitectura vigente del proyecto. Fuente: Elaboración propia (2026).
 
 > [!TIP]
 > Señal diagnóstica clave: revisa el `label` de las líneas `[VOICE-UI]` que ya tienes. Si nunca dice `Salir`, `Reiniciar` ni `Toca para Iniciar Escucha`, P1 queda confirmado.
@@ -56,6 +66,9 @@ BFCache no interviene: un login nuevo no es una restauración, y si lo fuera apa
 
 La secuencia `init IDLE → desmontaje → detenerSesion → READY → IDLE` es exactamente lo que imprime el cleanup de `useVoiceAgent.js:45-53`. `detenerSesion()` llama a `_invalidateCurrentTurn()`, que emite **READY** (`VoiceTurnManager.js:115`), y después emite **IDLE** (`:699`).
 
+**Tabla 3**  
+*Registro estructurado de especificaciones técnicas ( Sección 3 )*
+
 | Candidato | Veredicto | Evidencia |
 |---|---|---|
 | **Click que atraviesa hasta el "Salir" (logout) del Header** | **Causa principal en prod.** El "Salir" del overlay (arriba a la derecha, `MostradorMode.jsx:200`) cae sobre el "Salir" de logout del Header (arriba a la derecha, `Header.jsx:152-159`, `h-14`). `logout` → `usuario=null` → `ProtectedRoute` → `<Navigate to="/login">` → **Layout se desmonta** → cleanup. Al volver a loguearse, se remonta y el overlay reaparece. | P1 + `ProtectedRoute.jsx` |
@@ -64,6 +77,8 @@ La secuencia `init IDLE → desmontaje → detenerSesion → READY → IDLE` es 
 | AgentWidget / `<aside>` | Descartado: siempre se renderiza y no hay `key` ni render condicional. | `AgentWidget.jsx:189` |
 | Navegación / Suspense lazy | Descartado: `Layout` es una ruta padre compartida. RR v7 envuelve las navegaciones en `startTransition`, así que no hay fallback que desmonte. | `App.jsx`, `package.json` (`react-router-dom ^7`) |
 | 401 → `window.location.href` | Recarga dura, no es un "unmount". Se vería la URL `/login?expirado=1`. | `authService.js:93-97` |
+
+*Nota.* Especificación técnica sincronizada con la arquitectura vigente del proyecto. Fuente: Elaboración propia (2026).
 
 ---
 
@@ -76,11 +91,16 @@ La secuencia `init IDLE → desmontaje → detenerSesion → READY → IDLE` es 
 
 ## 5. Paracaídas existentes
 
+**Tabla 4**  
+*Registro estructurado de especificaciones técnicas ( Sección 4 )*
+
 | Paracaídas | ¿Falla? | Por qué | Mejora mínima |
 |---|---|---|---|
 | Cable de emergencia (`MostradorMode.jsx:68-104`) | **Parcial** | (a) Solo existe con `isOpen`, y en el estado A (el normal tras login) **no aparece**. (b) `remove()` manual de un nodo que maneja React: en el siguiente unmount (logout) React hace `removeChild` sobre un nodo ausente → `NotFoundError` → todo el árbol se cae (no hay ErrorBoundary). (c) Si ya estás en `/dashboard` no recarga, y el modo voz queda sin nodo hasta F5. (d) **No** sobrevive a una extensión que corte en la captura de `document`, porque sus listeners están en fase target, *después* de esa captura (lo que dice el commit `cdde821` es incorrecto). | No quitar nodos de React. Si el puente de React no cerró el overlay en ~300 ms, hacer `location.replace` siempre (diff F4). |
 | Teclado Escape/Enter (`:113-140`) | **Sí, en apariencia** | Escape → `onClose()` pone `isOpen=false`, pero el overlay **sigue visible** (§2). Enter sí funciona (es teclado, sin hit-testing), y eso explica que "a veces el teclado sí sirve". | Se arregla con F1, sin tocar este bloque. |
 | `pageshow` + `persisted` (`main.jsx:14-19`) | No falla | Correcto, aunque no tiene relación con este síntoma. | Ninguna. |
+
+*Nota.* Especificación técnica sincronizada con la arquitectura vigente del proyecto. Fuente: Elaboración propia (2026).
 
 ---
 
@@ -95,6 +115,9 @@ La secuencia `init IDLE → desmontaje → detenerSesion → READY → IDLE` es 
 
 ## 7. Tabla de hallazgos
 
+**Tabla 5**  
+*Registro estructurado de especificaciones técnicas ( Sección 5 )*
+
 | # | Causa | Evidencia | Prob. | Fix mínimo |
 |---|---|---|---|---|
 | H1 | El overlay hereda `pointer-events:none` y los clicks lo atraviesan | `AgentWidget.jsx:189`, `AgentContext.jsx:78`, `MostradorMode.jsx:164` | **Alta** | F2 (portal) |
@@ -104,6 +127,8 @@ La secuencia `init IDLE → desmontaje → detenerSesion → READY → IDLE` es 
 | H5 | El cable de emergencia quita un nodo de React → posible crash `removeChild`. No existe en el estado A. | `MostradorMode.jsx:75-76` | Media | F4 |
 | H6 | El E2E no reproduce el hit-testing real (click por JS, `force`, o `dispatchEvent`). No hay test de voz en el repo (`run_e2e_simulation.py` no hace clicks). | grep | Media | F5 |
 | H7 | Extensión (200.js) | §6 | **Baja** (refutada) | Ninguno |
+
+*Nota.* Especificación técnica sincronizada con la arquitectura vigente del proyecto. Fuente: Elaboración propia (2026).
 
 ### Diffs sugeridos
 
@@ -195,3 +220,22 @@ La secuencia `init IDLE → desmontaje → detenerSesion → READY → IDLE` es 
 
 > [!NOTE]
 > Los fixes de `48b9c0c` (Rules of Hooks, `salirAlDashboard` sin logout, `z-[70]`) siguen siendo correctos en su lógica, pero **ningún click llega a ellos**. El "Salir que deslogueaba" no era el handler: era el click que atravesaba el overlay hasta el logout del Header. Con F1 + F2 se cierra todo.
+
+---
+
+## Declaración de Uso de Inteligencia Artificial Generativa y Derechos de Autor (Norma APA 7.ª Edición)
+
+En cumplimiento de las políticas de integridad académica y propiedad intelectual del Servicio Nacional de Aprendizaje (SENA — Programa ADSO) y los estándares de citación de la American Psychological Association (APA, 7.ª ed., 2020), el equipo de desarrollo integrado por Tomás Barrera Ortiz (`@Tomasberserk`), Santiago Javela Ospino (`@SantiagoJavelaOspino`) y Juan Pablo Doria Caviedes (`@Doritotes444`) declara de manera explícita y transparente el uso ético y supervisado de herramientas de Inteligencia Artificial Generativa (IAG):
+
+1. **Alcance del apoyo con IA:** Los modelos de lenguaje fueron utilizados como asistentes de programación en pareja (*pair programming*), generación de código repetitivo (*boilerplate* de esquemas Pydantic y migraciones Alembic), estructuración inicial de plantillas documentales bajo el marco SDD (*Specification-Driven Development*), auditoría estática de seguridad OWASP y pruebas automatizadas. Toda la arquitectura de negocio, reglas de dominio del comercio minorista en Neiva (`BR-01` a `BR-12`), validación funcional y decisiones técnicas fueron diseñadas, verificadas y aprobadas íntegramente por los aprendices autores.
+2. **Modelos utilizados y atribución técnica:**
+   - *Anthropic Claude Sonnet 4.6 y Claude Haiku 4.5* (Anthropic, 2026): Asistencia en refactorización modular, generación de esquemas, contratos de fachada y coautoría declarada en metadatos de commits (`Co-Authored-By`).
+   - *Google Gemini 2.5 Flash / 3.6 Flash* (Google DeepMind, 2026): Procesamiento de lenguaje natural en el módulo `agente_ia`, análisis de contexto de repositorio y revisión de calidad documental.
+   - *Groq Cloud Whisper Large v3* (Groq Inc., 2026): Transcripción automática de voz a texto (STT) en tiempo real para el Modo Mostrador del punto de venta.
+   - *OpenAI ChatGPT (GPT-4o)* (OpenAI, 2026) y *Google Veo*: Consultoría de optimización de rendimiento frontend (`code-splitting`) y apoyo en guionización visual de la página de aterrizaje.
+3. **Derechos de autor y licencias de terceros:** El código fuente original de **Gestión Neiva (TiendApp POS SaaS)** es propiedad intelectual de sus autores humanos (Barrera Ortiz, Javela Ospino y Doria Caviedes, 2026). Las librerías de terceros (FastAPI, SQLAlchemy, React 19, TailwindCSS, Radix UI, Lucide Icons, ZXing) se utilizan bajo sus respectivas licencias de código abierto (MIT / Apache 2.0 / BSD), y los recursos fotográficos de demostración provienen de bancos libres de regalías (Pexels / Picsum Photos) conforme a sus términos de atribución.
+
+**Referencias de modelos IA (Formato APA 7):**
+- Anthropic. (2026). *Claude (Versiones Sonnet 4.6 y Haiku 4.5)* [Modelo de lenguaje grande]. https://www.anthropic.com
+- Google. (2026). *Gemini (Versión 2.5 Flash)* [Modelo multimodal de inteligencia artificial]. https://deepmind.google/technologies/gemini/
+- OpenAI. (2026). *ChatGPT (Versión GPT-4o)* [Modelo de lenguaje grande]. https://chat.openai.com

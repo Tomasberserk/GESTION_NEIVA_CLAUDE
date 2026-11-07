@@ -18,12 +18,17 @@ El criterio de **licenciamiento** separa el software propietario —código cerr
 
 El criterio de **despliegue y arquitectura** es el más relevante para el diseño moderno. Un *monolito* empaqueta toda la aplicación en una unidad desplegable: es simple de desarrollar y depurar, pero escala como un todo y acopla los ciclos de liberación. Un *monolito modular* conserva un único despliegue pero impone fronteras internas explícitas (módulos con interfaces y dependencias controladas), lo que suele ser el punto de partida recomendable. Los *microservicios* dividen el sistema en servicios autónomos, desplegables de forma independiente y comunicados por red; ganan en escalabilidad selectiva y aislamiento de fallos, pero introducen complejidad distribuida: latencia de red, consistencia eventual, trazas, reintentos idempotentes y observabilidad obligatoria. El modelo *serverless* (funciones como servicio) delega el escalado y el ciclo de vida del servidor en el proveedor, a cambio de límites de ejecución, arranque en frío (*cold start*) y dependencia del ecosistema.
 
+**Tabla 1**  
+*Registro estructurado de especificaciones técnicas ( Sección 1 )*
+
 | Criterio | Categorías | Implicación práctica |
 |---|---|---|
 | Función | Sistema, aplicación, middleware, herramientas, firmware | Define el tipo de pruebas y el perfil de mantenimiento |
 | Licencia | Propietario, permisivo (MIT/Apache), copyleft (GPL/LGPL) | Afecta la distribución y la propiedad intelectual |
 | Despliegue | On-premise, nube, web, móvil, embebido | Determina el modelo operativo y los costos |
 | Arquitectura | Monolito, modular, microservicios, serverless | Condiciona escalabilidad, latencia y complejidad operativa |
+
+*Nota.* Especificación técnica sincronizada con la arquitectura vigente del proyecto. Fuente: Elaboración propia (2026).
 
 ### 2. Arquitectura cliente-servidor
 
@@ -49,6 +54,9 @@ HTTP viaja normalmente sobre TCP en el puerto 80 y **no ofrece confidencialidad 
 
 El **handshake** de TLS 1.3 (RFC 8446) reduce el intercambio a un viaje de ida y vuelta: cliente y servidor acuerdan versión y *suite* criptográfica, realizan un intercambio Diffie-Hellman efímero (lo que aporta *forward secrecy*: comprometer la clave privada del servidor en el futuro no descifra sesiones pasadas), validan el certificado y derivan claves simétricas de sesión. TLS 1.2 requería dos viajes y permitía suites más débiles; por eso hoy se recomienda 1.3, con 1.2 como mínimo aceptable y versiones anteriores deshabilitadas. Mecanismos complementarios refuerzan el modelo: **SNI** permite alojar varios dominios en una IP y presentar el certificado correcto; **HSTS** obliga al navegador a usar HTTPS durante un periodo y bloquea el downgrade; **ALPN** negocia HTTP/2 o HTTP/3 dentro del mismo puerto.
 
+**Tabla 2**  
+*Registro estructurado de especificaciones técnicas ( Sección 2 )*
+
 | Aspecto | HTTP | HTTPS |
 |---|---|---|
 | Puerto por defecto | 80 | 443 |
@@ -58,6 +66,8 @@ El **handshake** de TLS 1.3 (RFC 8446) reduce el intercambio a un viaje de ida y
 | Resistencia a *sniffing* / MITM | Nula | Alta, si la configuración es correcta |
 | Costo computacional | Bajo | Mayor en el handshake; despreciable con sesiones reutilizadas |
 | Requisito operativo | Ninguno | Certificado válido y renovación automatizada |
+
+*Nota.* Especificación técnica sincronizada con la arquitectura vigente del proyecto. Fuente: Elaboración propia (2026).
 
 Conviene precisar el alcance de la garantía: HTTPS protege el tramo entre cliente y servidor, pero **no protege los datos en reposo**, no impide que un servidor malicioso o comprometido los use indebidamente, y no sustituye controles de aplicación como la validación de entrada, la autorización por recurso, la protección contra XSS o CSRF, ni el cifrado de la base de datos. Un sitio con candado puede seguir siendo vulnerable; el candado certifica identidad y cifrado del canal, no corrección del software. Por eso la práctica profesional exige HTTPS como línea base —hoy gratuito mediante Let's Encrypt y automatizable con ACME— y, sobre ella, una higiene de aplicación completa.
 
@@ -71,11 +81,16 @@ El NIST (SP 800-145) define la computación en nube por cinco características e
 
 **SaaS** (Software as a Service) entrega la aplicación completa: el cliente solo consume la funcionalidad mediante un navegador o API, y el proveedor gestiona toda la pila, incluidos datos y actualizaciones. Ejemplos: Gmail, Microsoft 365, Salesforce. Maximiza la simplicidad y traslada el mantenimiento al proveedor, pero limita la personalización profunda, la soberanía sobre los datos y la capacidad de integración a lo que el producto exponga.
 
+**Tabla 3**  
+*Registro estructurado de especificaciones técnicas ( Sección 3 )*
+
 | Modelo | Gestiona el proveedor | Gestiona el cliente | Control | Esfuerzo operativo |
 |---|---|---|---|---|
 | IaaS | Hardware, red, virtualización | SO, runtime, app, datos | Alto | Alto |
 | PaaS | Hasta el runtime y el escalado | Código, configuración, datos | Medio | Medio |
 | SaaS | Toda la pila | Uso, identidades, configuración | Bajo | Bajo |
+
+*Nota.* Especificación técnica sincronizada con la arquitectura vigente del proyecto. Fuente: Elaboración propia (2026).
 
 Junto a los tres modelos clásicos aparece **FaaS/serverless**, una especialización de PaaS donde la unidad de despliegue es una función activada por eventos, con escalado a cero y facturación por invocación. Es excelente para cargas intermitentes y tareas de integración, y problemático para procesos de larga duración o con estado.
 
@@ -99,3 +114,22 @@ El software se entiende mejor como una cadena de decisiones interconectadas que 
 - ISO/IEC 25010:2011. *Systems and software Quality Requirements and Evaluation (SQuaRE) — Quality models*.
 - Sommerville, I. (2016). *Software Engineering* (10.ª ed.). Pearson.
 - Pressman, R., y Maxim, B. (2020). *Software Engineering: A Practitioner's Approach* (9.ª ed.). McGraw-Hill.
+
+---
+
+## Declaración de Uso de Inteligencia Artificial Generativa y Derechos de Autor (Norma APA 7.ª Edición)
+
+En cumplimiento de las políticas de integridad académica y propiedad intelectual del Servicio Nacional de Aprendizaje (SENA — Programa ADSO) y los estándares de citación de la American Psychological Association (APA, 7.ª ed., 2020), el equipo de desarrollo integrado por Tomás Barrera Ortiz (`@Tomasberserk`), Santiago Javela Ospino (`@SantiagoJavelaOspino`) y Juan Pablo Doria Caviedes (`@Doritotes444`) declara de manera explícita y transparente el uso ético y supervisado de herramientas de Inteligencia Artificial Generativa (IAG):
+
+1. **Alcance del apoyo con IA:** Los modelos de lenguaje fueron utilizados como asistentes de programación en pareja (*pair programming*), generación de código repetitivo (*boilerplate* de esquemas Pydantic y migraciones Alembic), estructuración inicial de plantillas documentales bajo el marco SDD (*Specification-Driven Development*), auditoría estática de seguridad OWASP y pruebas automatizadas. Toda la arquitectura de negocio, reglas de dominio del comercio minorista en Neiva (`BR-01` a `BR-12`), validación funcional y decisiones técnicas fueron diseñadas, verificadas y aprobadas íntegramente por los aprendices autores.
+2. **Modelos utilizados y atribución técnica:**
+   - *Anthropic Claude Sonnet 4.6 y Claude Haiku 4.5* (Anthropic, 2026): Asistencia en refactorización modular, generación de esquemas, contratos de fachada y coautoría declarada en metadatos de commits (`Co-Authored-By`).
+   - *Google Gemini 2.5 Flash / 3.6 Flash* (Google DeepMind, 2026): Procesamiento de lenguaje natural en el módulo `agente_ia`, análisis de contexto de repositorio y revisión de calidad documental.
+   - *Groq Cloud Whisper Large v3* (Groq Inc., 2026): Transcripción automática de voz a texto (STT) en tiempo real para el Modo Mostrador del punto de venta.
+   - *OpenAI ChatGPT (GPT-4o)* (OpenAI, 2026) y *Google Veo*: Consultoría de optimización de rendimiento frontend (`code-splitting`) y apoyo en guionización visual de la página de aterrizaje.
+3. **Derechos de autor y licencias de terceros:** El código fuente original de **Gestión Neiva (TiendApp POS SaaS)** es propiedad intelectual de sus autores humanos (Barrera Ortiz, Javela Ospino y Doria Caviedes, 2026). Las librerías de terceros (FastAPI, SQLAlchemy, React 19, TailwindCSS, Radix UI, Lucide Icons, ZXing) se utilizan bajo sus respectivas licencias de código abierto (MIT / Apache 2.0 / BSD), y los recursos fotográficos de demostración provienen de bancos libres de regalías (Pexels / Picsum Photos) conforme a sus términos de atribución.
+
+**Referencias de modelos IA (Formato APA 7):**
+- Anthropic. (2026). *Claude (Versiones Sonnet 4.6 y Haiku 4.5)* [Modelo de lenguaje grande]. https://www.anthropic.com
+- Google. (2026). *Gemini (Versión 2.5 Flash)* [Modelo multimodal de inteligencia artificial]. https://deepmind.google/technologies/gemini/
+- OpenAI. (2026). *ChatGPT (Versión GPT-4o)* [Modelo de lenguaje grande]. https://chat.openai.com

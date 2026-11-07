@@ -10,12 +10,17 @@
 
 El flujo de registro de dos pasos implementa correctamente el Paso 1 (creación de empresa), pero el Paso 2 (creación de administrador) falla silenciosamente con "Failed to fetch". El análisis revela:
 
+**Tabla 1**  
+*Registro estructurado de especificaciones técnicas ( Sección 1 )*
+
 | Componente | Estado | Hallazgo |
 |-----------|--------|---------|
 | **Flujo Frontend** | ✅ Correcto | El `empresa_id` se captura y envía correctamente |
 | **Esquemas Backend** | ✅ Alineados | Pydantic espera exactamente lo que envía el frontend |
 | **Manejo de Errores** | ⚠️ **PROBLEMA** | Validación de Pydantic genera errores opacos |
 | **Integración Paso 1→2** | ⚠️ **FALLA** | **NO hay transacción atómica** (rollback manual no existe) |
+
+*Nota.* Especificación técnica sincronizada con la arquitectura vigente del proyecto. Fuente: Elaboración propia (2026).
 
 ---
 
@@ -114,12 +119,17 @@ class UsuarioCrear(BaseModel):
 
 ### 2.2 Alineación Frontend ↔ Backend
 
+**Tabla 2**  
+*Registro estructurado de especificaciones técnicas ( Sección 2 )*
+
 | Campo | Frontend | Backend (Schema) | ¿Coinciden? |
 |-------|----------|-----------------|-----------|
 | `email` | string | `EmailStr` | ✅ Sí |
 | `password` | string | `str` | ✅ Sí |
 | `empresa_id` | UUID string | `UUID` | ✅ **Sí (Pydantic convierte automáticamente)** |
 | `rol` | `"admin"` | `RolUsuario` enum | ⚠️ **Posible problema** |
+
+*Nota.* Especificación técnica sincronizada con la arquitectura vigente del proyecto. Fuente: Elaboración propia (2026).
 
 ### 2.3 ⚠️ PROBLEMA DETECTADO: Validación del `rol`
 
@@ -699,6 +709,9 @@ def test_registro_atomico_rollback(db):
 
 ## 📌 CONCLUSIONES Y RECOMENDACIONES
 
+**Tabla 3**  
+*Registro estructurado de especificaciones técnicas ( Sección 3 )*
+
 | Hallazgo | Severidad | Acción |
 |----------|-----------|--------|
 | Frontend captura `empresa_id` correctamente | ✅ OK | Mantener |
@@ -707,6 +720,8 @@ def test_registro_atomico_rollback(db):
 | **Falta validación en frontend** | 🟡 ALTO | Agregar checks de `empresaId` antes de Paso 2 |
 | **Errores silenciosos "Failed to fetch"** | 🟡 ALTO | Agregar logging y error handling robusto |
 | **Sin cleanup si falla Paso 2** | 🟡 MEDIO | Implementar transacción atómica |
+
+*Nota.* Especificación técnica sincronizada con la arquitectura vigente del proyecto. Fuente: Elaboración propia (2026).
 
 ---
 
@@ -772,3 +787,22 @@ HTTP 404 Not Found
 **Análisis completado por:** Senior QA Automation Engineer  
 **Estado:** Listo para implementación  
 **Próximo paso:** Ejecutar Fase 1 (Diagnóstico)
+
+---
+
+## Declaración de Uso de Inteligencia Artificial Generativa y Derechos de Autor (Norma APA 7.ª Edición)
+
+En cumplimiento de las políticas de integridad académica y propiedad intelectual del Servicio Nacional de Aprendizaje (SENA — Programa ADSO) y los estándares de citación de la American Psychological Association (APA, 7.ª ed., 2020), el equipo de desarrollo integrado por Tomás Barrera Ortiz (`@Tomasberserk`), Santiago Javela Ospino (`@SantiagoJavelaOspino`) y Juan Pablo Doria Caviedes (`@Doritotes444`) declara de manera explícita y transparente el uso ético y supervisado de herramientas de Inteligencia Artificial Generativa (IAG):
+
+1. **Alcance del apoyo con IA:** Los modelos de lenguaje fueron utilizados como asistentes de programación en pareja (*pair programming*), generación de código repetitivo (*boilerplate* de esquemas Pydantic y migraciones Alembic), estructuración inicial de plantillas documentales bajo el marco SDD (*Specification-Driven Development*), auditoría estática de seguridad OWASP y pruebas automatizadas. Toda la arquitectura de negocio, reglas de dominio del comercio minorista en Neiva (`BR-01` a `BR-12`), validación funcional y decisiones técnicas fueron diseñadas, verificadas y aprobadas íntegramente por los aprendices autores.
+2. **Modelos utilizados y atribución técnica:**
+   - *Anthropic Claude Sonnet 4.6 y Claude Haiku 4.5* (Anthropic, 2026): Asistencia en refactorización modular, generación de esquemas, contratos de fachada y coautoría declarada en metadatos de commits (`Co-Authored-By`).
+   - *Google Gemini 2.5 Flash / 3.6 Flash* (Google DeepMind, 2026): Procesamiento de lenguaje natural en el módulo `agente_ia`, análisis de contexto de repositorio y revisión de calidad documental.
+   - *Groq Cloud Whisper Large v3* (Groq Inc., 2026): Transcripción automática de voz a texto (STT) en tiempo real para el Modo Mostrador del punto de venta.
+   - *OpenAI ChatGPT (GPT-4o)* (OpenAI, 2026) y *Google Veo*: Consultoría de optimización de rendimiento frontend (`code-splitting`) y apoyo en guionización visual de la página de aterrizaje.
+3. **Derechos de autor y licencias de terceros:** El código fuente original de **Gestión Neiva (TiendApp POS SaaS)** es propiedad intelectual de sus autores humanos (Barrera Ortiz, Javela Ospino y Doria Caviedes, 2026). Las librerías de terceros (FastAPI, SQLAlchemy, React 19, TailwindCSS, Radix UI, Lucide Icons, ZXing) se utilizan bajo sus respectivas licencias de código abierto (MIT / Apache 2.0 / BSD), y los recursos fotográficos de demostración provienen de bancos libres de regalías (Pexels / Picsum Photos) conforme a sus términos de atribución.
+
+**Referencias de modelos IA (Formato APA 7):**
+- Anthropic. (2026). *Claude (Versiones Sonnet 4.6 y Haiku 4.5)* [Modelo de lenguaje grande]. https://www.anthropic.com
+- Google. (2026). *Gemini (Versión 2.5 Flash)* [Modelo multimodal de inteligencia artificial]. https://deepmind.google/technologies/gemini/
+- OpenAI. (2026). *ChatGPT (Versión GPT-4o)* [Modelo de lenguaje grande]. https://chat.openai.com
