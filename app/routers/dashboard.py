@@ -25,8 +25,10 @@ def resumen_dashboard(
             detail="Acceso no autorizado",
         )
 
-    hoy = date.today()
-    hoy_inicio = datetime.combine(hoy, datetime.min.time()).replace(tzinfo=timezone.utc)
+    COLOMBIA_TZ = timezone(timedelta(hours=-5))
+    ahora_col = datetime.now(COLOMBIA_TZ)
+    hoy = ahora_col.date()
+    hoy_inicio = datetime.combine(hoy, datetime.min.time(), tzinfo=COLOMBIA_TZ)
 
     # --- Métricas básicas ---
     ventas_hoy = db.query(func.count(models.Venta.id)).filter(
